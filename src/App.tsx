@@ -18,6 +18,7 @@ type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'histo
 function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 
   // Apply theme on app load
   useTheme()
@@ -84,14 +85,27 @@ function App() {
 
   useKeyboardShortcuts(shortcuts)
 
+  const handleNavigateToProject = (projectId: string) => {
+    setSelectedProjectId(projectId)
+    setCurrentView('projects')
+  }
+
+  const handleViewChange = (view: string) => {
+    // Clear selected project when changing views
+    if (view !== 'projects') {
+      setSelectedProjectId(null)
+    }
+    setCurrentView(view as View)
+  }
+
   return (
     <>
-      <Layout currentView={currentView} onNavigate={(view) => setCurrentView(view as View)}>
-        {currentView === 'dashboard' && <Dashboard />}
+      <Layout currentView={currentView} onNavigate={handleViewChange}>
+        {currentView === 'dashboard' && <Dashboard onProjectClick={handleNavigateToProject} />}
         {currentView === 'import' && (
           <Import sdCards={sdCards} isScanning={isScanning} onRefresh={scanForSDCards} />
         )}
-        {currentView === 'projects' && <Projects />}
+        {currentView === 'projects' && <Projects initialSelectedProjectId={selectedProjectId} />}
         {currentView === 'backup' && <BackupQueue />}
         {currentView === 'delivery' && <Delivery />}
         {currentView === 'history' && <History />}

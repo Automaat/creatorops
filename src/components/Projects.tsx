@@ -1,20 +1,36 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project, BackupDestination, ArchiveJob } from '../types'
+import { CreateProject } from './CreateProject'
 
-export function Projects() {
+interface ProjectsProps {
+  initialSelectedProjectId?: string | null
+}
+
+export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
   const [archiveLocation, setArchiveLocation] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
+  const [showCreateProject, setShowCreateProject] = useState(false)
 
   useEffect(() => {
     loadProjects()
     loadDestinations()
     loadArchiveLocation()
   }, [])
+
+  // Handle initial project selection from navigation
+  useEffect(() => {
+    if (initialSelectedProjectId && projects.length > 0) {
+      const project = projects.find((p) => p.id === initialSelectedProjectId)
+      if (project) {
+        setSelectedProject(project)
+      }
+    }
+  }, [initialSelectedProjectId, projects])
 
   async function loadProjects() {
     try {
@@ -94,6 +110,11 @@ export function Projects() {
       console.error('Failed to archive project:', err)
       alert(`Failed to archive project: ${err}`)
     }
+  }
+
+  function handleProjectCreated(project: Project) {
+    setShowCreateProject(false)
+    setProjects([project, ...projects])
   }
 
   function getStatusColor(status: string): string {
@@ -233,49 +254,68 @@ export function Projects() {
   }
 
   return (
-    <div className="projects">
-      <div className="projects-header">
-        <h1>Projects</h1>
+    <>
+      <div className="projects">
+        <div className="projects-header">
+          <div className="flex flex-between">
+            <h1>Projects</h1>
+            <button className="btn btn-primary" onClick={() => setShowCreateProject(true)}>
+              Create Project
+            </button>
+          </div>
+        </div>
+
+        {projects.length === 0 ? (
+          <div className="empty-state">
+            <p>No projects yet</p>
+            <p className="empty-state-hint">Click "Create Project" to get started</p>
+          </div>
+        ) : (
+          <div className="projects-list">
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="project-card"
+                onClick={() => setSelectedProject(project)}
+              >
+                <div className="project-card-header">
+                  <h3>{project.name}</h3>
+                  <span className={`project-status ${getStatusColor(project.status)}`}>
+                    {project.status}
+                  </span>
+                </div>
+
+                <div className="project-card-info">
+                  <div className="info-item">
+                    <span className="info-label">Client:</span>
+                    <span>{project.clientName}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Date:</span>
+                    <span>{project.date}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="info-label">Type:</span>
+                    <span>{project.shootType}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {projects.length === 0 ? (
-        <div className="empty-state">
-          <p>No projects yet</p>
-          <p className="empty-state-hint">Import files from an SD card to create a project</p>
-        </div>
-      ) : (
-        <div className="projects-list">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="project-card"
-              onClick={() => setSelectedProject(project)}
-            >
-              <div className="project-card-header">
-                <h3>{project.name}</h3>
-                <span className={`project-status ${getStatusColor(project.status)}`}>
-                  {project.status}
-                </span>
-              </div>
-
-              <div className="project-card-info">
-                <div className="info-item">
-                  <span className="info-label">Client:</span>
-                  <span>{project.clientName}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Date:</span>
-                  <span>{project.date}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Type:</span>
-                  <span>{project.shootType}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+      {showCreateProject && (
+        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>Create New Project</h2>
+            <CreateProject
+              onProjectCreated={handleProjectCreated}
+              onCancel={() => setShowCreateProject(false)}
+            />
+          </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

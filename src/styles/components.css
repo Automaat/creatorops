@@ -601,6 +601,26 @@
   background-color: var(--color-bg-secondary);
   color: var(--color-text-primary);
   font-size: var(--font-size-base);
+  transition: border-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.project-select:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+}
+
+.project-select:hover {
+  border-color: var(--color-accent-primary);
+}
+
+.card-clickable {
+  cursor: pointer;
+}
+
+.flex-between {
+  justify-content: space-between;
+  align-items: center;
 }
 
 .file-list {

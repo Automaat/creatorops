@@ -211,64 +211,66 @@ function SDCardItem({ card }: SDCardItemProps) {
     }
   }
 
-  if (showCreateNew) {
-    return (
-      <div className="card">
-        <h3 className="mb-md">Create New Project for {card.name}</h3>
-        <CreateProject
-          onProjectCreated={handleProjectCreated}
-          onCancel={() => setShowCreateNew(false)}
-        />
-      </div>
-    )
-  }
-
   if (showProjectSelect && !isImporting && !importResult) {
     return (
-      <div className="card">
-        <div className="flex flex-col gap-md">
-          <div>
-            <h3>{card.name}</h3>
-            <p className="text-secondary text-sm">{card.path}</p>
-            <p className="text-sm mt-xs">
-              {card.fileCount} files · {formatBytes(usedSpace)}
-            </p>
-          </div>
+      <>
+        <div className="card">
+          <div className="flex flex-col gap-md">
+            <div>
+              <h3>{card.name}</h3>
+              <p className="text-secondary text-sm">{card.path}</p>
+              <p className="text-sm mt-xs">
+                {card.fileCount} files · {formatBytes(usedSpace)}
+              </p>
+            </div>
 
-          <div>
-            <label htmlFor={`project-select-${card.path}`} className="text-sm font-medium mb-xs">
-              Select Project
-            </label>
-            <select
-              id={`project-select-${card.path}`}
-              className="input w-full"
-              value={selectedProject}
-              onChange={(e) => handleProjectSelect(e.target.value)}
-            >
-              <option value="">Choose a project...</option>
-              <option value="__new__">+ Create New Project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} - {project.clientName} ({project.date})
-                </option>
-              ))}
-            </select>
-          </div>
+            <div className="flex flex-col gap-xs">
+              <label htmlFor={`project-select-${card.path}`} className="text-sm font-medium">
+                Select Project
+              </label>
+              <select
+                id={`project-select-${card.path}`}
+                className="project-select"
+                value={selectedProject}
+                onChange={(e) => handleProjectSelect(e.target.value)}
+              >
+                <option value="">Choose a project...</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} - {project.clientName} ({project.date})
+                  </option>
+                ))}
+                <option value="__new__">+ Create New Project</option>
+              </select>
+            </div>
 
-          <div className="flex gap-sm">
-            <button
-              className="btn btn-primary"
-              onClick={handleStartImport}
-              disabled={!selectedProject}
-            >
-              Start Import
-            </button>
-            <button className="btn" onClick={() => setShowProjectSelect(false)}>
-              Cancel
-            </button>
+            <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleStartImport}
+                disabled={!selectedProject}
+              >
+                Start Import
+              </button>
+              <button className="btn" onClick={() => setShowProjectSelect(false)}>
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+
+        {showCreateNew && (
+          <div className="dialog-overlay" onClick={() => setShowCreateNew(false)}>
+            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+              <h2>Create New Project</h2>
+              <CreateProject
+                onProjectCreated={handleProjectCreated}
+                onCancel={() => setShowCreateNew(false)}
+              />
+            </div>
+          </div>
+        )}
+      </>
     )
   }
 
