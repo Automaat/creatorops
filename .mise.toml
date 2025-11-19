@@ -1,6 +1,6 @@
 [tools]
-rust = "latest"
-node = "lts"
+rust = "1.91.1"
+node = "24.11.1"
 
 [tasks.dev]
 description = "Run Tauri app in development mode"
