@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Setup mise
+        uses: jdx/mise-action@07cd07257f4b018b3df2fab4d6b9961ad546ef3b # v3.4.1
+        with:
+          experimental: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Run Rust tests
+        run: cd src-tauri && cargo test
+
+      - name: Update versions
+        run: |
+          sed -i '' 's/"version": "[^"]*"/"version": "${{ env.VERSION }}"/g' src-tauri/tauri.conf.json
+          sed -i '' 's/^version = "[^"]*"/version = "${{ env.VERSION }}"/g' src-tauri/Cargo.toml
+
+          echo "Updated tauri.conf.json:"
+          grep -A 1 '"version"' src-tauri/tauri.conf.json | head -1
+          echo "Updated Cargo.toml:"
+          grep '^version = ' src-tauri/Cargo.toml | head -1
+
+      - name: Commit version bump
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          git commit -m "chore: bump version to ${{ env.VERSION }}"
+
+      - name: Create and push tag
+        run: |
+          git tag -a "v${{ env.VERSION }}" -m "Release ${{ env.VERSION }}"
+          git push origin main
+          git push origin "v${{ env.VERSION }}"
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@51a9f1156b33df106d827c3a78f8f894946c5faa # action-v0.5.25
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v${{ env.VERSION }}
+          releaseName: v${{ env.VERSION }}
+          releaseBody: 'See commit history for changes'
+          releaseDraft: true
+          prerelease: false
