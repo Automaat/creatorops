@@ -23,8 +23,11 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@9dc7d5dd454262207dea3ab5a06a3df6afc8ff26 # v3.4.1
 
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
       - name: Format check
-        uses: actions-rust-lang/rustfmt@v1.1.1
+        run: cargo fmt --all --check
 
       - name: Lint
         run: mise run lint:rust
