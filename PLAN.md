@@ -338,7 +338,7 @@ Project Detail View:
 ---
 
 **Last Updated**: 2025-11-19
-**Status**: Phase 3 complete
+**Status**: Phase 4 complete
 
 ## Implementation Status
 
@@ -375,3 +375,17 @@ Project Detail View:
 - **Backup history**: Track all backup operations with status and metadata
 - **UI components**: BackupQueue view, Projects list/detail view with backup actions
 - **Settings integration**: Add/remove/enable backup destinations with folder picker
+
+### Phase 4: Delivery & Archive ✓
+
+- **Client delivery system**: Select files from projects for client delivery
+- **File selection UI**: Browse project files, select individual files or select all
+- **Naming templates**: Apply templates with {index}, {name}, {ext} placeholders
+- **Delivery destinations**: Configure multiple delivery destinations in Settings
+- **Manifest generation**: Auto-generate delivery manifest with file mapping
+- **Delivery queue**: Track delivery jobs with real-time progress
+- **Archive functionality**: Move projects to archive location with structure preservation
+- **Archive location config**: Configure archive location in Settings
+- **Project status update**: Automatically update project status to "Archived"
+- **UI components**: Delivery view with multi-step workflow, archive action in Projects view
+- **Progress tracking**: Real-time updates for both delivery and archive operations
