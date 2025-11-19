@@ -24,7 +24,14 @@ src/styles/
 
 ## Design Tokens
 
-**Colors:** Semantic naming (bg-primary/secondary/tertiary, text-primary/secondary/tertiary, accent, hover, status). Red/orange accent (#e44332). Separate light/dark palettes. High contrast for readability.
+**Color Palette:** <https://colorhunt.co/palette/fcf9eabadfdbffa4a4ffbdbd>
+
+- `#FCF9EA` - Cream/off-white (bg-primary light mode)
+- `#BADFDB` - Soft teal (secondary accent)
+- `#FFA4A4` - Muted pink (primary accent)
+- `#FFBDBD` - Light pink (tertiary accent/hover)
+
+**Colors:** Semantic naming (bg-primary/secondary/tertiary, text-primary/secondary/tertiary, accent-primary/secondary, hover, status). Separate light/dark palettes. High contrast for readability.
 
 **Spacing:** 2, 4, 8, 12, 16, 24, 32, 48px (xxs→xxl). Generous whitespace for breathing room.
 

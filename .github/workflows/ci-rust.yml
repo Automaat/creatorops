@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@34e11489ab9a643cf87de5c40cd7f94526963c18 # v4.3.1
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup mise
         uses: jdx/mise-action@9dc7d5d21d12a330a408220ab7de97c0e1b1bdc4 # v3.4.1
