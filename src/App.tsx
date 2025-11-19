@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Layout } from './components/Layout'
 import { Dashboard } from './components/Dashboard'
 import { Import } from './components/Import'
+import { Projects } from './components/Projects'
+import { BackupQueue } from './components/BackupQueue'
 import { Settings } from './components/Settings'
 import { useTheme } from './hooks/useTheme'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
@@ -36,21 +38,9 @@ function App() {
       {currentView === 'import' && (
         <Import sdCards={sdCards} isScanning={isScanning} onRefresh={scanForSDCards} />
       )}
+      {currentView === 'projects' && <Projects />}
+      {currentView === 'backup' && <BackupQueue />}
       {currentView === 'settings' && <Settings />}
-      {currentView === 'projects' && (
-        <div className="content-body">
-          <div className="card">
-            <p className="text-secondary">Projects view coming soon</p>
-          </div>
-        </div>
-      )}
-      {currentView === 'backup' && (
-        <div className="content-body">
-          <div className="card">
-            <p className="text-secondary">Backup queue coming soon</p>
-          </div>
-        </div>
-      )}
     </Layout>
   )
 }

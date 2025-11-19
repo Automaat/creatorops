@@ -338,7 +338,7 @@ Project Detail View:
 ---
 
 **Last Updated**: 2025-11-19
-**Status**: Phase 2 complete
+**Status**: Phase 3 complete
 
 ## Implementation Status
 
@@ -364,3 +364,14 @@ Project Detail View:
 - **Import history tracking**: All imports saved with metadata and status
 - **Progress tracking**: Real-time updates with speed, ETA, file counts
 - **File listing**: Photo/video file detection (JPEG, RAW, MOV, MP4, etc.)
+
+### Phase 3: Backup System ✓
+- **Backup queue management**: Queue, start, cancel, remove backup jobs
+- **Backup to external disk**: Copy entire projects with folder structure preservation
+- **Multiple destinations**: Configure and manage multiple backup destinations in Settings
+- **Checksum verification**: SHA-256 with 3-retry logic per file
+- **Progress tracking**: Real-time updates with speed, ETA, file counts per backup job
+- **Retry logic**: Exponential backoff with jitter, skip files after max retries
+- **Backup history**: Track all backup operations with status and metadata
+- **UI components**: BackupQueue view, Projects list/detail view with backup actions
+- **Settings integration**: Add/remove/enable backup destinations with folder picker
