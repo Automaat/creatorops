@@ -1,0 +1,59 @@
+[tools]
+rust = "latest"
+node = "lts"
+
+[tasks.dev]
+description = "Run Tauri app in development mode"
+run = "cargo tauri dev"
+
+[tasks.build]
+description = "Build Tauri app for production"
+run = "cargo tauri build"
+
+[tasks.lint]
+description = "Run all linters"
+depends = ["lint:rust", "lint:frontend"]
+
+[tasks."lint:rust"]
+description = "Run Rust linter (clippy)"
+run = "cargo clippy --all-targets --all-features -- -D warnings"
+
+[tasks."lint:frontend"]
+description = "Run frontend linter (eslint)"
+run = "npm run lint"
+
+[tasks.fmt]
+description = "Format all code"
+depends = ["fmt:rust", "fmt:frontend"]
+
+[tasks."fmt:rust"]
+description = "Format Rust code"
+run = "cargo fmt --all"
+
+[tasks."fmt:frontend"]
+description = "Format frontend code"
+run = "npm run format"
+
+[tasks.test]
+description = "Run all tests"
+depends = ["test:rust", "test:frontend"]
+
+[tasks."test:rust"]
+description = "Run Rust tests"
+run = "cargo test"
+
+[tasks."test:frontend"]
+description = "Run frontend tests"
+run = "npm run test"
+
+[tasks.check]
+description = "Run all checks (fmt, lint, test)"
+depends = ["fmt", "lint", "test"]
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "cargo clean && rm -rf node_modules dist"
+
+[tasks.install]
+description = "Install frontend dependencies"
+run = "npm install"

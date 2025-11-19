@@ -1,0 +1,5 @@
+# Clippy configuration for CreatorOps
+# https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# Deny common issues
+warn-on-all-wildcard-imports = true
