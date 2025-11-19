@@ -3,6 +3,9 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { useTheme } from '../hooks/useTheme'
 import type { BackupDestination, DeliveryDestination } from '../types'
 
+const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
+const DEFAULT_FILE_TEMPLATE = '{original}'
+
 export function Settings() {
   const { theme, setTheme } = useTheme()
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
@@ -10,8 +13,8 @@ export function Settings() {
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
   const [newDeliveryDestName, setNewDeliveryDestName] = useState('')
   const [archiveLocation, setArchiveLocation] = useState('')
-  const [folderTemplate, setFolderTemplate] = useState('{YYYY}-{MM}-{DD}_{ClientName}_{Type}')
-  const [fileRenameTemplate, setFileRenameTemplate] = useState('{original}')
+  const [folderTemplate, setFolderTemplate] = useState(DEFAULT_FOLDER_TEMPLATE)
+  const [fileRenameTemplate, setFileRenameTemplate] = useState(DEFAULT_FILE_TEMPLATE)
   const [autoEject, setAutoEject] = useState(false)
 
   useEffect(() => {
@@ -200,8 +203,8 @@ export function Settings() {
   }
 
   function resetTemplates() {
-    saveFolderTemplate('{YYYY}-{MM}-{DD}_{ClientName}_{Type}')
-    saveFileRenameTemplate('{original}')
+    saveFolderTemplate(DEFAULT_FOLDER_TEMPLATE)
+    saveFileRenameTemplate(DEFAULT_FILE_TEMPLATE)
   }
 
   return (

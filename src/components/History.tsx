@@ -70,7 +70,9 @@ export function History() {
 
   function formatDate(dateString: string): string {
     try {
-      const timestamp = parseInt(dateString) * 1000
+      const timestamp = parseInt(dateString, 10) * 1000
+      if (isNaN(timestamp)) return dateString
+
       const date = new Date(timestamp)
       return date.toLocaleString('en-US', {
         month: 'short',
