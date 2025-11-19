@@ -27,7 +27,7 @@ jobs:
         run: rustup component add rustfmt
 
       - name: Format check
-        run: cargo fmt --all --check
+        run: cargo fmt --all --manifest-path src-tauri/Cargo.toml --check
 
       - name: Lint
         run: mise run lint:rust
