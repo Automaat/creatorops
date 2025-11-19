@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup mise
-        uses: jdx/mise-action@9dc7d5d21d12a330a408220ab7de97c0e1b1bdc4 # v3.4.1
+        uses: jdx/mise-action@9dc7d5dd454262207dea3ab5a06a3df6afc8ff26 # v3.4.1
 
       - name: Format check
         run: mise run fmt:rust -- --check
