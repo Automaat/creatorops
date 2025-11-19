@@ -61,7 +61,7 @@ function SDCardItem({ card }: SDCardItemProps) {
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
 
   const usedSpace = card.size - card.freeSpace
-  const usedPercent = (usedSpace / card.size) * 100
+  const usedPercent = card.size > 0 ? (usedSpace / card.size) * 100 : 0
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -395,6 +395,7 @@ function SDCardItem({ card }: SDCardItemProps) {
 }
 
 function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
