@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { formatBytes } from '../utils/formatting'
 import type { SDCard, Project, ImportProgress, CopyResult } from '../types'
 import { CreateProject } from './CreateProject'
 
@@ -392,15 +393,6 @@ function SDCardItem({ card }: SDCardItemProps) {
       </div>
     </div>
   )
-}
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
 }
 
 function formatTime(seconds: number): string {

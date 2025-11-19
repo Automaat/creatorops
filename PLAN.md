@@ -338,7 +338,7 @@ Project Detail View:
 ---
 
 **Last Updated**: 2025-11-19
-**Status**: Phase 4 complete
+**Status**: Phase 5 complete - MVP ready for distribution
 
 ## Implementation Status
 
@@ -389,3 +389,29 @@ Project Detail View:
 - **Project status update**: Automatically update project status to "Archived"
 - **UI components**: Delivery view with multi-step workflow, archive action in Projects view
 - **Progress tracking**: Real-time updates for both delivery and archive operations
+
+### Phase 5: Settings & Polish ✓
+
+- **Settings panel**: Complete configuration UI with all app settings
+- **Template editor**: Folder naming and file rename templates with live preview
+  - Project folder template: `{YYYY}-{MM}-{DD}_{ClientName}_{Type}`
+  - File rename template: `{original}`, `{index}`, `{name}`, `{ext}`
+- **Notification system**: Global toast notifications for success/error/warning/info
+  - NotificationProvider context with hook
+  - Auto-dismiss after 5 seconds
+  - Click to dismiss
+- **Keyboard shortcuts**: Global shortcuts for navigation and actions
+  - ⌘+, : Settings
+  - ⌘+/ : Show keyboard shortcuts
+  - ⌘+1-5 : Navigate to views
+  - ⌘+R : Refresh SD cards
+  - Esc : Close modals
+- **History browser**: View all import and backup history
+  - Tabbed interface (Imports/Backups)
+  - Detailed stats per operation
+  - Filter by success/partial/failed status
+- **Auto-eject setting**: Toggle auto-eject SD cards after import
+- **DMG packaging**: macOS distribution configuration
+  - DMG and .app bundle targets
+  - Custom window layout for installer
+  - Minimum macOS 10.15 requirement
