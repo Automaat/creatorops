@@ -1,5 +1,5 @@
+use crate::modules::file_utils::verify_checksum;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Emitter;
@@ -218,33 +218,4 @@ async fn copy_file_with_progress(
     }
 
     Ok(file_size)
-}
-
-/// Verify file integrity using SHA-256 checksum
-async fn verify_checksum(src: &Path, dest: &Path) -> Result<bool, String> {
-    let src_hash = calculate_file_hash(src).await?;
-    let dest_hash = calculate_file_hash(dest).await?;
-    Ok(src_hash == dest_hash)
-}
-
-/// Calculate SHA-256 hash of a file
-async fn calculate_file_hash(path: &Path) -> Result<String, String> {
-    let mut file = tokio::fs::File::open(path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; CHUNK_SIZE];
-
-    loop {
-        let bytes_read = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
-
-        if bytes_read == 0 {
-            break;
-        }
-
-        hasher.update(&buffer[..bytes_read]);
-    }
-
-    Ok(format!("{:x}", hasher.finalize()))
 }

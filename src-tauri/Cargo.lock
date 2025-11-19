@@ -579,6 +579,7 @@ dependencies = [
  "chrono",
  "lazy_static",
  "libc",
+ "log",
  "serde",
  "serde_json",
  "sha2",

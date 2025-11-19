@@ -1,8 +1,10 @@
+use crate::modules::file_utils::{
+    collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
+};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -12,17 +14,6 @@ use uuid::Uuid;
 
 const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 const MAX_RETRY_ATTEMPTS: usize = 3;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct BackupDestination {
-    pub id: String,
-    pub name: String,
-    pub path: String,
-    pub enabled: bool,
-    pub created_at: String,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,7 +123,7 @@ pub async fn queue_backup(
     let mut queue = BACKUP_QUEUE
         .lock()
         .map_err(|e| format!("Failed to lock queue: {}", e))?;
-    queue.insert(id.clone(), job.clone());
+    queue.insert(id, job.clone());
 
     Ok(job)
 }
@@ -188,28 +179,32 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
         let result = perform_backup(&window_clone, &job_id_clone, &job).await;
 
         // Update job status
-        let mut queue = BACKUP_QUEUE.lock().unwrap();
-        if let Some(j) = queue.get_mut(&job_id_clone) {
-            match result {
-                Ok((files_copied, files_skipped, bytes_transferred)) => {
-                    j.status = BackupStatus::Completed;
-                    j.files_copied = files_copied;
-                    j.files_skipped = files_skipped;
-                    j.bytes_transferred = bytes_transferred;
-                    j.completed_at = Some(get_timestamp());
+        let queue_result = BACKUP_QUEUE.lock();
+        if let Ok(mut queue) = queue_result {
+            if let Some(j) = queue.get_mut(&job_id_clone) {
+                match result {
+                    Ok((files_copied, files_skipped, bytes_transferred)) => {
+                        j.status = BackupStatus::Completed;
+                        j.files_copied = files_copied;
+                        j.files_skipped = files_skipped;
+                        j.bytes_transferred = bytes_transferred;
+                        j.completed_at = Some(get_timestamp());
 
-                    // Save to history
-                    let _ = save_backup_to_history(j);
+                        // Save to history
+                        let _ = save_backup_to_history(j);
+                    }
+                    Err(e) => {
+                        j.status = BackupStatus::Failed;
+                        j.error_message = Some(e);
+                        j.completed_at = Some(get_timestamp());
+                    }
                 }
-                Err(e) => {
-                    j.status = BackupStatus::Failed;
-                    j.error_message = Some(e);
-                    j.completed_at = Some(get_timestamp());
-                }
+
+                // Emit job update
+                let _ = window_clone.emit("backup-job-updated", j.clone());
             }
-
-            // Emit job update
-            let _ = window_clone.emit("backup-job-updated", j.clone());
+        } else {
+            log::error!("Failed to lock backup queue in background task");
         }
     });
 
@@ -217,7 +212,10 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
     let queue = BACKUP_QUEUE
         .lock()
         .map_err(|e| format!("Failed to lock queue: {}", e))?;
-    Ok(queue.get(&job_id).unwrap().clone())
+    queue
+        .get(&job_id)
+        .cloned()
+        .ok_or_else(|| "Backup job not found".to_string())
 }
 
 /// Cancel a backup job
@@ -334,7 +332,7 @@ async fn perform_backup(
                 files_copied += 1;
             }
             Err(e) => {
-                eprintln!("Failed to copy {} after retries: {}", file_name, e);
+                log::error!("Failed to copy {} after retries: {}", file_name, e);
                 files_skipped += 1;
             }
         }
@@ -384,7 +382,7 @@ async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
         match verify_checksum(src, dest).await {
             Ok(true) => Ok(size),
             Ok(false) => {
-                eprintln!("Checksum mismatch, retrying...");
+                log::warn!("Checksum mismatch for {:?}, retrying...", src);
                 let _ = tokio::fs::remove_file(dest).await;
                 Err("Checksum verification failed".to_string())
             }
@@ -429,69 +427,16 @@ async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
     Ok(file_size)
 }
 
-async fn verify_checksum(src: &Path, dest: &Path) -> Result<bool, String> {
-    let src_hash = calculate_file_hash(src).await?;
-    let dest_hash = calculate_file_hash(dest).await?;
-    Ok(src_hash == dest_hash)
-}
-
-async fn calculate_file_hash(path: &Path) -> Result<String, String> {
-    let mut file = tokio::fs::File::open(path)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; CHUNK_SIZE];
-
-    loop {
-        let bytes_read = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
-
-        if bytes_read == 0 {
-            break;
-        }
-
-        hasher.update(&buffer[..bytes_read]);
-    }
-
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
-    let mut files = Vec::new();
-
-    if path.is_file() {
-        files.push(path.to_path_buf());
-    } else if path.is_dir() {
-        for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let entry_path = entry.path();
-
-            if entry_path.is_file() {
-                files.push(entry_path);
-            } else if entry_path.is_dir() {
-                let mut sub_files = collect_files_recursive(&entry_path)?;
-                files.append(&mut sub_files);
-            }
-        }
-    }
-
-    Ok(files)
-}
-
-fn count_files_and_size(path: &str) -> Result<(usize, u64), String> {
-    let files = collect_files_recursive(Path::new(path))?;
-    let mut total_size = 0u64;
-
-    for file in &files {
-        if let Ok(metadata) = fs::metadata(file) {
-            total_size += metadata.len();
-        }
-    }
-
-    Ok((files.len(), total_size))
+// Global mutex for backup history file access
+lazy_static::lazy_static! {
+    static ref HISTORY_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 }
 
 fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
+    // Acquire lock to prevent race conditions when multiple backups complete
+    let _lock = HISTORY_MUTEX
+        .lock()
+        .map_err(|e| format!("Failed to lock history mutex: {}", e))?;
     let home_dir = get_home_dir()?;
     let history_dir = home_dir.join("CreatorOps");
     fs::create_dir_all(&history_dir).map_err(|e| e.to_string())?;
@@ -526,17 +471,4 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     fs::write(&history_path, json_data).map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-fn get_home_dir() -> Result<PathBuf, String> {
-    std::env::var_os("HOME")
-        .and_then(|h| if h.is_empty() { None } else { Some(h) })
-        .map(PathBuf::from)
-        .ok_or_else(|| "Failed to get home directory".to_string())
-}
-
-fn get_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    format!("{}", duration.as_secs())
 }
