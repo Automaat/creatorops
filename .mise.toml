@@ -2,8 +2,6 @@
 rust = "1.91.1"
 node = "24.11.1"
 "cargo:tauri-cli" = "2.9.4"
-"cargo:rustfmt" = "1.91.1"
-"cargo:clippy" = "1.91.1"
 
 [tasks.dev]
 description = "Run Tauri app in development mode"
