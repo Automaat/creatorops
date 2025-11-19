@@ -17,7 +17,7 @@ depends = ["lint:rust", "lint:frontend"]
 
 [tasks."lint:rust"]
 description = "Run Rust linter (clippy)"
-run = "cargo clippy --all-targets --all-features -- -D warnings"
+run = "cargo clippy --all-targets --all-features --manifest-path src-tauri/Cargo.toml -- -D warnings"
 
 [tasks."lint:frontend"]
 description = "Run frontend linter (eslint)"
@@ -29,7 +29,7 @@ depends = ["fmt:rust", "fmt:frontend"]
 
 [tasks."fmt:rust"]
 description = "Format Rust code"
-run = "cargo fmt --all"
+run = "cargo fmt --all --manifest-path src-tauri/Cargo.toml"
 
 [tasks."fmt:frontend"]
 description = "Format frontend code"
@@ -41,7 +41,7 @@ depends = ["test:rust", "test:frontend"]
 
 [tasks."test:rust"]
 description = "Run Rust tests"
-run = "cargo test"
+run = "cargo test --manifest-path src-tauri/Cargo.toml"
 
 [tasks."test:frontend"]
 description = "Run frontend tests"
