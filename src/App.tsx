@@ -4,11 +4,12 @@ import { Dashboard } from './components/Dashboard'
 import { Import } from './components/Import'
 import { Projects } from './components/Projects'
 import { BackupQueue } from './components/BackupQueue'
+import { Delivery } from './components/Delivery'
 import { Settings } from './components/Settings'
 import { useTheme } from './hooks/useTheme'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 
-type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'settings'
+type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'settings'
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
@@ -40,6 +41,7 @@ function App() {
       )}
       {currentView === 'projects' && <Projects />}
       {currentView === 'backup' && <BackupQueue />}
+      {currentView === 'delivery' && <Delivery />}
       {currentView === 'settings' && <Settings />}
     </Layout>
   )

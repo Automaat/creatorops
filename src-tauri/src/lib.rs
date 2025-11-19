@@ -1,8 +1,12 @@
 mod modules;
 
+use modules::archive::{create_archive, get_archive_queue, remove_archive_job, start_archive};
 use modules::backup::{
     cancel_backup, get_backup_history, get_backup_queue, get_project_backup_history, queue_backup,
     remove_backup_job, start_backup,
+};
+use modules::delivery::{
+    create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
 };
 use modules::file_copy::copy_files;
 use modules::import_history::{
@@ -33,6 +37,15 @@ pub fn run() {
             remove_backup_job,
             get_backup_history,
             get_project_backup_history,
+            list_project_files,
+            create_delivery,
+            start_delivery,
+            get_delivery_queue,
+            remove_delivery_job,
+            create_archive,
+            start_archive,
+            get_archive_queue,
+            remove_archive_job,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

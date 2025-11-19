@@ -126,3 +126,71 @@ export interface BackupHistory {
   status: BackupStatus
   errorMessage?: string
 }
+
+export type JobStatus = 'pending' | 'inprogress' | 'completed' | 'failed'
+
+export interface DeliveryJob {
+  id: string
+  projectId: string
+  projectName: string
+  selectedFiles: string[]
+  deliveryPath: string
+  namingTemplate?: string
+  status: JobStatus
+  totalFiles: number
+  filesCopied: number
+  totalBytes: number
+  bytesTransferred: number
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  errorMessage?: string
+  manifestPath?: string
+}
+
+export interface DeliveryDestination {
+  id: string
+  name: string
+  path: string
+  enabled: boolean
+  createdAt: string
+}
+
+export interface DeliveryProgress {
+  jobId: string
+  fileName: string
+  currentFile: number
+  totalFiles: number
+  bytesTransferred: number
+  totalBytes: number
+  speed: number
+  eta: number
+}
+
+export interface ArchiveJob {
+  id: string
+  projectId: string
+  projectName: string
+  sourcePath: string
+  archivePath: string
+  compress: boolean
+  compressionFormat?: 'zip' | 'tar'
+  status: JobStatus
+  totalFiles: number
+  filesArchived: number
+  totalBytes: number
+  bytesTransferred: number
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  errorMessage?: string
+}
+
+export interface ProjectFile {
+  name: string
+  path: string
+  size: number
+  modified: string
+  type: string
+  relativePath: string
+}

@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, BackupDestination } from '../types'
+import type { Project, BackupDestination, ArchiveJob } from '../types'
 
 export function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [archiveLocation, setArchiveLocation] = useState('')
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false)
 
   useEffect(() => {
     loadProjects()
     loadDestinations()
+    loadArchiveLocation()
   }, [])
 
   async function loadProjects() {
@@ -27,13 +30,23 @@ export function Projects() {
 
   async function loadDestinations() {
     try {
-      // Load from localStorage for now (will add Rust backend later)
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
         setDestinations(JSON.parse(stored))
       }
     } catch (err) {
       console.error('Failed to load destinations:', err)
+    }
+  }
+
+  async function loadArchiveLocation() {
+    try {
+      const stored = localStorage.getItem('archive_location')
+      if (stored) {
+        setArchiveLocation(stored)
+      }
+    } catch (err) {
+      console.error('Failed to load archive location:', err)
     }
   }
 
@@ -47,9 +60,39 @@ export function Projects() {
         destinationName: destination.name,
         destinationPath: destination.path,
       })
-      console.log(`Backup queued for ${project.name} to ${destination.name}`)
     } catch (err) {
       console.error('Failed to queue backup:', err)
+    }
+  }
+
+  async function archiveProject(project: Project) {
+    if (!archiveLocation) {
+      alert('Please configure archive location in Settings')
+      return
+    }
+
+    try {
+      const job = await invoke<ArchiveJob>('create_archive', {
+        projectId: project.id,
+        projectName: project.name,
+        sourcePath: project.folderPath,
+        archiveLocation,
+        compress: false,
+        compressionFormat: null,
+      })
+
+      // Auto-start the archive job
+      await invoke('start_archive', { jobId: job.id })
+
+      setShowArchiveDialog(false)
+
+      // Refresh projects list after a delay
+      setTimeout(() => {
+        loadProjects()
+      }, 1000)
+    } catch (err) {
+      console.error('Failed to archive project:', err)
+      alert(`Failed to archive project: ${err}`)
     }
   }
 
@@ -134,7 +177,57 @@ export function Projects() {
               <p className="empty-state-hint">Add destinations in Settings to enable backup</p>
             </div>
           )}
+
+          <div className="archive-action">
+            <h3>Archive Project</h3>
+            <p className="action-hint">
+              Move this project to the archive location and update status to Archived
+            </p>
+            <button
+              onClick={() => setShowArchiveDialog(true)}
+              className="btn-archive"
+              disabled={selectedProject.status === 'Archived'}
+            >
+              {selectedProject.status === 'Archived' ? 'Already Archived' : 'Archive Project'}
+            </button>
+          </div>
         </section>
+
+        {showArchiveDialog && (
+          <div className="dialog-overlay" onClick={() => setShowArchiveDialog(false)}>
+            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+              <h2>Archive Project</h2>
+              <p>
+                This will move the project to the archive location and update its status to
+                Archived. The project will be removed from the active projects folder.
+              </p>
+              {archiveLocation ? (
+                <div className="archive-info">
+                  <p>
+                    <strong>Archive Location:</strong>
+                  </p>
+                  <p className="folder-path">{archiveLocation}</p>
+                </div>
+              ) : (
+                <div className="warning">
+                  <p>No archive location configured. Please set one in Settings first.</p>
+                </div>
+              )}
+              <div className="dialog-actions">
+                <button onClick={() => setShowArchiveDialog(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => archiveProject(selectedProject)}
+                  className="btn-primary"
+                  disabled={!archiveLocation}
+                >
+                  Confirm Archive
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

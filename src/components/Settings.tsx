@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useTheme } from '../hooks/useTheme'
-import type { BackupDestination } from '../types'
+import type { BackupDestination, DeliveryDestination } from '../types'
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
+  const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
+  const [newDeliveryDestName, setNewDeliveryDestName] = useState('')
+  const [archiveLocation, setArchiveLocation] = useState('')
 
   useEffect(() => {
     loadDestinations()
+    loadDeliveryDestinations()
+    loadArchiveLocation()
   }, [])
 
   function loadDestinations() {
@@ -64,6 +69,93 @@ export function Settings() {
 
   function removeDestination(id: string) {
     saveDestinations(destinations.filter((d) => d.id !== id))
+  }
+
+  function loadDeliveryDestinations() {
+    try {
+      const stored = localStorage.getItem('delivery_destinations')
+      if (stored) {
+        setDeliveryDestinations(JSON.parse(stored))
+      }
+    } catch (err) {
+      console.error('Failed to load delivery destinations:', err)
+    }
+  }
+
+  function loadArchiveLocation() {
+    try {
+      const stored = localStorage.getItem('archive_location')
+      if (stored) {
+        setArchiveLocation(stored)
+      }
+    } catch (err) {
+      console.error('Failed to load archive location:', err)
+    }
+  }
+
+  function saveDeliveryDestinations(dests: DeliveryDestination[]) {
+    localStorage.setItem('delivery_destinations', JSON.stringify(dests))
+    setDeliveryDestinations(dests)
+  }
+
+  async function addDeliveryDestination() {
+    if (!newDeliveryDestName.trim()) {
+      return
+    }
+
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      })
+
+      if (selected) {
+        const newDest: DeliveryDestination = {
+          id: crypto.randomUUID(),
+          name: newDeliveryDestName.trim(),
+          path: selected,
+          enabled: true,
+          createdAt: new Date().toISOString(),
+        }
+
+        saveDeliveryDestinations([...deliveryDestinations, newDest])
+        setNewDeliveryDestName('')
+      }
+    } catch (err) {
+      console.error('Failed to add delivery destination:', err)
+    }
+  }
+
+  function toggleDeliveryDestination(id: string) {
+    const updated = deliveryDestinations.map((d) =>
+      d.id === id ? { ...d, enabled: !d.enabled } : d
+    )
+    saveDeliveryDestinations(updated)
+  }
+
+  function removeDeliveryDestination(id: string) {
+    saveDeliveryDestinations(deliveryDestinations.filter((d) => d.id !== id))
+  }
+
+  async function selectArchiveLocation() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+      })
+
+      if (selected) {
+        localStorage.setItem('archive_location', selected)
+        setArchiveLocation(selected)
+      }
+    } catch (err) {
+      console.error('Failed to select archive location:', err)
+    }
+  }
+
+  function clearArchiveLocation() {
+    localStorage.removeItem('archive_location')
+    setArchiveLocation('')
   }
 
   return (
@@ -160,6 +252,57 @@ export function Settings() {
           </section>
 
           <section>
+            <h2>Delivery Destinations</h2>
+            <div className="card">
+              <div className="flex flex-col gap-md">
+                <p className="text-secondary text-sm">
+                  Configure folders for client delivery exports
+                </p>
+
+                {deliveryDestinations.length > 0 && (
+                  <div className="destinations-list">
+                    {deliveryDestinations.map((dest) => (
+                      <div key={dest.id} className="destination-item">
+                        <div className="destination-info">
+                          <div className="flex gap-sm align-center">
+                            <input
+                              type="checkbox"
+                              checked={dest.enabled}
+                              onChange={() => toggleDeliveryDestination(dest.id)}
+                            />
+                            <span className="font-medium">{dest.name}</span>
+                          </div>
+                          <p className="text-secondary text-sm">{dest.path}</p>
+                        </div>
+                        <button
+                          onClick={() => removeDeliveryDestination(dest.id)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="add-destination">
+                  <input
+                    type="text"
+                    placeholder="Destination name (e.g., Client Delivery Folder)"
+                    value={newDeliveryDestName}
+                    onChange={(e) => setNewDeliveryDestName(e.target.value)}
+                    className="input"
+                    onKeyDown={(e) => e.key === 'Enter' && addDeliveryDestination()}
+                  />
+                  <button onClick={addDeliveryDestination} className="btn btn-primary">
+                    Add Destination
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section>
             <h2>Storage Paths</h2>
             <div className="card">
               <div className="flex flex-col gap-md">
@@ -167,9 +310,19 @@ export function Settings() {
                   <label className="font-medium">Default Import Location</label>
                   <p className="text-secondary text-sm">~/CreatorOps/Projects</p>
                 </div>
-                <div className="flex flex-col gap-xs">
+                <div className="flex flex-col gap-md">
                   <label className="font-medium">Archive Location</label>
-                  <p className="text-secondary text-sm">Not configured</p>
+                  <p className="text-secondary text-sm">{archiveLocation || 'Not configured'}</p>
+                  <div className="flex gap-sm">
+                    <button onClick={selectArchiveLocation} className="btn btn-primary">
+                      {archiveLocation ? 'Change Location' : 'Select Location'}
+                    </button>
+                    {archiveLocation && (
+                      <button onClick={clearArchiveLocation} className="btn btn-secondary">
+                        Clear
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

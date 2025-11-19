@@ -39,6 +39,12 @@ export function Layout({ children, currentView, onNavigate }: LayoutProps) {
             onClick={() => onNavigate('backup')}
           />
           <NavItem
+            icon="📦"
+            label="Delivery"
+            active={currentView === 'delivery'}
+            onClick={() => onNavigate('delivery')}
+          />
+          <NavItem
             icon="⚙️"
             label="Settings"
             active={currentView === 'settings'}
