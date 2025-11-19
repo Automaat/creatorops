@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { formatBytes, formatDate } from '../utils/formatting'
+import { useNotification } from '../hooks/useNotification'
 import '../styles/history.css'
 
 interface ImportHistory {
@@ -39,6 +41,7 @@ export function History() {
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
   const [backupHistory, setBackupHistory] = useState<BackupHistory[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const { error } = useNotification()
 
   useEffect(() => {
     async function loadHistory() {
@@ -53,38 +56,13 @@ export function History() {
         }
       } catch (err) {
         console.error('Failed to load history:', err)
+        error('Failed to load history')
       } finally {
         setIsLoading(false)
       }
     }
     loadHistory()
-  }, [historyType])
-
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-  }
-
-  function formatDate(dateString: string): string {
-    try {
-      const timestamp = parseInt(dateString, 10) * 1000
-      if (isNaN(timestamp)) return dateString
-
-      const date = new Date(timestamp)
-      return date.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return dateString
-    }
-  }
+  }, [historyType, error])
 
   function getStatusClass(status: string): string {
     switch (status) {

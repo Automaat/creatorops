@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { formatBytes } from '../utils/formatting'
 import type {
   Project,
   ProjectFile,
@@ -141,14 +142,6 @@ export function Delivery() {
     } catch (err) {
       console.error('Failed to remove job:', err)
     }
-  }
-
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
   }
 
   function getStatusClass(status: string): string {

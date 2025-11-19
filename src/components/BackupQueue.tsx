@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { formatBytes, formatSpeed, formatETA } from '../utils/formatting'
 import type { BackupJob, BackupProgress } from '../types'
+
+const QUEUE_REFRESH_INTERVAL = 30000
 
 export function BackupQueue() {
   const [jobs, setJobs] = useState<BackupJob[]>([])
@@ -18,8 +21,8 @@ export function BackupQueue() {
       setJobs((prev) => prev.map((j) => (j.id === event.payload.id ? event.payload : j)))
     })
 
-    // Occasional refresh to catch any missed events (30s interval)
-    const interval = setInterval(loadQueue, 30000)
+    // Occasional refresh to catch any missed events
+    const interval = setInterval(loadQueue, QUEUE_REFRESH_INTERVAL)
 
     return () => {
       unlistenProgress.then((fn) => fn())
@@ -62,28 +65,6 @@ export function BackupQueue() {
     } catch (err) {
       console.error('Failed to remove job:', err)
     }
-  }
-
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-  }
-
-  function formatSpeed(bytesPerSecond: number): string {
-    return `${formatBytes(bytesPerSecond)}/s`
-  }
-
-  function formatETA(seconds: number): string {
-    if (seconds === 0) return '--'
-    const hrs = Math.floor(seconds / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    if (hrs > 0) return `${hrs}h ${mins}m`
-    if (mins > 0) return `${mins}m ${secs}s`
-    return `${secs}s`
   }
 
   const pendingJobs = jobs.filter((j) => j.status === 'pending')

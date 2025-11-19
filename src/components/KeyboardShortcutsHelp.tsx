@@ -14,7 +14,7 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
       <div className="shortcuts-modal" onClick={(e) => e.stopPropagation()}>
         <div className="shortcuts-header">
           <h2>Keyboard Shortcuts</h2>
-          <button className="btn-icon" onClick={onClose}>
+          <button className="btn-icon" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
@@ -22,8 +22,8 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
           <div className="shortcuts-section">
             <h3>Navigation</h3>
             <div className="shortcuts-list">
-              {GLOBAL_SHORTCUTS.map((shortcut, index) => (
-                <div key={index} className="shortcut-item">
+              {GLOBAL_SHORTCUTS.map((shortcut) => (
+                <div key={`${shortcut.key}-${shortcut.metaKey}`} className="shortcut-item">
                   <span className="shortcut-description">{shortcut.description}</span>
                   <div className="shortcut-keys">
                     {shortcut.metaKey && <kbd>⌘</kbd>}

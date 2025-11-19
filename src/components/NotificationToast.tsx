@@ -22,6 +22,7 @@ export function NotificationToast() {
               e.stopPropagation()
               removeNotification(notification.id)
             }}
+            aria-label="Dismiss notification"
           >
             ×
           </button>

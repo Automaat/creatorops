@@ -141,3 +141,7 @@ a:hover {
 .font-bold {
   font-weight: var(--font-weight-bold);
 }
+
+.align-self-start {
+  align-self: flex-start;
+}

@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState, useCallback, ReactNode } from 'react'
 
+const DEFAULT_NOTIFICATION_DURATION = 5000
+
 export type NotificationType = 'success' | 'error' | 'warning' | 'info'
 
 export interface Notification {
@@ -30,7 +32,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addNotification = useCallback(
-    (type: NotificationType, message: string, duration = 5000) => {
+    (type: NotificationType, message: string, duration = DEFAULT_NOTIFICATION_DURATION) => {
       const id = crypto.randomUUID()
       const notification: Notification = { id, type, message, duration }
 

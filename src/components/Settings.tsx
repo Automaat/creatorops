@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useTheme } from '../hooks/useTheme'
+import { useNotification } from '../hooks/useNotification'
 import type { BackupDestination, DeliveryDestination } from '../types'
 
 const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
@@ -8,6 +9,7 @@ const DEFAULT_FILE_TEMPLATE = '{original}'
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
+  const { error: showError } = useNotification()
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
@@ -23,6 +25,7 @@ export function Settings() {
     loadArchiveLocation()
     loadTemplates()
     loadAutoEject()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function loadDestinations() {
@@ -174,6 +177,7 @@ export function Settings() {
       if (storedFileTemplate) setFileRenameTemplate(storedFileTemplate)
     } catch (err) {
       console.error('Failed to load templates:', err)
+      showError('Failed to load template settings')
     }
   }
 
@@ -183,6 +187,7 @@ export function Settings() {
       if (stored) setAutoEject(stored === 'true')
     } catch (err) {
       console.error('Failed to load auto-eject setting:', err)
+      showError('Failed to load auto-eject setting')
     }
   }
 
@@ -415,11 +420,7 @@ export function Settings() {
                       : 'CustomName_001.jpg'}
                   </p>
                 </div>
-                <button
-                  onClick={resetTemplates}
-                  className="btn btn-secondary"
-                  style={{ alignSelf: 'flex-start' }}
-                >
+                <button onClick={resetTemplates} className="btn btn-secondary align-self-start">
                   Reset to Defaults
                 </button>
               </div>

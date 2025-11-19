@@ -43,5 +43,6 @@ export const GLOBAL_SHORTCUTS: Omit<KeyboardShortcut, 'action'>[] = [
   { key: '3', metaKey: true, description: 'Go to Projects' },
   { key: '4', metaKey: true, description: 'Go to Backup Queue' },
   { key: '5', metaKey: true, description: 'Go to Delivery' },
+  { key: '6', metaKey: true, description: 'Go to History' },
   { key: 'r', metaKey: true, description: 'Refresh SD Cards' },
 ]
