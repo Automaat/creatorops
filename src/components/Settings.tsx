@@ -10,11 +10,16 @@ export function Settings() {
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
   const [newDeliveryDestName, setNewDeliveryDestName] = useState('')
   const [archiveLocation, setArchiveLocation] = useState('')
+  const [folderTemplate, setFolderTemplate] = useState('{YYYY}-{MM}-{DD}_{ClientName}_{Type}')
+  const [fileRenameTemplate, setFileRenameTemplate] = useState('{original}')
+  const [autoEject, setAutoEject] = useState(false)
 
   useEffect(() => {
     loadDestinations()
     loadDeliveryDestinations()
     loadArchiveLocation()
+    loadTemplates()
+    loadAutoEject()
   }, [])
 
   function loadDestinations() {
@@ -156,6 +161,47 @@ export function Settings() {
   function clearArchiveLocation() {
     localStorage.removeItem('archive_location')
     setArchiveLocation('')
+  }
+
+  function loadTemplates() {
+    try {
+      const storedFolderTemplate = localStorage.getItem('folder_template')
+      const storedFileTemplate = localStorage.getItem('file_rename_template')
+      if (storedFolderTemplate) setFolderTemplate(storedFolderTemplate)
+      if (storedFileTemplate) setFileRenameTemplate(storedFileTemplate)
+    } catch (err) {
+      console.error('Failed to load templates:', err)
+    }
+  }
+
+  function loadAutoEject() {
+    try {
+      const stored = localStorage.getItem('auto_eject')
+      if (stored) setAutoEject(stored === 'true')
+    } catch (err) {
+      console.error('Failed to load auto-eject setting:', err)
+    }
+  }
+
+  function saveFolderTemplate(template: string) {
+    localStorage.setItem('folder_template', template)
+    setFolderTemplate(template)
+  }
+
+  function saveFileRenameTemplate(template: string) {
+    localStorage.setItem('file_rename_template', template)
+    setFileRenameTemplate(template)
+  }
+
+  function toggleAutoEject() {
+    const newValue = !autoEject
+    localStorage.setItem('auto_eject', newValue.toString())
+    setAutoEject(newValue)
+  }
+
+  function resetTemplates() {
+    saveFolderTemplate('{YYYY}-{MM}-{DD}_{ClientName}_{Type}')
+    saveFileRenameTemplate('{original}')
   }
 
   return (
@@ -329,16 +375,68 @@ export function Settings() {
           </section>
 
           <section>
-            <h2>Import Settings</h2>
+            <h2>Folder Templates</h2>
             <div className="card">
               <div className="flex flex-col gap-md">
                 <div className="flex flex-col gap-xs">
-                  <label className="font-medium">Auto-eject SD cards after import</label>
-                  <p className="text-secondary text-sm">Coming soon</p>
+                  <label className="font-medium">Project Folder Template</label>
+                  <p className="text-secondary text-sm">
+                    Available variables: {'{YYYY}'}, {'{MM}'}, {'{DD}'}, {'{ClientName}'},{' '}
+                    {'{Type}'}
+                  </p>
+                  <input
+                    type="text"
+                    className="input"
+                    value={folderTemplate}
+                    onChange={(e) => saveFolderTemplate(e.target.value)}
+                    placeholder="{YYYY}-{MM}-{DD}_{ClientName}_{Type}"
+                  />
+                  <p className="text-secondary text-sm">Preview: 2024-01-15_JohnDoe_Wedding</p>
                 </div>
                 <div className="flex flex-col gap-xs">
-                  <label className="font-medium">File renaming rules</label>
-                  <p className="text-secondary text-sm">Keep original names</p>
+                  <label className="font-medium">File Rename Template</label>
+                  <p className="text-secondary text-sm">
+                    Available variables: {'{original}'}, {'{index}'}, {'{name}'}, {'{ext}'}
+                  </p>
+                  <input
+                    type="text"
+                    className="input"
+                    value={fileRenameTemplate}
+                    onChange={(e) => saveFileRenameTemplate(e.target.value)}
+                    placeholder="{original}"
+                  />
+                  <p className="text-secondary text-sm">
+                    Preview:{' '}
+                    {fileRenameTemplate === '{original}'
+                      ? 'IMG_1234.jpg (unchanged)'
+                      : 'CustomName_001.jpg'}
+                  </p>
+                </div>
+                <button
+                  onClick={resetTemplates}
+                  className="btn btn-secondary"
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  Reset to Defaults
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2>Import Settings</h2>
+            <div className="card">
+              <div className="flex flex-col gap-md">
+                <div className="flex align-center gap-sm">
+                  <input
+                    type="checkbox"
+                    id="auto-eject"
+                    checked={autoEject}
+                    onChange={toggleAutoEject}
+                  />
+                  <label htmlFor="auto-eject" className="font-medium">
+                    Auto-eject SD cards after successful import
+                  </label>
                 </div>
               </div>
             </div>
