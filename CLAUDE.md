@@ -1,11 +1,13 @@
 # CreatorOps Design Guidelines
 
 ## Design Philosophy
-- Clean, minimal desktop UI like FileExplorer
+- Clean, minimal UI inspired by Todoist + FileExplorer
+- Prioritize content hierarchy and whitespace
 - Light/dark theme core requirement
-- Glass morphism (backdrop-filter blur)
+- Subtle glass morphism (backdrop-filter blur)
 - 0.3s transitions standard
 - Component-focused modular architecture
+- Functional simplicity with visual clarity
 
 ## CSS Structure
 ```

@@ -1,0 +1,30 @@
+name: CI - Rust
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  rust:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e11489ab9a643cf87de5c40cd7f94526963c18 # v4.3.1
+
+      - name: Setup mise
+        uses: jdx/mise-action@9dc7d5d21d12a330a408220ab7de97c0e1b1bdc4 # v3.4.1
+
+      - name: Format check
+        run: mise run fmt:rust -- --check
+
+      - name: Lint
+        run: mise run lint:rust
+
+      - name: Test
+        run: mise run test:rust
+
+      - name: Build
+        run: cd src-tauri && cargo build --release

@@ -1,0 +1,33 @@
+name: CI - Frontend
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  frontend:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e11489ab9a643cf87de5c40cd7f94526963c18 # v4.3.1
+
+      - name: Setup mise
+        uses: jdx/mise-action@9dc7d5d21d12a330a408220ab7de97c0e1b1bdc4 # v3.4.1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test -- --run
+
+      - name: Build
+        run: npm run build
