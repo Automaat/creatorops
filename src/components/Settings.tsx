@@ -1,7 +1,7 @@
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from '../hooks/useTheme'
 
 export function Settings() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme()
 
   return (
     <>
@@ -83,5 +83,5 @@ export function Settings() {
         </div>
       </div>
     </>
-  );
+  )
 }

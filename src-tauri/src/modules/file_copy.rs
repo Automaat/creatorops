@@ -1,10 +1,14 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::Retry;
 
 const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
+const MAX_RETRY_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportProgress {
@@ -21,6 +25,9 @@ pub struct ImportProgress {
 pub struct CopyResult {
     pub success: bool,
     pub error: Option<String>,
+    pub files_copied: usize,
+    pub files_skipped: usize,
+    pub skipped_files: Vec<String>,
 }
 
 /// Context for tracking copy progress across multiple files
@@ -32,7 +39,7 @@ struct CopyContext {
     start_time: std::time::Instant,
 }
 
-/// Copy files from source to destination with progress tracking
+/// Copy files from source to destination with progress tracking and checksum verification
 #[tauri::command]
 pub async fn copy_files(
     window: tauri::Window,
@@ -58,6 +65,9 @@ pub async fn copy_files(
 
     let mut bytes_transferred = 0u64;
     let start_time = std::time::Instant::now();
+    let mut files_copied = 0;
+    let mut files_skipped = 0;
+    let mut skipped_files = Vec::new();
 
     for (index, src_path) in source_paths.iter().enumerate() {
         let src = Path::new(src_path);
@@ -77,23 +87,64 @@ pub async fn copy_files(
             start_time,
         };
 
-        match copy_file_with_progress(src, &dest_file, &window, &context).await {
+        // Try copying with retries
+        match copy_file_with_retry(src, &dest_file, &window, &context).await {
             Ok(size) => {
                 bytes_transferred += size;
+                files_copied += 1;
             }
             Err(e) => {
-                return Ok(CopyResult {
-                    success: false,
-                    error: Some(format!("Failed to copy {}: {}", file_name, e)),
-                });
+                eprintln!("Failed to copy {} after retries: {}", file_name, e);
+                files_skipped += 1;
+                skipped_files.push(file_name);
+                // Continue with next file instead of failing entire operation
             }
         }
     }
 
     Ok(CopyResult {
-        success: true,
-        error: None,
+        success: files_copied > 0,
+        error: if files_skipped > 0 {
+            Some(format!("{} file(s) skipped due to errors", files_skipped))
+        } else {
+            None
+        },
+        files_copied,
+        files_skipped,
+        skipped_files,
     })
+}
+
+/// Copy file with retry logic and checksum verification
+async fn copy_file_with_retry(
+    src: &Path,
+    dest: &Path,
+    window: &tauri::Window,
+    context: &CopyContext,
+) -> Result<u64, String> {
+    let retry_strategy = ExponentialBackoff::from_millis(10)
+        .map(jitter)
+        .take(MAX_RETRY_ATTEMPTS);
+
+    Retry::spawn(retry_strategy, || async {
+        // Attempt copy
+        let size = copy_file_with_progress(src, dest, window, context).await?;
+
+        // Verify checksum
+        match verify_checksum(src, dest).await {
+            Ok(true) => Ok(size),
+            Ok(false) => {
+                eprintln!("Checksum mismatch, retrying...");
+                let _ = tokio::fs::remove_file(dest).await;
+                Err("Checksum verification failed".to_string())
+            }
+            Err(e) => {
+                let _ = tokio::fs::remove_file(dest).await;
+                Err(format!("Checksum calculation failed: {}", e))
+            }
+        }
+    })
+    .await
 }
 
 async fn copy_file_with_progress(
@@ -167,4 +218,33 @@ async fn copy_file_with_progress(
     }
 
     Ok(file_size)
+}
+
+/// Verify file integrity using SHA-256 checksum
+async fn verify_checksum(src: &Path, dest: &Path) -> Result<bool, String> {
+    let src_hash = calculate_file_hash(src).await?;
+    let dest_hash = calculate_file_hash(dest).await?;
+    Ok(src_hash == dest_hash)
+}
+
+/// Calculate SHA-256 hash of a file
+async fn calculate_file_hash(path: &Path) -> Result<String, String> {
+    let mut file = tokio::fs::File::open(path)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; CHUNK_SIZE];
+
+    loop {
+        let bytes_read = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
 }

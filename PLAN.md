@@ -338,4 +338,29 @@ Project Detail View:
 ---
 
 **Last Updated**: 2025-11-19
-**Status**: Phase 0 in progress
+**Status**: Phase 2 complete
+
+## Implementation Status
+
+### Phase 0: Project Setup ✓
+- Git repository initialized
+- Tauri 2.0 + React + TypeScript configured
+- mise toolchain management setup
+- Linting, formatting, testing configured
+- Initial commit complete
+
+### Phase 1: Foundation ✓
+- Tauri app with basic UI and theme system
+- SD card detection from `/Volumes/`
+- File copy with progress tracking
+- Project creation UI and folder structure
+- Basic navigation and layout
+
+### Phase 2: Core Workflow ✓
+- **Project selection on import**: Choose existing project or create new
+- **Folder structure templates**: `YYYY-MM-DD_ClientName_Type/[RAW, Selects, Delivery]`
+- **Checksum verification**: SHA-256 with 3-retry logic, skip on failure
+- **Parallel multi-card import**: Each card can be imported independently
+- **Import history tracking**: All imports saved with metadata and status
+- **Progress tracking**: Real-time updates with speed, ETA, file counts
+- **File listing**: Photo/video file detection (JPEG, RAW, MOV, MP4, etc.)

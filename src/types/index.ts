@@ -6,6 +6,8 @@ export interface SDCard {
   size: number
   freeSpace: number
   fileCount: number
+  deviceType: string
+  isRemovable: boolean
 }
 
 export interface Project {
@@ -43,4 +45,27 @@ export interface FileInfo {
   size: number
   modified: string
   type: string
+}
+
+export interface ImportHistory {
+  id: string
+  projectId: string
+  projectName: string
+  sourcePath: string
+  destinationPath: string
+  filesCopied: number
+  filesSkipped: number
+  totalBytes: number
+  startedAt: string
+  completedAt: string
+  status: 'success' | 'partial' | 'failed'
+  errorMessage?: string
+}
+
+export interface CopyResult {
+  success: boolean
+  error?: string
+  filesCopied: number
+  filesSkipped: number
+  skippedFiles: string[]
 }

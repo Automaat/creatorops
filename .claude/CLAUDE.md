@@ -98,6 +98,33 @@ src/styles/
 - ❌ Cramped layouts (always prioritize whitespace)
 - ❌ Over-decorated UI (avoid unnecessary visual noise)
 
+## Verification
+
+After adding functionality, verify using CI commands:
+
+**Frontend:**
+```bash
+npm run format:check
+npm run lint
+npm run test -- --run
+npm run build
+```
+
+**Rust:**
+```bash
+cargo fmt --all --manifest-path src-tauri/Cargo.toml --check
+mise run lint:rust
+mise run test:rust
+cd src-tauri && cargo build --release
+```
+
+**All (via mise):**
+```bash
+mise run fmt
+mise run lint
+mise run test
+```
+
 ## Example Usage
 
 ```css

@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard'
 import { Import } from './components/Import'
 import { Settings } from './components/Settings'
 import { useTheme } from './hooks/useTheme'
+import { useSDCardScanner } from './hooks/useSDCardScanner'
 
 type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'settings'
 
@@ -12,6 +13,9 @@ function App() {
 
   // Apply theme on app load
   useTheme()
+
+  // Global SD card scanner - runs in background across all pages
+  const { sdCards, isScanning, scanForSDCards } = useSDCardScanner()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -29,7 +33,9 @@ function App() {
   return (
     <Layout currentView={currentView} onNavigate={(view) => setCurrentView(view as View)}>
       {currentView === 'dashboard' && <Dashboard />}
-      {currentView === 'import' && <Import />}
+      {currentView === 'import' && (
+        <Import sdCards={sdCards} isScanning={isScanning} onRefresh={scanForSDCards} />
+      )}
       {currentView === 'settings' && <Settings />}
       {currentView === 'projects' && (
         <div className="content-body">

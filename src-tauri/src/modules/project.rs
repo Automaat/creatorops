@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use uuid::Uuid;
+use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -66,7 +67,50 @@ pub async fn create_project(
         updated_at: now,
     };
 
+    // Save project metadata to a JSON file
+    let metadata_path = project_path.join("project.json");
+    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
+    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
+
     Ok(project)
+}
+
+#[tauri::command]
+pub async fn list_projects() -> Result<Vec<Project>, String> {
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let base_path = home_dir.join("CreatorOps").join("Projects");
+
+    if !base_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut projects = Vec::new();
+
+    // Scan for project directories
+    for entry in WalkDir::new(&base_path)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if path == base_path {
+            continue;
+        }
+
+        let metadata_path = path.join("project.json");
+        if metadata_path.exists() {
+            if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+                if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
+                    projects.push(project);
+                }
+            }
+        }
+    }
+
+    // Sort by updated_at descending
+    projects.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+    Ok(projects)
 }
 
 /// Add dirs crate dependency
