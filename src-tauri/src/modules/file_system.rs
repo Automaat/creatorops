@@ -1,5 +1,81 @@
 use std::process::Command;
 
+fn open_in_external_app(
+    project_path: &str,
+    subfolder: &str,
+    app_name: &str,
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] windows_paths: &[&str],
+    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] linux_path: Option<&str>,
+) -> Result<(), String> {
+    let media_path = std::path::Path::new(project_path)
+        .join("RAW")
+        .join(subfolder);
+
+    if !media_path.exists() {
+        return Err(format!(
+            "{} directory not found. Expected RAW/{} subdirectory.",
+            subfolder, subfolder
+        ));
+    }
+
+    let media_path_str = media_path
+        .to_str()
+        .ok_or_else(|| "Invalid path encoding".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg("-a")
+            .arg(app_name)
+            .arg(media_path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut launched = false;
+        for exe_path in windows_paths {
+            if std::path::Path::new(exe_path).exists() {
+                Command::new(exe_path)
+                    .arg(media_path_str)
+                    .spawn()
+                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+                launched = true;
+                break;
+            }
+        }
+
+        if !launched {
+            return Err(format!(
+                "{} not found. Please ensure it's installed.",
+                app_name
+            ));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(path) = linux_path {
+            if std::path::Path::new(path).exists() {
+                Command::new(path)
+                    .arg(media_path_str)
+                    .spawn()
+                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+            } else {
+                return Err(format!(
+                    "{} not found. Please ensure it's installed.",
+                    app_name
+                ));
+            }
+        } else {
+            return Err(format!("{} not supported on Linux", app_name));
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn reveal_in_finder(path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -34,4 +110,46 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn open_in_lightroom(path: String) -> Result<(), String> {
+    open_in_external_app(
+        &path,
+        "Photos",
+        "Adobe Lightroom Classic",
+        &[
+            r"C:\Program Files\Adobe\Adobe Lightroom Classic\Lightroom.exe",
+            r"C:\Program Files (x86)\Adobe\Adobe Lightroom Classic\Lightroom.exe",
+        ],
+        None,
+    )
+}
+
+#[tauri::command]
+pub fn open_in_aftershoot(path: String) -> Result<(), String> {
+    open_in_external_app(
+        &path,
+        "Photos",
+        "AfterShoot",
+        &[
+            r"C:\Program Files\AfterShoot\AfterShoot.exe",
+            r"C:\Program Files (x86)\AfterShoot\AfterShoot.exe",
+        ],
+        None,
+    )
+}
+
+#[tauri::command]
+pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
+    open_in_external_app(
+        &path,
+        "Videos",
+        "DaVinci Resolve",
+        &[
+            r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe",
+            r"C:\Program Files (x86)\Blackmagic Design\DaVinci Resolve\Resolve.exe",
+        ],
+        Some("/opt/resolve/bin/resolve"),
+    )
 }

@@ -236,6 +236,57 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
         <section className="project-actions">
           <h2>Actions</h2>
 
+          <div className="backup-destinations">
+            <h3>Open Photos In</h3>
+            <p className="action-hint">Open this project's photos in your editing app</p>
+            <div className="destination-list">
+              <button
+                onClick={() => {
+                  invoke('open_in_lightroom', { path: selectedProject.folderPath }).catch((err) => {
+                    alert(`Failed to open Lightroom: ${err}`)
+                  })
+                }}
+                className="destination-button"
+              >
+                <span className="destination-name">Lightroom Classic</span>
+                <span className="destination-path">Adobe Lightroom Classic</span>
+              </button>
+              <button
+                onClick={() => {
+                  invoke('open_in_aftershoot', { path: selectedProject.folderPath }).catch(
+                    (err) => {
+                      alert(`Failed to open AfterShoot: ${err}`)
+                    }
+                  )
+                }}
+                className="destination-button"
+              >
+                <span className="destination-name">AfterShoot</span>
+                <span className="destination-path">AfterShoot</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="backup-destinations">
+            <h3>Open Videos In</h3>
+            <p className="action-hint">Open this project's videos in your editing app</p>
+            <div className="destination-list">
+              <button
+                onClick={() => {
+                  invoke('open_in_davinci_resolve', { path: selectedProject.folderPath }).catch(
+                    (err) => {
+                      alert(`Failed to open DaVinci Resolve: ${err}`)
+                    }
+                  )
+                }}
+                className="destination-button"
+              >
+                <span className="destination-name">DaVinci Resolve</span>
+                <span className="destination-path">Blackmagic Design DaVinci Resolve</span>
+              </button>
+            </div>
+          </div>
+
           {destinations.length > 0 ? (
             <div className="backup-destinations">
               <h3>Backup to:</h3>

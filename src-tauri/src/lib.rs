@@ -9,7 +9,9 @@ use modules::delivery::{
     create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
 };
 use modules::file_copy::{cancel_import, copy_files};
-use modules::file_system::reveal_in_finder;
+use modules::file_system::{
+    open_in_aftershoot, open_in_davinci_resolve, open_in_lightroom, reveal_in_finder,
+};
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
@@ -51,6 +53,9 @@ pub fn run() {
             get_archive_queue,
             remove_archive_job,
             reveal_in_finder,
+            open_in_lightroom,
+            open_in_aftershoot,
+            open_in_davinci_resolve,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
