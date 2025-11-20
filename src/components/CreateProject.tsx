@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
 
@@ -7,15 +7,28 @@ interface CreateProjectProps {
   onCancel?: () => void
 }
 
+const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000
+
 export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    clientName: '',
-    date: new Date().toISOString().split('T')[0],
-    shootType: '',
+  const [formData, setFormData] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const oneWeekLater = new Date(Date.now() + WEEK_IN_MS).toISOString().split('T')[0]
+    return {
+      name: '',
+      clientName: '',
+      date: today,
+      shootType: '',
+      deadline: oneWeekLater,
+    }
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const shootDate = new Date(formData.date)
+    const newDeadline = new Date(shootDate.getTime() + WEEK_IN_MS)
+    setFormData((prev) => ({ ...prev, deadline: newDeadline.toISOString().split('T')[0] }))
+  }, [formData.date])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +100,7 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
 
           <div className="flex flex-col gap-xs">
             <label htmlFor="shootType" className="font-medium">
-              Shoot Type *
+              Shoot Type (optional)
             </label>
             <input
               id="shootType"
@@ -96,7 +109,19 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
               value={formData.shootType}
               onChange={(e) => handleChange('shootType', e.target.value)}
               placeholder="e.g., Wedding, Portrait, Event"
-              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-xs">
+            <label htmlFor="deadline" className="font-medium">
+              Deadline (optional)
+            </label>
+            <input
+              id="deadline"
+              type="date"
+              className="input"
+              value={formData.deadline}
+              onChange={(e) => handleChange('deadline', e.target.value)}
             />
           </div>
 

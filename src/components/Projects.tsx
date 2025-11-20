@@ -180,6 +180,12 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
               {selectedProject.status}
             </span>
           </div>
+          {selectedProject.deadline && (
+            <div className="info-row">
+              <span className="info-label">Deadline:</span>
+              <span>{selectedProject.deadline}</span>
+            </div>
+          )}
           <div className="info-row">
             <span className="info-label">Location:</span>
             <span className="folder-path">{selectedProject.folderPath}</span>

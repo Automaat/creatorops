@@ -20,6 +20,7 @@ export interface Project {
   folderPath: string
   createdAt: string
   updatedAt: string
+  deadline?: string
 }
 
 export enum ProjectStatus {
