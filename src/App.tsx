@@ -24,7 +24,9 @@ function App() {
   useTheme()
 
   // Global SD card scanner - runs in background across all pages
-  const { sdCards, isScanning, scanForSDCards } = useSDCardScanner()
+  const { sdCards, isScanning, scanForSDCards } = useSDCardScanner({
+    onCardDetected: () => setCurrentView('import'),
+  })
 
   // Global keyboard shortcuts - memoized to prevent re-creating on every render
   const shortcuts = useMemo(

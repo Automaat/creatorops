@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ImportHistory {
     pub id: String,
     pub project_id: String,
@@ -13,6 +14,8 @@ pub struct ImportHistory {
     pub files_copied: usize,
     pub files_skipped: usize,
     pub total_bytes: u64,
+    pub photos_copied: usize,
+    pub videos_copied: usize,
     pub started_at: String,
     pub completed_at: String,
     pub status: ImportStatus,
@@ -37,6 +40,8 @@ pub async fn save_import_history(
     files_copied: usize,
     files_skipped: usize,
     total_bytes: u64,
+    photos_copied: usize,
+    videos_copied: usize,
     started_at: String,
     error_message: Option<String>,
 ) -> Result<ImportHistory, String> {
@@ -60,6 +65,8 @@ pub async fn save_import_history(
         files_copied,
         files_skipped,
         total_bytes,
+        photos_copied,
+        videos_copied,
         started_at,
         completed_at,
         status,

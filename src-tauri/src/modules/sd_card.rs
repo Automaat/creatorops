@@ -5,6 +5,7 @@ use std::process::Command;
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SDCard {
     pub name: String,
     pub path: String,
