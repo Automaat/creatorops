@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project, ImportHistory } from '../types'
+import { formatProjectInfo } from '../utils/project'
 
 interface DashboardProps {
   onProjectClick?: (projectId: string) => void
@@ -105,10 +106,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
                     <div className="flex flex-between">
                       <div>
                         <h3>{project.name}</h3>
-                        <p className="text-secondary text-sm">
-                          {project.clientName} · {project.date} · {project.shootType}
-                          {project.deadline && ` · Deadline: ${project.deadline}`}
-                        </p>
+                        <p className="text-secondary text-sm">{formatProjectInfo(project)}</p>
                       </div>
                       <span className={`project-status ${getStatusColor(project.status)}`}>
                         {project.status}

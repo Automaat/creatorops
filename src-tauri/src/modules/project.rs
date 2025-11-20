@@ -28,6 +28,15 @@ pub enum ProjectStatus {
     Archived,
 }
 
+fn sanitize_path_component(s: &str) -> String {
+    s.split_whitespace()
+        .collect::<Vec<&str>>()
+        .join("")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+        .collect()
+}
+
 #[tauri::command]
 pub async fn create_project(
     name: String,
@@ -39,15 +48,12 @@ pub async fn create_project(
     let id = Uuid::new_v4().to_string();
 
     // Create folder structure: YYYY-MM-DD_ClientName[_ProjectType]/[RAW, Selects, Delivery]
+    let sanitized_client = sanitize_path_component(&client_name);
     let folder_name = if shoot_type.is_empty() {
-        format!("{}_{}", date, client_name.replace(" ", ""))
+        format!("{}_{}", date, sanitized_client)
     } else {
-        format!(
-            "{}_{}_{}",
-            date,
-            client_name.replace(" ", ""),
-            shoot_type.replace(" ", "")
-        )
+        let sanitized_type = sanitize_path_component(&shoot_type);
+        format!("{}_{}_{}", date, sanitized_client, sanitized_type)
     };
 
     // Default location (should be configurable in settings)

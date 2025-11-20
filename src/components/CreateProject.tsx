@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
 
@@ -10,18 +10,25 @@ interface CreateProjectProps {
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000
 
 export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps) {
-  const today = new Date().toISOString().split('T')[0]
-  const oneWeekLater = new Date(Date.now() + WEEK_IN_MS).toISOString().split('T')[0]
-
-  const [formData, setFormData] = useState({
-    name: '',
-    clientName: '',
-    date: today,
-    shootType: '',
-    deadline: oneWeekLater,
+  const [formData, setFormData] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const oneWeekLater = new Date(Date.now() + WEEK_IN_MS).toISOString().split('T')[0]
+    return {
+      name: '',
+      clientName: '',
+      date: today,
+      shootType: '',
+      deadline: oneWeekLater,
+    }
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const shootDate = new Date(formData.date)
+    const newDeadline = new Date(shootDate.getTime() + WEEK_IN_MS)
+    setFormData((prev) => ({ ...prev, deadline: newDeadline.toISOString().split('T')[0] }))
+  }, [formData.date])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,18 +46,7 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
   }
 
   const handleChange = (field: string, value: string) => {
-    if (field === 'date') {
-      // Auto-update deadline to 1 week after shoot date
-      const shootDate = new Date(value)
-      const newDeadline = new Date(shootDate.getTime() + WEEK_IN_MS)
-      setFormData((prev) => ({
-        ...prev,
-        date: value,
-        deadline: newDeadline.toISOString().split('T')[0],
-      }))
-    } else {
-      setFormData((prev) => ({ ...prev, [field]: value }))
-    }
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
