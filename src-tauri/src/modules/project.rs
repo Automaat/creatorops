@@ -125,6 +125,44 @@ mod dirs {
     }
 }
 
+#[tauri::command]
+pub async fn delete_project(project_id: String) -> Result<(), String> {
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let base_path = home_dir.join("CreatorOps").join("Projects");
+
+    if !base_path.exists() {
+        return Err("Projects directory does not exist".to_string());
+    }
+
+    // Find project by ID
+    for entry in WalkDir::new(&base_path)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if path == base_path {
+            continue;
+        }
+
+        let metadata_path = path.join("project.json");
+        if metadata_path.exists() {
+            if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+                if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
+                    if project.id == project_id {
+                        // Delete entire project folder
+                        fs::remove_dir_all(path)
+                            .map_err(|e| format!("Failed to delete project folder: {}", e))?;
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
+
+    Err("Project not found".to_string())
+}
+
 mod chrono {
     pub struct Utc;
 

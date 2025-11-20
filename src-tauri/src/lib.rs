@@ -12,7 +12,7 @@ use modules::file_copy::copy_files;
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
-use modules::project::{create_project, list_projects};
+use modules::project::{create_project, delete_project, list_projects};
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,6 +27,7 @@ pub fn run() {
             copy_files,
             create_project,
             list_projects,
+            delete_project,
             save_import_history,
             get_import_history,
             get_project_import_history,

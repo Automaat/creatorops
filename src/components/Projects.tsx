@@ -15,6 +15,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [archiveLocation, setArchiveLocation] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
   const [showCreateProject, setShowCreateProject] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     loadProjects()
@@ -117,6 +118,20 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
     setProjects([project, ...projects])
   }
 
+  async function deleteProject() {
+    if (!selectedProject) return
+
+    try {
+      await invoke('delete_project', { projectId: selectedProject.id })
+      setShowDeleteDialog(false)
+      setSelectedProject(null)
+      loadProjects()
+    } catch (err) {
+      console.error('Failed to delete project:', err)
+      alert(`Failed to delete project: ${err}`)
+    }
+  }
+
   function getStatusColor(status: string): string {
     switch (status) {
       case 'Importing':
@@ -212,6 +227,16 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
               {selectedProject.status === 'Archived' ? 'Already Archived' : 'Archive Project'}
             </button>
           </div>
+
+          <div className="delete-action">
+            <h3>Delete Project</h3>
+            <p className="action-hint">
+              Permanently delete this project and all its files. This action cannot be undone.
+            </p>
+            <button onClick={() => setShowDeleteDialog(true)} className="btn-danger">
+              Delete Project
+            </button>
+          </div>
         </section>
 
         {showArchiveDialog && (
@@ -244,6 +269,27 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
                   disabled={!archiveLocation}
                 >
                   Confirm Archive
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteDialog && (
+          <div className="dialog-overlay" onClick={() => setShowDeleteDialog(false)}>
+            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+              <h2>Delete Project</h2>
+              <p>
+                Are you sure you want to delete <strong>{selectedProject.name}</strong>? This will
+                permanently delete the project folder and all its contents.
+              </p>
+              <p className="warning">This action cannot be undone.</p>
+              <div className="dialog-actions">
+                <button onClick={() => setShowDeleteDialog(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button onClick={deleteProject} className="btn-danger">
+                  Delete Project
                 </button>
               </div>
             </div>

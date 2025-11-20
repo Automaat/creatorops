@@ -836,6 +836,21 @@
   cursor: not-allowed;
 }
 
+.btn-danger {
+  padding: var(--space-md) var(--space-lg);
+  background-color: var(--color-error);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.btn-danger:hover {
+  opacity: 0.85;
+}
+
 /* Dialog */
 
 .dialog-overlay {
