@@ -3,7 +3,8 @@
 /* Buttons */
 
 .btn {
-  padding: var(--space-sm) var(--space-lg);
+  min-height: 40px;
+  padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-medium);
   transition: all var(--transition-fast);
@@ -18,7 +19,8 @@
 }
 
 .btn-primary {
-  padding: var(--space-sm) var(--space-lg);
+  min-height: 40px;
+  padding: var(--space-md) var(--space-lg);
   background-color: var(--color-accent-primary);
   color: white;
   border: none;
@@ -39,7 +41,8 @@
 }
 
 .btn-secondary {
-  padding: var(--space-sm) var(--space-lg);
+  min-height: 40px;
+  padding: var(--space-md) var(--space-lg);
   background-color: var(--color-bg-tertiary);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
@@ -150,7 +153,7 @@
 }
 
 .backup-queue-header {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-xxl);
 }
 
 .backup-queue-header h1 {
@@ -310,7 +313,7 @@
 }
 
 .projects-header {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-xxl);
 }
 
 .projects-header h1 {
@@ -408,7 +411,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-xxl);
 }
 
 .project-detail-header h1 {
@@ -437,13 +440,13 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-xxl);
 }
 
 .info-row {
   display: flex;
   gap: var(--space-sm);
-  padding: var(--space-sm) 0;
+  padding: var(--space-md) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -464,7 +467,7 @@
 }
 
 .project-actions {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-xxl);
 }
 
 .project-actions h2 {
@@ -818,7 +821,7 @@
 
 .archive-action,
 .delete-action {
-  margin-top: var(--space-xl);
+  margin-top: var(--space-xxl);
   padding: var(--space-lg);
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);

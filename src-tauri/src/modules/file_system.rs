@@ -22,7 +22,7 @@ const DAVINCI_RESOLVE_PATHS: &[&str] = &[
 /// Opens a project's media folder in an external editing application.
 ///
 /// This function assumes the standard CreatorOps project structure:
-/// ```
+/// ```text
 /// ProjectFolder/
 ///   RAW/
 ///     Photos/  (for photo editing apps)
