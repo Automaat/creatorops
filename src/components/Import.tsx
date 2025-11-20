@@ -280,7 +280,9 @@ function SDCardItem({ card }: SDCardItemProps) {
         <div className="flex flex-col gap-md">
           <div>
             <h3>{card.name}</h3>
-            <p className="text-secondary text-sm">Importing...</p>
+            <p className="text-secondary text-sm">
+              {importProgress ? 'Importing...' : 'Starting import...'}
+            </p>
           </div>
 
           {importProgress && (

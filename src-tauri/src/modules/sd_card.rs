@@ -34,7 +34,14 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
                     let name = entry.file_name().to_string_lossy().to_string();
 
                     // Skip system volumes
-                    if name == "Macintosh HD" || name.starts_with('.') {
+                    if name == "Macintosh HD"
+                        || name == "Data"
+                        || name == "Preboot"
+                        || name == "Recovery"
+                        || name == "VM"
+                        || name == "Update"
+                        || name.starts_with('.')
+                    {
                         continue;
                     }
 
