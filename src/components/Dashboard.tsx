@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, ImportHistory } from '../types'
+import type { Project } from '../types'
 import { formatProjectInfo } from '../utils/project'
 
 interface DashboardProps {
@@ -9,7 +9,6 @@ interface DashboardProps {
 
 export function Dashboard({ onProjectClick }: DashboardProps) {
   const [projects, setProjects] = useState<Project[]>([])
-  const [recentImports, setRecentImports] = useState<ImportHistory[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,12 +18,8 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
   async function loadData() {
     try {
       setLoading(true)
-      const [projectList, importList] = await Promise.all([
-        invoke<Project[]>('list_projects'),
-        invoke<ImportHistory[]>('get_import_history'),
-      ])
+      const projectList = await invoke<Project[]>('list_projects')
       setProjects(projectList)
-      setRecentImports(importList.slice(0, 5)) // Show last 5
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
     } finally {
@@ -44,23 +39,6 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
         return 'status-archived'
       default:
         return ''
-    }
-  }
-
-  function formatBytes(bytes: number): string {
-    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-  }
-
-  function formatDate(dateStr: string): string {
-    try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString()
-    } catch {
-      return dateStr
     }
   }
 
@@ -119,34 +97,6 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
           </section>
 
           <section>
-            <h2>Recent Imports</h2>
-            <div className="flex flex-col gap-md">
-              {recentImports.length === 0 ? (
-                <div className="card">
-                  <p className="text-secondary">No recent imports</p>
-                </div>
-              ) : (
-                recentImports.map((imp, idx) => (
-                  <div key={idx} className="card">
-                    <div className="flex flex-col gap-xs">
-                      <div className="flex flex-between">
-                        <h4>{imp.projectName}</h4>
-                        <span className="text-sm text-secondary">{formatDate(imp.startedAt)}</span>
-                      </div>
-                      <p className="text-sm text-secondary">
-                        {imp.filesCopied} files · {formatBytes(imp.totalBytes)}
-                        {imp.errorMessage && (
-                          <span className="text-error"> · Error: {imp.errorMessage}</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section>
             <h2>Quick Stats</h2>
             <div className="card">
               <div className="flex flex-col gap-md">
@@ -157,10 +107,6 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
                 <div className="flex flex-between">
                   <span className="text-secondary">Active Projects:</span>
                   <span className="font-medium">{activeProjects.length}</span>
-                </div>
-                <div className="flex flex-between">
-                  <span className="text-secondary">Recent Imports:</span>
-                  <span className="font-medium">{recentImports.length}</span>
                 </div>
               </div>
             </div>

@@ -103,7 +103,12 @@ function App() {
       <Layout currentView={currentView} onNavigate={handleViewChange}>
         {currentView === 'dashboard' && <Dashboard onProjectClick={handleNavigateToProject} />}
         {currentView === 'import' && (
-          <Import sdCards={sdCards} isScanning={isScanning} onRefresh={scanForSDCards} />
+          <Import
+            sdCards={sdCards}
+            isScanning={isScanning}
+            onRefresh={scanForSDCards}
+            onImportComplete={handleNavigateToProject}
+          />
         )}
         {currentView === 'projects' && <Projects initialSelectedProjectId={selectedProjectId} />}
         {currentView === 'backup' && <BackupQueue />}

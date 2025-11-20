@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-import { formatBytes } from '../utils/formatting'
-import type { SDCard, Project, ImportProgress, CopyResult } from '../types'
+import type { SDCard, Project, CopyResult } from '../types'
 import { CreateProject } from './CreateProject'
 
 interface ImportProps {
   sdCards: SDCard[]
   isScanning: boolean
   onRefresh: () => void
+  onImportComplete: (projectId: string) => void
 }
 
-export function Import({ sdCards, isScanning, onRefresh }: ImportProps) {
+export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: ImportProps) {
+  const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
+
   return (
     <>
       <div className="content-header">
@@ -38,7 +39,13 @@ export function Import({ sdCards, isScanning, onRefresh }: ImportProps) {
           ) : (
             <div className="flex flex-col gap-md">
               {sdCards.map((card) => (
-                <SDCardItem key={card.path} card={card} />
+                <SDCardItem
+                  key={card.path}
+                  card={card}
+                  onImportComplete={onImportComplete}
+                  isActive={activeCardPath === card.path}
+                  onActivate={() => setActiveCardPath(card.path)}
+                />
               ))}
             </div>
           )}
@@ -50,37 +57,25 @@ export function Import({ sdCards, isScanning, onRefresh }: ImportProps) {
 
 interface SDCardItemProps {
   card: SDCard
+  onImportComplete: (projectId: string) => void
+  isActive: boolean
+  onActivate: () => void
 }
 
-function SDCardItem({ card }: SDCardItemProps) {
+function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItemProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [showCreateNew, setShowCreateNew] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
-
-  const usedSpace = card.size - card.freeSpace
-  const usedPercent = card.size > 0 ? (usedSpace / card.size) * 100 : 0
+  const [cancelRequested, setCancelRequested] = useState(false)
 
   useEffect(() => {
     if (showProjectSelect) {
       loadProjects()
     }
   }, [showProjectSelect])
-
-  useEffect(() => {
-    if (!isImporting) return
-
-    const unlisten = listen<ImportProgress>('import-progress', (event) => {
-      setImportProgress(event.payload)
-    })
-
-    return () => {
-      unlisten.then((fn) => fn())
-    }
-  }, [isImporting])
 
   const loadProjects = async () => {
     try {
@@ -92,6 +87,7 @@ function SDCardItem({ card }: SDCardItemProps) {
   }
 
   const handleImportClick = () => {
+    onActivate()
     setShowProjectSelect(true)
   }
 
@@ -116,8 +112,8 @@ function SDCardItem({ card }: SDCardItemProps) {
     if (!project) return
 
     setIsImporting(true)
-    setImportProgress(null)
     setImportResult(null)
+    setCancelRequested(false)
 
     const startedAt = new Date().toISOString()
 
@@ -163,9 +159,6 @@ function SDCardItem({ card }: SDCardItemProps) {
 
       setImportResult(result)
 
-      // Calculate total bytes transferred (approximation based on progress)
-      const totalBytes = importProgress?.totalBytes || 0
-
       // Save to history
       await invoke('save_import_history', {
         projectId: project.id,
@@ -174,20 +167,24 @@ function SDCardItem({ card }: SDCardItemProps) {
         destinationPath: destination,
         filesCopied: result.filesCopied,
         filesSkipped: result.filesSkipped,
-        totalBytes,
+        totalBytes: 0,
         startedAt,
         errorMessage: result.error || null,
       })
+
+      // Navigate to project view on successful import
+      if (result.success && result.filesCopied > 0) {
+        setTimeout(() => onImportComplete(project.id), 1500)
+      }
     } catch (error) {
       console.error('Import failed:', error)
-      const result = {
+      setImportResult({
         success: false,
-        error: error as string,
+        error: String(error),
         filesCopied: 0,
         filesSkipped: 0,
         skippedFiles: [],
-      }
-      setImportResult(result)
+      })
 
       // Save failed import to history
       try {
@@ -207,8 +204,31 @@ function SDCardItem({ card }: SDCardItemProps) {
       }
     } finally {
       setIsImporting(false)
-      setImportProgress(null)
     }
+  }
+
+  // Only show expanded view if this card is active
+  if (!isActive) {
+    return (
+      <div className="card" onClick={handleImportClick} style={{ cursor: 'pointer' }}>
+        <div className="flex flex-col gap-md">
+          <div className="flex" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3>{card.name}</h3>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleImportClick()
+              }}
+            >
+              Import
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (showProjectSelect && !isImporting && !importResult) {
@@ -218,10 +238,6 @@ function SDCardItem({ card }: SDCardItemProps) {
           <div className="flex flex-col gap-md">
             <div>
               <h3>{card.name}</h3>
-              <p className="text-secondary text-sm">{card.path}</p>
-              <p className="text-sm mt-xs">
-                {card.fileCount} files · {formatBytes(usedSpace)}
-              </p>
             </div>
 
             <div className="flex flex-col gap-xs">
@@ -274,50 +290,24 @@ function SDCardItem({ card }: SDCardItemProps) {
     )
   }
 
-  if (isImporting || importProgress) {
+  const handleCancelImport = () => {
+    setCancelRequested(true)
+  }
+
+  if (isImporting) {
     return (
       <div className="card">
         <div className="flex flex-col gap-md">
           <div>
             <h3>{card.name}</h3>
             <p className="text-secondary text-sm">
-              {importProgress ? 'Importing...' : 'Starting import...'}
+              {cancelRequested ? 'Import continuing in background...' : 'Importing files...'}
             </p>
           </div>
-
-          {importProgress && (
-            <>
-              <div>
-                <div
-                  className="flex"
-                  style={{ justifyContent: 'space-between', marginBottom: 'var(--space-xs)' }}
-                >
-                  <span className="text-sm">
-                    {importProgress.currentFile} / {importProgress.totalFiles} files
-                  </span>
-                  <span className="text-sm">
-                    {formatBytes(importProgress.bytesTransferred)} /{' '}
-                    {formatBytes(importProgress.totalBytes)}
-                  </span>
-                </div>
-                <div className="progress">
-                  <div
-                    className="progress-bar"
-                    style={{
-                      width: `${(importProgress.bytesTransferred / importProgress.totalBytes) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="text-sm text-secondary">
-                <p>Current: {importProgress.fileName}</p>
-                <p>
-                  Speed: {formatBytes(importProgress.speed)}/s · ETA:{' '}
-                  {formatTime(importProgress.eta)}
-                </p>
-              </div>
-            </>
+          {!cancelRequested && (
+            <button className="btn" onClick={handleCancelImport}>
+              Stop Waiting
+            </button>
           )}
         </div>
       </div>
@@ -363,48 +353,6 @@ function SDCardItem({ card }: SDCardItemProps) {
     )
   }
 
-  return (
-    <div className="card">
-      <div className="flex flex-col gap-md">
-        <div className="flex" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h3>{card.name}</h3>
-            <p className="text-secondary text-sm">{card.path}</p>
-            <p className="text-secondary text-xs mt-xxs">
-              {card.deviceType}
-              {card.isRemovable && ' • Removable'}
-            </p>
-          </div>
-          <button className="btn btn-primary" onClick={handleImportClick}>
-            Import
-          </button>
-        </div>
-
-        <div>
-          <div
-            className="flex"
-            style={{ justifyContent: 'space-between', marginBottom: 'var(--space-xs)' }}
-          >
-            <span className="text-sm text-secondary">{card.fileCount} files</span>
-            <span className="text-sm text-secondary">
-              {formatBytes(usedSpace)} / {formatBytes(card.size)}
-            </span>
-          </div>
-          <div className="progress">
-            <div className="progress-bar" style={{ width: `${usedPercent}%` }} />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function formatTime(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  const minutes = Math.floor(seconds / 60)
-  const secs = Math.round(seconds % 60)
-  if (minutes < 60) return `${minutes}m ${secs}s`
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${hours}h ${mins}m`
+  // This should never be reached, but just in case return null
+  return null
 }
