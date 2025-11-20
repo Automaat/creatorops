@@ -63,7 +63,18 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
     }
   }
 
-  const activeProjects = projects.filter((p) => p.status !== 'Archived')
+  const activeProjects = projects
+    .filter((p) => p.status !== 'Archived')
+    .sort((a, b) => {
+      // Projects with deadlines come first, sorted by deadline (earliest first)
+      if (a.deadline && b.deadline) {
+        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      }
+      if (a.deadline) return -1
+      if (b.deadline) return 1
+      // No deadline: sort by updated date descending
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
 
   if (loading) {
     return <div className="loading">Loading...</div>
@@ -96,6 +107,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
                         <h3>{project.name}</h3>
                         <p className="text-secondary text-sm">
                           {project.clientName} · {project.date} · {project.shootType}
+                          {project.deadline && ` · Deadline: ${project.deadline}`}
                         </p>
                       </div>
                       <span className={`project-status ${getStatusColor(project.status)}`}>

@@ -15,6 +15,8 @@ pub struct Project {
     pub folder_path: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deadline: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,16 +34,21 @@ pub async fn create_project(
     client_name: String,
     date: String,
     shoot_type: String,
+    deadline: Option<String>,
 ) -> Result<Project, String> {
     let id = Uuid::new_v4().to_string();
 
-    // Create folder structure: YYYY-MM-DD_ClientName_ProjectType/[RAW, Selects, Delivery]
-    let folder_name = format!(
-        "{}_{}_{}",
-        date,
-        client_name.replace(" ", ""),
-        shoot_type.replace(" ", "")
-    );
+    // Create folder structure: YYYY-MM-DD_ClientName[_ProjectType]/[RAW, Selects, Delivery]
+    let folder_name = if shoot_type.is_empty() {
+        format!("{}_{}", date, client_name.replace(" ", ""))
+    } else {
+        format!(
+            "{}_{}_{}",
+            date,
+            client_name.replace(" ", ""),
+            shoot_type.replace(" ", "")
+        )
+    };
 
     // Default location (should be configurable in settings)
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
@@ -66,6 +73,7 @@ pub async fn create_project(
         folder_path: project_path.to_string_lossy().to_string(),
         created_at: now.clone(),
         updated_at: now,
+        deadline: deadline.filter(|d| !d.is_empty()),
     };
 
     // Save project metadata to a JSON file
