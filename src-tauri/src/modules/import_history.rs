@@ -27,27 +27,25 @@ pub enum ImportStatus {
     Failed,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct SaveImportHistoryParams {
-    pub project_id: String,
-    pub project_name: String,
-    pub source_path: String,
-    pub destination_path: String,
-    pub files_copied: usize,
-    pub files_skipped: usize,
-    pub total_bytes: u64,
-    pub started_at: String,
-    pub error_message: Option<String>,
-}
-
-#[tauri::command]
-pub async fn save_import_history(params: SaveImportHistoryParams) -> Result<ImportHistory, String> {
+#[tauri::command(rename_all = "camelCase")]
+#[allow(clippy::too_many_arguments)]
+pub async fn save_import_history(
+    project_id: String,
+    project_name: String,
+    source_path: String,
+    destination_path: String,
+    files_copied: usize,
+    files_skipped: usize,
+    total_bytes: u64,
+    started_at: String,
+    error_message: Option<String>,
+) -> Result<ImportHistory, String> {
     let id = Uuid::new_v4().to_string();
     let completed_at = chrono::Utc::now().to_rfc3339();
 
-    let status = if params.files_copied == 0 {
+    let status = if files_copied == 0 {
         ImportStatus::Failed
-    } else if params.files_skipped > 0 {
+    } else if files_skipped > 0 {
         ImportStatus::Partial
     } else {
         ImportStatus::Success
@@ -55,17 +53,17 @@ pub async fn save_import_history(params: SaveImportHistoryParams) -> Result<Impo
 
     let history = ImportHistory {
         id: id.clone(),
-        project_id: params.project_id,
-        project_name: params.project_name,
-        source_path: params.source_path,
-        destination_path: params.destination_path,
-        files_copied: params.files_copied,
-        files_skipped: params.files_skipped,
-        total_bytes: params.total_bytes,
-        started_at: params.started_at,
+        project_id,
+        project_name,
+        source_path,
+        destination_path,
+        files_copied,
+        files_skipped,
+        total_bytes,
+        started_at,
         completed_at,
         status,
-        error_message: params.error_message,
+        error_message,
     };
 
     // Save to history file

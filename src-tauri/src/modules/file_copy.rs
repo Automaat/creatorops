@@ -1,48 +1,38 @@
-use crate::modules::file_utils::verify_checksum;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Emitter;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
+use tokio_util::sync::CancellationToken;
 
-const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 const MAX_RETRY_ATTEMPTS: usize = 3;
+const MAX_CONCURRENT_COPIES: usize = 4; // Parallel file copies
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ImportProgress {
-    pub file_name: String,
-    pub current_file: usize,
-    pub total_files: usize,
-    pub bytes_transferred: u64,
-    pub total_bytes: u64,
-    pub speed: f64,
-    pub eta: u64,
+// Global map of active import cancellation tokens
+lazy_static::lazy_static! {
+    static ref IMPORT_TOKENS: Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>> =
+        Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CopyResult {
     pub success: bool,
     pub error: Option<String>,
     pub files_copied: usize,
     pub files_skipped: usize,
     pub skipped_files: Vec<String>,
+    pub total_bytes: u64,
 }
 
-/// Context for tracking copy progress across multiple files
-struct CopyContext {
-    current_file: usize,
-    total_files: usize,
-    bytes_transferred: u64,
-    total_bytes: u64,
-    start_time: std::time::Instant,
-}
-
-/// Copy files from source to destination with progress tracking and checksum verification
+/// Copy files from source to destination with parallel processing
 #[tauri::command]
 pub async fn copy_files(
-    window: tauri::Window,
+    import_id: String,
     source_paths: Vec<String>,
     destination: String,
 ) -> Result<CopyResult, String> {
@@ -53,58 +43,100 @@ pub async fn copy_files(
         fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
     }
 
-    let total_files = source_paths.len();
-    let mut total_bytes = 0u64;
-
-    // Calculate total size
-    for src in &source_paths {
-        if let Ok(metadata) = fs::metadata(src) {
-            total_bytes += metadata.len();
-        }
+    // Create cancellation token and register it
+    let cancel_token = CancellationToken::new();
+    {
+        let mut tokens = IMPORT_TOKENS.lock().await;
+        tokens.insert(import_id.clone(), cancel_token.clone());
     }
 
-    let mut bytes_transferred = 0u64;
-    let start_time = std::time::Instant::now();
-    let mut files_copied = 0;
-    let mut files_skipped = 0;
-    let mut skipped_files = Vec::new();
+    let files_copied = Arc::new(AtomicUsize::new(0));
+    let files_skipped = Arc::new(AtomicUsize::new(0));
+    let total_bytes = Arc::new(AtomicUsize::new(0));
+    let skipped_files = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_COPIES));
 
-    for (index, src_path) in source_paths.iter().enumerate() {
-        let src = Path::new(src_path);
+    let mut tasks = Vec::new();
+
+    for src_path in source_paths.iter() {
+        let src = PathBuf::from(src_path);
         let file_name = src
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-
         let dest_file = dest_path.join(&file_name);
 
-        let context = CopyContext {
-            current_file: index + 1,
-            total_files,
-            bytes_transferred,
-            total_bytes,
-            start_time,
-        };
+        let files_copied_clone = files_copied.clone();
+        let files_skipped_clone = files_skipped.clone();
+        let total_bytes_clone = total_bytes.clone();
+        let skipped_files_clone = skipped_files.clone();
+        let semaphore_clone = semaphore.clone();
+        let cancel_token_clone = cancel_token.clone();
 
-        // Try copying with retries
-        match copy_file_with_retry(src, &dest_file, &window, &context).await {
-            Ok(size) => {
-                bytes_transferred += size;
-                files_copied += 1;
+        let task = tokio::spawn(async move {
+            // Check if cancelled before starting
+            if cancel_token_clone.is_cancelled() {
+                return Err("Import cancelled".to_string());
             }
-            Err(e) => {
-                eprintln!("Failed to copy {} after retries: {}", file_name, e);
-                files_skipped += 1;
-                skipped_files.push(file_name);
-                // Continue with next file instead of failing entire operation
+
+            let _permit = semaphore_clone.acquire().await.unwrap();
+
+            // Check again after acquiring semaphore
+            if cancel_token_clone.is_cancelled() {
+                return Err("Import cancelled".to_string());
             }
+
+            match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
+                Ok(size) => {
+                    files_copied_clone.fetch_add(1, Ordering::SeqCst);
+                    total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
+                    Ok(())
+                }
+                Err(e) => {
+                    if cancel_token_clone.is_cancelled() {
+                        return Err("Import cancelled".to_string());
+                    }
+                    eprintln!("Failed to copy {} after retries: {}", file_name, e);
+                    files_skipped_clone.fetch_add(1, Ordering::SeqCst);
+                    skipped_files_clone.lock().await.push(file_name);
+                    Err(e)
+                }
+            }
+        });
+
+        tasks.push(task);
+    }
+
+    // Wait for all tasks and handle errors
+    let mut cancelled = false;
+    for result in futures::future::join_all(tasks).await {
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) if e == "Import cancelled" => {
+                cancelled = true;
+            }
+            Ok(Err(_)) => {} // File copy failed, already counted as skipped
+            Err(e) => return Err(format!("Task failed: {}", e)),
         }
     }
 
+    // Clean up token
+    {
+        let mut tokens = IMPORT_TOKENS.lock().await;
+        tokens.remove(&import_id);
+    }
+
+    let files_copied = files_copied.load(Ordering::SeqCst);
+    let files_skipped = files_skipped.load(Ordering::SeqCst);
+    let total_bytes = total_bytes.load(Ordering::SeqCst) as u64;
+    let skipped_files = skipped_files.lock().await.clone();
+
     Ok(CopyResult {
-        success: files_copied > 0,
-        error: if files_skipped > 0 {
+        success: !cancelled && files_copied > 0,
+        error: if cancelled {
+            Some(format!("Import cancelled ({} files copied)", files_copied))
+        } else if files_skipped > 0 {
             Some(format!("{} file(s) skipped due to errors", files_skipped))
         } else {
             None
@@ -112,110 +144,38 @@ pub async fn copy_files(
         files_copied,
         files_skipped,
         skipped_files,
+        total_bytes,
     })
 }
 
-/// Copy file with retry logic and checksum verification
+/// Copy file with retry logic using fast native copy
 async fn copy_file_with_retry(
     src: &Path,
     dest: &Path,
-    window: &tauri::Window,
-    context: &CopyContext,
+    cancel_token: &CancellationToken,
 ) -> Result<u64, String> {
     let retry_strategy = ExponentialBackoff::from_millis(10)
         .map(jitter)
         .take(MAX_RETRY_ATTEMPTS);
 
     Retry::spawn(retry_strategy, || async {
-        // Attempt copy
-        let size = copy_file_with_progress(src, dest, window, context).await?;
-
-        // Verify checksum
-        match verify_checksum(src, dest).await {
-            Ok(true) => Ok(size),
-            Ok(false) => {
-                eprintln!("Checksum mismatch, retrying...");
-                let _ = tokio::fs::remove_file(dest).await;
-                Err("Checksum verification failed".to_string())
-            }
-            Err(e) => {
-                let _ = tokio::fs::remove_file(dest).await;
-                Err(format!("Checksum calculation failed: {}", e))
-            }
+        if cancel_token.is_cancelled() {
+            return Err("Import cancelled".to_string());
         }
+        // Use fast native copy instead of manual chunking
+        tokio::fs::copy(src, dest).await.map_err(|e| e.to_string())
     })
     .await
 }
 
-async fn copy_file_with_progress(
-    src: &Path,
-    dest: &Path,
-    window: &tauri::Window,
-    context: &CopyContext,
-) -> Result<u64, String> {
-    let file_name = src
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-
-    let mut src_file = tokio::fs::File::open(src)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut dest_file = tokio::fs::File::create(dest)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let file_size = src_file.metadata().await.map_err(|e| e.to_string())?.len();
-
-    let mut buffer = vec![0u8; CHUNK_SIZE];
-    let mut file_bytes_transferred = 0u64;
-
-    loop {
-        let bytes_read = src_file
-            .read(&mut buffer)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        if bytes_read == 0 {
-            break;
-        }
-
-        dest_file
-            .write_all(&buffer[..bytes_read])
-            .await
-            .map_err(|e| e.to_string())?;
-
-        file_bytes_transferred += bytes_read as u64;
-
-        let elapsed = context.start_time.elapsed().as_secs_f64();
-        let speed = if elapsed > 0.0 {
-            (context.bytes_transferred + file_bytes_transferred) as f64 / elapsed
-        } else {
-            0.0
-        };
-
-        let remaining_bytes =
-            context.total_bytes - (context.bytes_transferred + file_bytes_transferred);
-        let eta = if speed > 0.0 {
-            (remaining_bytes as f64 / speed) as u64
-        } else {
-            0
-        };
-
-        let progress = ImportProgress {
-            file_name: file_name.clone(),
-            current_file: context.current_file,
-            total_files: context.total_files,
-            bytes_transferred: context.bytes_transferred + file_bytes_transferred,
-            total_bytes: context.total_bytes,
-            speed,
-            eta,
-        };
-
-        let _ = window.emit("import-progress", progress);
+/// Cancel an ongoing import
+#[tauri::command]
+pub async fn cancel_import(import_id: String) -> Result<(), String> {
+    let tokens = IMPORT_TOKENS.lock().await;
+    if let Some(token) = tokens.get(&import_id) {
+        token.cancel();
+        Ok(())
+    } else {
+        Err("Import not found or already completed".to_string())
     }
-
-    Ok(file_size)
 }

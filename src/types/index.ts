@@ -69,6 +69,7 @@ export interface CopyResult {
   filesCopied: number
   filesSkipped: number
   skippedFiles: string[]
+  totalBytes: number
 }
 
 export interface BackupDestination {
