@@ -166,6 +166,16 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
     }
   }
 
+  async function handleOpenInApp(command: string, appName: string) {
+    if (!selectedProject) return
+
+    try {
+      await invoke(command, { path: selectedProject.folderPath })
+    } catch (err) {
+      alert(`Failed to open ${appName}: ${err}`)
+    }
+  }
+
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -235,6 +245,41 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
         <section className="project-actions">
           <h2>Actions</h2>
+
+          <div className="backup-destinations">
+            <h3>Open Photos In</h3>
+            <p className="action-hint">Open this project's photos in your editing app</p>
+            <div className="destination-list">
+              <button
+                onClick={() => handleOpenInApp('open_in_lightroom', 'Lightroom Classic')}
+                className="destination-button"
+              >
+                <span className="destination-name">Lightroom Classic</span>
+                <span className="destination-path">Photo editing application</span>
+              </button>
+              <button
+                onClick={() => handleOpenInApp('open_in_aftershoot', 'AfterShoot')}
+                className="destination-button"
+              >
+                <span className="destination-name">AfterShoot</span>
+                <span className="destination-path">Photo culling & editing</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="backup-destinations">
+            <h3>Open Videos In</h3>
+            <p className="action-hint">Open this project's videos in your editing app</p>
+            <div className="destination-list">
+              <button
+                onClick={() => handleOpenInApp('open_in_davinci_resolve', 'DaVinci Resolve')}
+                className="destination-button"
+              >
+                <span className="destination-name">DaVinci Resolve</span>
+                <span className="destination-path">Video editing & color grading</span>
+              </button>
+            </div>
+          </div>
 
           {destinations.length > 0 ? (
             <div className="backup-destinations">
