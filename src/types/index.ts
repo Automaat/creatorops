@@ -31,13 +31,9 @@ export enum ProjectStatus {
 }
 
 export interface ImportProgress {
-  fileName: string
-  currentFile: number
+  filesCopied: number
   totalFiles: number
-  bytesTransferred: number
-  totalBytes: number
-  speed: number
-  eta: number
+  currentFile: string
 }
 
 export interface FileInfo {
@@ -57,6 +53,8 @@ export interface ImportHistory {
   filesCopied: number
   filesSkipped: number
   totalBytes: number
+  photosCopied: number
+  videosCopied: number
   startedAt: string
   completedAt: string
   status: 'success' | 'partial' | 'failed'
@@ -70,6 +68,8 @@ export interface CopyResult {
   filesSkipped: number
   skippedFiles: string[]
   totalBytes: number
+  photosCopied: number
+  videosCopied: number
 }
 
 export interface BackupDestination {

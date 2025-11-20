@@ -63,7 +63,8 @@ pub async fn create_project(
 
     // Create directory structure
     fs::create_dir_all(&project_path).map_err(|e| e.to_string())?;
-    fs::create_dir_all(project_path.join("RAW")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(project_path.join("RAW/Photos")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(project_path.join("RAW/Videos")).map_err(|e| e.to_string())?;
     fs::create_dir_all(project_path.join("Selects")).map_err(|e| e.to_string())?;
     fs::create_dir_all(project_path.join("Delivery")).map_err(|e| e.to_string())?;
 

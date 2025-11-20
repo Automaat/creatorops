@@ -143,6 +143,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesSkipped: 0,
           skippedFiles: [],
           totalBytes: 0,
+          photosCopied: 0,
+          videosCopied: 0,
         }
         setImportResult(result)
         setIsImporting(false)
@@ -157,6 +159,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesCopied: 0,
           filesSkipped: 0,
           totalBytes: 0,
+          photosCopied: 0,
+          videosCopied: 0,
           startedAt,
           errorMessage: result.error,
         })
@@ -187,6 +191,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesCopied: result.filesCopied,
           filesSkipped: result.filesSkipped,
           totalBytes: result.totalBytes,
+          photosCopied: result.photosCopied,
+          videosCopied: result.videosCopied,
           startedAt,
           errorMessage: result.error || null,
         })
@@ -205,6 +211,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
         filesSkipped: 0,
         skippedFiles: [],
         totalBytes: 0,
+        photosCopied: 0,
+        videosCopied: 0,
       })
 
       // Save failed import to history
@@ -217,6 +225,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesCopied: 0,
           filesSkipped: 0,
           totalBytes: 0,
+          photosCopied: 0,
+          videosCopied: 0,
           startedAt,
           errorMessage: String(error),
         })
@@ -234,7 +244,6 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
 
     try {
       await invoke('cancel_import', { importId })
-      console.log('Import cancellation requested')
     } catch (error) {
       console.error('Failed to cancel import:', error)
     }
@@ -361,6 +370,8 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           {!wasCancelled && (
             <div className="text-sm">
               <p>Files copied: {importResult.filesCopied}</p>
+              {importResult.photosCopied > 0 && <p>Photos: {importResult.photosCopied}</p>}
+              {importResult.videosCopied > 0 && <p>Videos: {importResult.videosCopied}</p>}
               {importResult.filesSkipped > 0 && (
                 <>
                   <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>

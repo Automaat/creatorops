@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Semaphore;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
@@ -11,6 +12,29 @@ use tokio_util::sync::CancellationToken;
 
 const MAX_RETRY_ATTEMPTS: usize = 3;
 const MAX_CONCURRENT_COPIES: usize = 4; // Parallel file copies
+
+// Photo extensions
+const PHOTO_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "raw", "cr2", "nef", "arw", "dng", "orf",
+    "rw2", "pef", "srw", "heic", "heif", "webp",
+];
+
+// Video extensions
+const VIDEO_EXTENSIONS: &[&str] = &[
+    "mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v", "mpg", "mpeg", "3gp", "mts", "m2ts",
+];
+
+/// Detect if file is a photo or video based on extension
+fn get_file_type(path: &Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_lowercase();
+    if PHOTO_EXTENSIONS.contains(&ext.as_str()) {
+        Some("photo")
+    } else if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+        Some("video")
+    } else {
+        None
+    }
+}
 
 // Global map of active import cancellation tokens
 lazy_static::lazy_static! {
@@ -27,11 +51,22 @@ pub struct CopyResult {
     pub files_skipped: usize,
     pub skipped_files: Vec<String>,
     pub total_bytes: u64,
+    pub photos_copied: usize,
+    pub videos_copied: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportProgress {
+    pub files_copied: usize,
+    pub total_files: usize,
+    pub current_file: String,
 }
 
 /// Copy files from source to destination with parallel processing
 #[tauri::command]
 pub async fn copy_files(
+    app: AppHandle,
     import_id: String,
     source_paths: Vec<String>,
     destination: String,
@@ -53,8 +88,11 @@ pub async fn copy_files(
     let files_copied = Arc::new(AtomicUsize::new(0));
     let files_skipped = Arc::new(AtomicUsize::new(0));
     let total_bytes = Arc::new(AtomicUsize::new(0));
+    let photos_copied = Arc::new(AtomicUsize::new(0));
+    let videos_copied = Arc::new(AtomicUsize::new(0));
     let skipped_files = Arc::new(tokio::sync::Mutex::new(Vec::new()));
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_COPIES));
+    let total_files = source_paths.len();
 
     let mut tasks = Vec::new();
 
@@ -65,32 +103,59 @@ pub async fn copy_files(
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-        let dest_file = dest_path.join(&file_name);
+        let file_type = get_file_type(&src);
+
+        // Route to Photos or Videos subdirectory based on file type
+        let dest_file = match file_type {
+            Some("photo") => dest_path.join("Photos").join(&file_name),
+            Some("video") => dest_path.join("Videos").join(&file_name),
+            _ => dest_path.join(&file_name), // Fallback to root if unknown type
+        };
 
         let files_copied_clone = files_copied.clone();
         let files_skipped_clone = files_skipped.clone();
         let total_bytes_clone = total_bytes.clone();
+        let photos_copied_clone = photos_copied.clone();
+        let videos_copied_clone = videos_copied.clone();
         let skipped_files_clone = skipped_files.clone();
         let semaphore_clone = semaphore.clone();
         let cancel_token_clone = cancel_token.clone();
+        let app_clone = app.clone();
 
         let task = tokio::spawn(async move {
-            // Check if cancelled before starting
-            if cancel_token_clone.is_cancelled() {
-                return Err("Import cancelled".to_string());
-            }
-
             let _permit = semaphore_clone.acquire().await.unwrap();
 
-            // Check again after acquiring semaphore
+            // Check if cancelled before starting work
             if cancel_token_clone.is_cancelled() {
                 return Err("Import cancelled".to_string());
             }
 
             match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
                 Ok(size) => {
-                    files_copied_clone.fetch_add(1, Ordering::SeqCst);
+                    let copied = files_copied_clone.fetch_add(1, Ordering::SeqCst) + 1;
                     total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
+
+                    // Track photo/video counts
+                    match file_type {
+                        Some("photo") => {
+                            photos_copied_clone.fetch_add(1, Ordering::SeqCst);
+                        }
+                        Some("video") => {
+                            videos_copied_clone.fetch_add(1, Ordering::SeqCst);
+                        }
+                        _ => {}
+                    }
+
+                    // Emit progress event
+                    let _ = app_clone.emit(
+                        "import-progress",
+                        ImportProgress {
+                            files_copied: copied,
+                            total_files,
+                            current_file: file_name.clone(),
+                        },
+                    );
+
                     Ok(())
                 }
                 Err(e) => {
@@ -130,6 +195,8 @@ pub async fn copy_files(
     let files_copied = files_copied.load(Ordering::SeqCst);
     let files_skipped = files_skipped.load(Ordering::SeqCst);
     let total_bytes = total_bytes.load(Ordering::SeqCst) as u64;
+    let photos_copied = photos_copied.load(Ordering::SeqCst);
+    let videos_copied = videos_copied.load(Ordering::SeqCst);
     let skipped_files = skipped_files.lock().await.clone();
 
     Ok(CopyResult {
@@ -145,6 +212,8 @@ pub async fn copy_files(
         files_skipped,
         skipped_files,
         total_bytes,
+        photos_copied,
+        videos_copied,
     })
 }
 

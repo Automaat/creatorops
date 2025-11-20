@@ -1,16 +1,28 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { sendNotification } from '@tauri-apps/plugin-notification'
+import {
+  sendNotification,
+  isPermissionGranted,
+  requestPermission,
+} from '@tauri-apps/plugin-notification'
+import { useNotification } from './useNotification'
 import type { SDCard } from '../types'
 
 const AUTO_SCAN_INTERVAL_MS = 5000 // Scan every 5 seconds
 
-export function useSDCardScanner() {
+interface UseSDCardScannerOptions {
+  onCardDetected?: () => void
+}
+
+export function useSDCardScanner(options?: UseSDCardScannerOptions) {
   const [sdCards, setSdCards] = useState<SDCard[]>([])
   const [isScanning, setIsScanning] = useState(false)
   const previousCardPaths = useRef<Set<string>>(new Set())
+  const permissionGranted = useRef<boolean | null>(null)
+  const { info } = useNotification()
+  const onCardDetected = options?.onCardDetected
 
-  const scanForSDCards = async () => {
+  const scanForSDCards = useCallback(async () => {
     setIsScanning(true)
     try {
       const cards = await invoke<SDCard[]>('scan_sd_cards')
@@ -22,13 +34,32 @@ export function useSDCardScanner() {
       // Send notification for newly detected cards
       if (previousCardPaths.current.size > 0 && newCards.length > 0) {
         for (const card of newCards) {
-          try {
-            await sendNotification({
-              title: 'SD Card Detected',
-              body: `${card.name} (${card.deviceType}) has been mounted`,
-            })
-          } catch (error) {
-            console.error('Failed to send notification:', error)
+          // In-app toast notification
+          info(`SD Card detected: ${card.name}`)
+
+          // Navigate to import view
+          if (onCardDetected) {
+            onCardDetected()
+          }
+
+          // System notification (if permission granted)
+          if (permissionGranted.current === null) {
+            permissionGranted.current = await isPermissionGranted()
+            if (!permissionGranted.current) {
+              const permission = await requestPermission()
+              permissionGranted.current = permission === 'granted'
+            }
+          }
+
+          if (permissionGranted.current) {
+            try {
+              await sendNotification({
+                title: 'SD Card Detected',
+                body: `${card.name} has been mounted`,
+              })
+            } catch (error) {
+              console.error('Failed to send system notification:', error)
+            }
           }
         }
       }
@@ -40,7 +71,7 @@ export function useSDCardScanner() {
     } finally {
       setIsScanning(false)
     }
-  }
+  }, [info, onCardDetected])
 
   useEffect(() => {
     // Initial scan
@@ -52,7 +83,7 @@ export function useSDCardScanner() {
     }, AUTO_SCAN_INTERVAL_MS)
 
     return () => clearInterval(intervalId)
-  }, [])
+  }, [scanForSDCards])
 
   return { sdCards, isScanning, scanForSDCards }
 }

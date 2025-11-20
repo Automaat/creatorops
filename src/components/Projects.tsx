@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, BackupDestination, ArchiveJob } from '../types'
+import type { Project, BackupDestination, ArchiveJob, ImportHistory } from '../types'
 import { CreateProject } from './CreateProject'
 
 interface ProjectsProps {
@@ -16,6 +16,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
   const [showCreateProject, setShowCreateProject] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
 
   useEffect(() => {
     loadProjects()
@@ -32,6 +34,13 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       }
     }
   }, [initialSelectedProjectId, projects])
+
+  // Load import history when project is selected
+  useEffect(() => {
+    if (selectedProject) {
+      loadProjectImportHistory(selectedProject.id)
+    }
+  }, [selectedProject])
 
   async function loadProjects() {
     try {
@@ -64,6 +73,15 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       }
     } catch (err) {
       console.error('Failed to load archive location:', err)
+    }
+  }
+
+  async function loadProjectImportHistory(projectId: string) {
+    try {
+      const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
+      setImportHistory(history)
+    } catch (err) {
+      console.error('Failed to load import history:', err)
     }
   }
 
@@ -121,6 +139,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   async function deleteProject() {
     if (!selectedProject) return
 
+    setIsDeleting(true)
+
     try {
       await invoke('delete_project', { projectId: selectedProject.id })
       setShowDeleteDialog(false)
@@ -129,6 +149,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
     } catch (err) {
       console.error('Failed to delete project:', err)
       alert(`Failed to delete project: ${err}`)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -190,6 +212,18 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
             <span className="info-label">Location:</span>
             <span className="folder-path">{selectedProject.folderPath}</span>
           </div>
+          {importHistory.length > 0 && importHistory[0].status === 'success' && (
+            <>
+              <div className="info-row">
+                <span className="info-label">Photos Imported:</span>
+                <span>{importHistory[0].photosCopied}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Videos Imported:</span>
+                <span>{importHistory[0].videosCopied}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <section className="project-actions">
@@ -282,22 +316,37 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
         )}
 
         {showDeleteDialog && (
-          <div className="dialog-overlay" onClick={() => setShowDeleteDialog(false)}>
+          <div className="dialog-overlay" onClick={() => !isDeleting && setShowDeleteDialog(false)}>
             <div className="dialog" onClick={(e) => e.stopPropagation()}>
-              <h2>Delete Project</h2>
-              <p>
-                Are you sure you want to delete <strong>{selectedProject.name}</strong>? This will
-                permanently delete the project folder and all its contents.
-              </p>
-              <p className="warning">This action cannot be undone.</p>
-              <div className="dialog-actions">
-                <button onClick={() => setShowDeleteDialog(false)} className="btn-secondary">
-                  Cancel
-                </button>
-                <button onClick={deleteProject} className="btn-danger">
-                  Delete Project
-                </button>
-              </div>
+              {isDeleting ? (
+                <>
+                  <h2>Deleting Project</h2>
+                  <div
+                    className="flex flex-col gap-md"
+                    style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
+                  >
+                    <div className="spinner"></div>
+                    <p className="text-secondary">Hang tight, removing your project...</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2>Delete Project</h2>
+                  <p>
+                    Are you sure you want to delete <strong>{selectedProject.name}</strong>? This
+                    will permanently delete the project folder and all its contents.
+                  </p>
+                  <p className="warning">This action cannot be undone.</p>
+                  <div className="dialog-actions">
+                    <button onClick={() => setShowDeleteDialog(false)} className="btn-secondary">
+                      Cancel
+                    </button>
+                    <button onClick={deleteProject} className="btn-danger">
+                      Delete Project
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
