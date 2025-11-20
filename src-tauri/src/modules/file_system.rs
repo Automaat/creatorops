@@ -1,5 +1,36 @@
 use std::process::Command;
 
+// Windows application paths for external editors
+#[cfg(target_os = "windows")]
+const LIGHTROOM_PATHS: &[&str] = &[
+    r"C:\Program Files\Adobe\Adobe Lightroom Classic\Lightroom.exe",
+    r"C:\Program Files (x86)\Adobe\Adobe Lightroom Classic\Lightroom.exe",
+];
+
+#[cfg(target_os = "windows")]
+const AFTERSHOOT_PATHS: &[&str] = &[
+    r"C:\Program Files\AfterShoot\AfterShoot.exe",
+    r"C:\Program Files (x86)\AfterShoot\AfterShoot.exe",
+];
+
+#[cfg(target_os = "windows")]
+const DAVINCI_RESOLVE_PATHS: &[&str] = &[
+    r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe",
+    r"C:\Program Files (x86)\Blackmagic Design\DaVinci Resolve\Resolve.exe",
+];
+
+/// Opens a project's media folder in an external editing application.
+///
+/// This function assumes the standard CreatorOps project structure:
+/// ```
+/// ProjectFolder/
+///   RAW/
+///     Photos/  (for photo editing apps)
+///     Videos/  (for video editing apps)
+/// ```
+///
+/// The function launches the external app in the background (fire-and-forget)
+/// which is appropriate for GUI applications that should run independently.
 fn open_in_external_app(
     project_path: &str,
     subfolder: &str,
@@ -114,42 +145,36 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn open_in_lightroom(path: String) -> Result<(), String> {
-    open_in_external_app(
-        &path,
-        "Photos",
-        "Adobe Lightroom Classic",
-        &[
-            r"C:\Program Files\Adobe\Adobe Lightroom Classic\Lightroom.exe",
-            r"C:\Program Files (x86)\Adobe\Adobe Lightroom Classic\Lightroom.exe",
-        ],
-        None,
-    )
+    #[cfg(target_os = "windows")]
+    let paths = LIGHTROOM_PATHS;
+    #[cfg(not(target_os = "windows"))]
+    let paths = &[];
+
+    open_in_external_app(&path, "Photos", "Adobe Lightroom Classic", paths, None)
 }
 
 #[tauri::command]
 pub fn open_in_aftershoot(path: String) -> Result<(), String> {
-    open_in_external_app(
-        &path,
-        "Photos",
-        "AfterShoot",
-        &[
-            r"C:\Program Files\AfterShoot\AfterShoot.exe",
-            r"C:\Program Files (x86)\AfterShoot\AfterShoot.exe",
-        ],
-        None,
-    )
+    #[cfg(target_os = "windows")]
+    let paths = AFTERSHOOT_PATHS;
+    #[cfg(not(target_os = "windows"))]
+    let paths = &[];
+
+    open_in_external_app(&path, "Photos", "AfterShoot", paths, None)
 }
 
 #[tauri::command]
 pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let paths = DAVINCI_RESOLVE_PATHS;
+    #[cfg(not(target_os = "windows"))]
+    let paths = &[];
+
     open_in_external_app(
         &path,
         "Videos",
         "DaVinci Resolve",
-        &[
-            r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe",
-            r"C:\Program Files (x86)\Blackmagic Design\DaVinci Resolve\Resolve.exe",
-        ],
+        paths,
         Some("/opt/resolve/bin/resolve"),
     )
 }
