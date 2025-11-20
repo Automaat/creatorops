@@ -329,7 +329,7 @@
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
   cursor: pointer;
   transition: all var(--transition-base);
 }

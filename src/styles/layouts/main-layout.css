@@ -42,7 +42,7 @@
 }
 
 .nav-item.active {
-  background-color: var(--color-accent-secondary);
+  background-color: var(--color-cream-highlight);
   font-weight: var(--font-weight-medium);
 }
 
