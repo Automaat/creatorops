@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import type { SDCard, Project, CopyResult } from '../types'
 import { CreateProject } from './CreateProject'
 
+const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
+
 interface ImportProps {
   sdCards: SDCard[]
   isScanning: boolean
@@ -12,6 +14,14 @@ interface ImportProps {
 
 export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: ImportProps) {
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
+
+  // Reset active card when the active card is no longer in the list
+  useEffect(() => {
+    if (activeCardPath && !sdCards.some((card) => card.path === activeCardPath)) {
+      setActiveCardPath(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sdCards.length, activeCardPath])
 
   return (
     <>
@@ -69,7 +79,7 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
   const [showCreateNew, setShowCreateNew] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
-  const [cancelRequested, setCancelRequested] = useState(false)
+  const [importId, setImportId] = useState<string | null>(null)
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -111,9 +121,11 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     const project = projects.find((p) => p.id === selectedProject)
     if (!project) return
 
+    // Generate unique import ID
+    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    setImportId(currentImportId)
     setIsImporting(true)
     setImportResult(null)
-    setCancelRequested(false)
 
     const startedAt = new Date().toISOString()
 
@@ -130,9 +142,11 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesCopied: 0,
           filesSkipped: 0,
           skippedFiles: [],
+          totalBytes: 0,
         }
         setImportResult(result)
         setIsImporting(false)
+        setImportId(null)
 
         // Save to history
         await invoke('save_import_history', {
@@ -153,28 +167,34 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
       const destination = `${project.folderPath}/RAW`
 
       const result = await invoke<CopyResult>('copy_files', {
+        importId: currentImportId,
         sourcePaths,
         destination,
       })
 
       setImportResult(result)
 
-      // Save to history
-      await invoke('save_import_history', {
-        projectId: project.id,
-        projectName: project.name,
-        sourcePath: card.path,
-        destinationPath: destination,
-        filesCopied: result.filesCopied,
-        filesSkipped: result.filesSkipped,
-        totalBytes: 0,
-        startedAt,
-        errorMessage: result.error || null,
-      })
+      // Check if cancelled
+      const wasCancelled = result.error?.includes('cancelled') || false
+
+      // Save to history (unless cancelled)
+      if (!wasCancelled) {
+        await invoke('save_import_history', {
+          projectId: project.id,
+          projectName: project.name,
+          sourcePath: card.path,
+          destinationPath: destination,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          totalBytes: result.totalBytes,
+          startedAt,
+          errorMessage: result.error || null,
+        })
+      }
 
       // Navigate to project view on successful import
       if (result.success && result.filesCopied > 0) {
-        setTimeout(() => onImportComplete(project.id), 1500)
+        setTimeout(() => onImportComplete(project.id), POST_IMPORT_DELAY_MS)
       }
     } catch (error) {
       console.error('Import failed:', error)
@@ -184,6 +204,7 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
         filesCopied: 0,
         filesSkipped: 0,
         skippedFiles: [],
+        totalBytes: 0,
       })
 
       // Save failed import to history
@@ -197,13 +218,25 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
           filesSkipped: 0,
           totalBytes: 0,
           startedAt,
-          errorMessage: error as string,
+          errorMessage: String(error),
         })
       } catch (historyError) {
         console.error('Failed to save import history:', historyError)
       }
     } finally {
       setIsImporting(false)
+      setImportId(null)
+    }
+  }
+
+  const handleCancelImport = async () => {
+    if (!importId) return
+
+    try {
+      await invoke('cancel_import', { importId })
+      console.log('Import cancellation requested')
+    } catch (error) {
+      console.error('Failed to cancel import:', error)
     }
   }
 
@@ -290,60 +323,62 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     )
   }
 
-  const handleCancelImport = () => {
-    setCancelRequested(true)
-  }
-
   if (isImporting) {
     return (
       <div className="card">
         <div className="flex flex-col gap-md">
           <div>
             <h3>{card.name}</h3>
-            <p className="text-secondary text-sm">
-              {cancelRequested ? 'Import continuing in background...' : 'Importing files...'}
-            </p>
+            <p className="text-secondary text-sm">Importing files...</p>
           </div>
-          {!cancelRequested && (
-            <button className="btn" onClick={handleCancelImport}>
-              Stop Waiting
-            </button>
-          )}
+          <button className="btn" onClick={handleCancelImport}>
+            Cancel Import
+          </button>
         </div>
       </div>
     )
   }
 
   if (importResult) {
+    const wasCancelled = importResult.error?.includes('cancelled') || false
+
     return (
       <div className="card">
         <div className="flex flex-col gap-md">
           <div>
             <h3>{card.name}</h3>
-            <p className={`text-sm ${importResult.success ? 'text-success' : 'text-error'}`}>
-              {importResult.success ? 'Import completed' : 'Import failed'}
+            <p
+              className={`text-sm ${wasCancelled ? 'text-warning' : importResult.success ? 'text-success' : 'text-error'}`}
+            >
+              {wasCancelled
+                ? `Import cancelled (${importResult.filesCopied} files copied)`
+                : importResult.success
+                  ? 'Import completed'
+                  : 'Import failed'}
             </p>
           </div>
 
-          <div className="text-sm">
-            <p>Files copied: {importResult.filesCopied}</p>
-            {importResult.filesSkipped > 0 && (
-              <>
-                <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>
-                {importResult.skippedFiles.length > 0 && (
-                  <div className="mt-xs">
-                    <p className="font-medium">Skipped files:</p>
-                    <ul className="list-disc ml-md">
-                      {importResult.skippedFiles.map((file, i) => (
-                        <li key={i}>{file}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            )}
-            {importResult.error && <p className="text-error mt-xs">{importResult.error}</p>}
-          </div>
+          {!wasCancelled && (
+            <div className="text-sm">
+              <p>Files copied: {importResult.filesCopied}</p>
+              {importResult.filesSkipped > 0 && (
+                <>
+                  <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>
+                  {importResult.skippedFiles.length > 0 && (
+                    <div className="mt-xs">
+                      <p className="font-medium">Skipped files:</p>
+                      <ul className="list-disc ml-md">
+                        {importResult.skippedFiles.map((file, i) => (
+                          <li key={i}>{file}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+              {importResult.error && <p className="text-error mt-xs">{importResult.error}</p>}
+            </div>
+          )}
 
           <button className="btn" onClick={() => setImportResult(null)}>
             Done

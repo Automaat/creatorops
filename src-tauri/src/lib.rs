@@ -8,7 +8,7 @@ use modules::backup::{
 use modules::delivery::{
     create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
 };
-use modules::file_copy::copy_files;
+use modules::file_copy::{cancel_import, copy_files};
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
@@ -25,6 +25,7 @@ pub fn run() {
             scan_sd_cards,
             list_sd_card_files,
             copy_files,
+            cancel_import,
             create_project,
             list_projects,
             delete_project,

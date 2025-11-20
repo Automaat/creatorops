@@ -591,6 +591,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tokio",
  "tokio-retry",
+ "tokio-util",
  "uuid",
  "walkdir",
 ]

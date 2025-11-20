@@ -1,11 +1,22 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::Retry;
+use tokio_util::sync::CancellationToken;
 
 const MAX_RETRY_ATTEMPTS: usize = 3;
 const MAX_CONCURRENT_COPIES: usize = 4; // Parallel file copies
+
+// Global map of active import cancellation tokens
+lazy_static::lazy_static! {
+    static ref IMPORT_TOKENS: Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>> =
+        Arc::new(tokio::sync::Mutex::new(HashMap::new()));
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,12 +26,13 @@ pub struct CopyResult {
     pub files_copied: usize,
     pub files_skipped: usize,
     pub skipped_files: Vec<String>,
+    pub total_bytes: u64,
 }
 
 /// Copy files from source to destination with parallel processing
 #[tauri::command]
 pub async fn copy_files(
-    _window: tauri::Window,
+    import_id: String,
     source_paths: Vec<String>,
     destination: String,
 ) -> Result<CopyResult, String> {
@@ -31,11 +43,19 @@ pub async fn copy_files(
         fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
     }
 
-    let files_copied = std::sync::Arc::new(std::sync::Mutex::new(0usize));
-    let files_skipped = std::sync::Arc::new(std::sync::Mutex::new(0usize));
-    let skipped_files = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    // Create cancellation token and register it
+    let cancel_token = CancellationToken::new();
+    {
+        let mut tokens = IMPORT_TOKENS.lock().await;
+        tokens.insert(import_id.clone(), cancel_token.clone());
+    }
 
-    // Process files in parallel batches
+    let files_copied = Arc::new(AtomicUsize::new(0));
+    let files_skipped = Arc::new(AtomicUsize::new(0));
+    let total_bytes = Arc::new(AtomicUsize::new(0));
+    let skipped_files = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+    let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_COPIES));
+
     let mut tasks = Vec::new();
 
     for src_path in source_paths.iter() {
@@ -49,44 +69,74 @@ pub async fn copy_files(
 
         let files_copied_clone = files_copied.clone();
         let files_skipped_clone = files_skipped.clone();
+        let total_bytes_clone = total_bytes.clone();
         let skipped_files_clone = skipped_files.clone();
+        let semaphore_clone = semaphore.clone();
+        let cancel_token_clone = cancel_token.clone();
 
         let task = tokio::spawn(async move {
-            match copy_file_with_retry(&src, &dest_file).await {
-                Ok(_size) => {
-                    let mut fc = files_copied_clone.lock().unwrap();
-                    *fc += 1;
+            // Check if cancelled before starting
+            if cancel_token_clone.is_cancelled() {
+                return Err("Import cancelled".to_string());
+            }
+
+            let _permit = semaphore_clone.acquire().await.unwrap();
+
+            // Check again after acquiring semaphore
+            if cancel_token_clone.is_cancelled() {
+                return Err("Import cancelled".to_string());
+            }
+
+            match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
+                Ok(size) => {
+                    files_copied_clone.fetch_add(1, Ordering::SeqCst);
+                    total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
                     Ok(())
                 }
                 Err(e) => {
+                    if cancel_token_clone.is_cancelled() {
+                        return Err("Import cancelled".to_string());
+                    }
                     eprintln!("Failed to copy {} after retries: {}", file_name, e);
-                    let mut fs = files_skipped_clone.lock().unwrap();
-                    *fs += 1;
-                    let mut sf = skipped_files_clone.lock().unwrap();
-                    sf.push(file_name);
+                    files_skipped_clone.fetch_add(1, Ordering::SeqCst);
+                    skipped_files_clone.lock().await.push(file_name);
                     Err(e)
                 }
             }
         });
 
         tasks.push(task);
+    }
 
-        // Limit concurrent copies
-        if tasks.len() >= MAX_CONCURRENT_COPIES {
-            futures::future::join_all(tasks.drain(..)).await;
+    // Wait for all tasks and handle errors
+    let mut cancelled = false;
+    for result in futures::future::join_all(tasks).await {
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) if e == "Import cancelled" => {
+                cancelled = true;
+            }
+            Ok(Err(_)) => {} // File copy failed, already counted as skipped
+            Err(e) => return Err(format!("Task failed: {}", e)),
         }
     }
 
-    // Wait for remaining tasks
-    futures::future::join_all(tasks).await;
+    // Clean up token
+    {
+        let mut tokens = IMPORT_TOKENS.lock().await;
+        tokens.remove(&import_id);
+    }
 
-    let files_copied = *files_copied.lock().unwrap();
-    let files_skipped = *files_skipped.lock().unwrap();
-    let skipped_files = skipped_files.lock().unwrap().clone();
+    let files_copied = files_copied.load(Ordering::SeqCst);
+    let files_skipped = files_skipped.load(Ordering::SeqCst);
+    let total_bytes = total_bytes.load(Ordering::SeqCst) as u64;
+    let skipped_files = skipped_files.lock().await.clone();
 
     Ok(CopyResult {
-        success: files_copied > 0,
-        error: if files_skipped > 0 {
+        success: !cancelled && files_copied > 0,
+        error: if cancelled {
+            Some(format!("Import cancelled ({} files copied)", files_copied))
+        } else if files_skipped > 0 {
             Some(format!("{} file(s) skipped due to errors", files_skipped))
         } else {
             None
@@ -94,18 +144,38 @@ pub async fn copy_files(
         files_copied,
         files_skipped,
         skipped_files,
+        total_bytes,
     })
 }
 
 /// Copy file with retry logic using fast native copy
-async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
+async fn copy_file_with_retry(
+    src: &Path,
+    dest: &Path,
+    cancel_token: &CancellationToken,
+) -> Result<u64, String> {
     let retry_strategy = ExponentialBackoff::from_millis(10)
         .map(jitter)
         .take(MAX_RETRY_ATTEMPTS);
 
     Retry::spawn(retry_strategy, || async {
+        if cancel_token.is_cancelled() {
+            return Err("Import cancelled".to_string());
+        }
         // Use fast native copy instead of manual chunking
         tokio::fs::copy(src, dest).await.map_err(|e| e.to_string())
     })
     .await
+}
+
+/// Cancel an ongoing import
+#[tauri::command]
+pub async fn cancel_import(import_id: String) -> Result<(), String> {
+    let tokens = IMPORT_TOKENS.lock().await;
+    if let Some(token) = tokens.get(&import_id) {
+        token.cancel();
+        Ok(())
+    } else {
+        Err("Import not found or already completed".to_string())
+    }
 }
