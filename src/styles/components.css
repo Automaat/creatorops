@@ -794,9 +794,10 @@
   color: var(--color-text-secondary);
 }
 
-/* Archive Components */
+/* Project Actions */
 
-.archive-action {
+.archive-action,
+.delete-action {
   margin-top: var(--space-xl);
   padding: var(--space-lg);
   background-color: var(--color-bg-secondary);
@@ -804,7 +805,8 @@
   border-radius: var(--radius-lg);
 }
 
-.archive-action h3 {
+.archive-action h3,
+.delete-action h3 {
   margin: 0 0 var(--space-sm) 0;
   font-size: var(--font-size-lg);
 }

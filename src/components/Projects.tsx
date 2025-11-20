@@ -121,10 +121,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
       setShowArchiveDialog(false)
 
-      // Refresh projects list after a delay
-      setTimeout(() => {
-        loadProjects()
-      }, 1000)
+      // Note: No need to reload - cache will be invalidated on backend when archive completes
     } catch (err) {
       console.error('Failed to archive project:', err)
       alert(`Failed to archive project: ${err}`)
@@ -211,6 +208,16 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
           <div className="info-row">
             <span className="info-label">Location:</span>
             <span className="folder-path">{selectedProject.folderPath}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                invoke('reveal_in_finder', { path: selectedProject.folderPath })
+              }}
+              className="btn-icon"
+              title="Show in Finder"
+            >
+              📁
+            </button>
           </div>
           {importHistory.length > 0 && importHistory[0].status === 'success' && (
             <>

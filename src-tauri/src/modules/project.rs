@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::sync::Mutex;
 use uuid::Uuid;
-use walkdir::WalkDir;
+
+// Cached project list to avoid repeated directory scans
+static PROJECT_CACHE: Mutex<Option<Vec<Project>>> = Mutex::new(None);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -88,11 +91,54 @@ pub async fn create_project(
     let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
     fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
 
+    // Invalidate cache since we created a new project
+    invalidate_cache();
+
     Ok(project)
 }
 
 #[tauri::command]
 pub async fn list_projects() -> Result<Vec<Project>, String> {
+    // Check cache first
+    {
+        let cache = PROJECT_CACHE.lock().unwrap();
+        if let Some(projects) = &*cache {
+            return Ok(projects.clone());
+        }
+    }
+
+    // Cache miss - scan directory
+    let projects = scan_projects_directory()?;
+
+    // Update cache
+    {
+        let mut cache = PROJECT_CACHE.lock().unwrap();
+        *cache = Some(projects.clone());
+    }
+
+    Ok(projects)
+}
+
+/// Invalidate cache (call after project mutations)
+fn invalidate_cache() {
+    let mut cache = PROJECT_CACHE.lock().unwrap();
+    *cache = None;
+}
+
+/// Public function to invalidate cache from other modules
+pub fn invalidate_project_cache() {
+    invalidate_cache();
+}
+
+/// Force refresh project cache
+#[tauri::command]
+pub async fn refresh_projects() -> Result<Vec<Project>, String> {
+    invalidate_cache();
+    list_projects().await
+}
+
+/// Scan projects directory (expensive operation)
+fn scan_projects_directory() -> Result<Vec<Project>, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let base_path = home_dir.join("CreatorOps").join("Projects");
 
@@ -102,23 +148,20 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
 
     let mut projects = Vec::new();
 
-    // Scan for project directories
-    for entry in WalkDir::new(&base_path)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    // Use fs::read_dir instead of WalkDir - much faster, only reads top-level
+    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        if path == base_path {
+
+        // Skip non-directories and hidden files
+        if !path.is_dir() || entry.file_name().to_string_lossy().starts_with('.') {
             continue;
         }
 
         let metadata_path = path.join("project.json");
-        if metadata_path.exists() {
-            if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-                if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
-                    projects.push(project);
-                }
+        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+            if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
+                projects.push(project);
             }
         }
     }
@@ -149,27 +192,27 @@ pub async fn delete_project(project_id: String) -> Result<(), String> {
         return Err("Projects directory does not exist".to_string());
     }
 
-    // Find project by ID
-    for entry in WalkDir::new(&base_path)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    // Find project by ID using fs::read_dir (faster than WalkDir)
+    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
-        if path == base_path {
+
+        if !path.is_dir() {
             continue;
         }
 
         let metadata_path = path.join("project.json");
-        if metadata_path.exists() {
-            if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-                if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
-                    if project.id == project_id {
-                        // Delete entire project folder
-                        fs::remove_dir_all(path)
-                            .map_err(|e| format!("Failed to delete project folder: {}", e))?;
-                        return Ok(());
-                    }
+        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+            if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
+                if project.id == project_id {
+                    // Delete entire project folder
+                    fs::remove_dir_all(path)
+                        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
+
+                    // Invalidate cache since we deleted a project
+                    invalidate_cache();
+
+                    return Ok(());
                 }
             }
         }

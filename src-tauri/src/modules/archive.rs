@@ -1,5 +1,5 @@
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
-use crate::modules::project::{Project, ProjectStatus};
+use crate::modules::project::{invalidate_project_cache, Project, ProjectStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -276,6 +276,9 @@ fn update_project_status(project_id: &str, new_status: ProjectStatus) -> Result<
                         let updated_json =
                             serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
                         fs::write(&metadata_path, updated_json).map_err(|e| e.to_string())?;
+
+                        // Invalidate project cache since we updated project status
+                        invalidate_project_cache();
 
                         return Ok(());
                     }

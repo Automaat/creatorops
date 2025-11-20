@@ -103,20 +103,32 @@ function App() {
   return (
     <>
       <Layout currentView={currentView} onNavigate={handleViewChange}>
-        {currentView === 'dashboard' && <Dashboard onProjectClick={handleNavigateToProject} />}
-        {currentView === 'import' && (
+        <div style={{ display: currentView === 'dashboard' ? 'block' : 'none' }}>
+          <Dashboard onProjectClick={handleNavigateToProject} />
+        </div>
+        <div style={{ display: currentView === 'import' ? 'block' : 'none' }}>
           <Import
             sdCards={sdCards}
             isScanning={isScanning}
             onRefresh={scanForSDCards}
             onImportComplete={handleNavigateToProject}
           />
-        )}
-        {currentView === 'projects' && <Projects initialSelectedProjectId={selectedProjectId} />}
-        {currentView === 'backup' && <BackupQueue />}
-        {currentView === 'delivery' && <Delivery />}
-        {currentView === 'history' && <History />}
-        {currentView === 'settings' && <Settings />}
+        </div>
+        <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
+          <Projects initialSelectedProjectId={selectedProjectId} />
+        </div>
+        <div style={{ display: currentView === 'backup' ? 'block' : 'none' }}>
+          <BackupQueue />
+        </div>
+        <div style={{ display: currentView === 'delivery' ? 'block' : 'none' }}>
+          <Delivery />
+        </div>
+        <div style={{ display: currentView === 'history' ? 'block' : 'none' }}>
+          <History />
+        </div>
+        <div style={{ display: currentView === 'settings' ? 'block' : 'none' }}>
+          <Settings />
+        </div>
       </Layout>
       <NotificationToast />
       <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />

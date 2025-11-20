@@ -9,10 +9,11 @@ use modules::delivery::{
     create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
 };
 use modules::file_copy::{cancel_import, copy_files};
+use modules::file_system::reveal_in_finder;
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
-use modules::project::{create_project, delete_project, list_projects};
+use modules::project::{create_project, delete_project, list_projects, refresh_projects};
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -28,6 +29,7 @@ pub fn run() {
             cancel_import,
             create_project,
             list_projects,
+            refresh_projects,
             delete_project,
             save_import_history,
             get_import_history,
@@ -48,6 +50,7 @@ pub fn run() {
             start_archive,
             get_archive_queue,
             remove_archive_job,
+            reveal_in_finder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
