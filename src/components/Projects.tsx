@@ -6,9 +6,10 @@ import { CreateProject } from './CreateProject'
 
 interface ProjectsProps {
   initialSelectedProjectId?: string | null
+  onBackFromProject?: () => void
 }
 
-export function Projects({ initialSelectedProjectId }: ProjectsProps) {
+export function Projects({ initialSelectedProjectId, onBackFromProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -68,6 +69,9 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
           setSelectedProject(project)
         }
       })
+    } else {
+      // Clear selection when navigating to projects list
+      setSelectedProject(null)
     }
   }, [initialSelectedProjectId, loadProjects])
 
@@ -78,6 +82,28 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       scrollToTop()
     }
   }, [selectedProject, scrollToTop])
+
+  const handleBackToList = useCallback(() => {
+    if (onBackFromProject) {
+      onBackFromProject()
+    } else {
+      setSelectedProject(null)
+    }
+  }, [onBackFromProject])
+
+  // ESC key to return to previous view
+  useEffect(() => {
+    if (!selectedProject) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleBackToList()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedProject, handleBackToList])
 
   async function loadDestinations() {
     try {
@@ -226,8 +252,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
     return (
       <div className="project-detail" ref={containerRef}>
         <div className="project-detail-header">
-          <button onClick={() => setSelectedProject(null)} className="btn-back">
-            ← Back to Projects
+          <button onClick={handleBackToList} className="btn-back">
+            ← Back
           </button>
           <h1>{selectedProject.name}</h1>
         </div>

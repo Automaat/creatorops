@@ -24,6 +24,7 @@ function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [projectsCount, setProjectsCount] = useState<number>(0)
+  const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
 
   // Apply theme on app load
   useTheme()
@@ -113,14 +114,20 @@ function App() {
   useKeyboardShortcuts(shortcuts)
 
   const handleNavigateToProject = (projectId: string) => {
+    setViewBeforeProject(currentView)
     setSelectedProjectId(projectId)
     setCurrentView('projects')
     loadProjectCount() // Refresh count after project creation
   }
 
+  const handleBackFromProject = () => {
+    setSelectedProjectId(null)
+    setCurrentView(viewBeforeProject)
+  }
+
   const handleViewChange = (view: string) => {
-    // Clear selected project when changing views
-    if (view !== 'projects') {
+    // When navigating to Projects view via sidebar, always clear selection to show list
+    if (view === 'projects') {
       setSelectedProjectId(null)
     }
     setCurrentView(view as View)
@@ -149,7 +156,13 @@ function App() {
           />
         </div>
         <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
-          <Projects initialSelectedProjectId={selectedProjectId} />
+          {currentView === 'projects' && (
+            <Projects
+              key={selectedProjectId || 'projects-list'}
+              initialSelectedProjectId={selectedProjectId}
+              onBackFromProject={handleBackFromProject}
+            />
+          )}
         </div>
         <div style={{ display: currentView === 'backup' ? 'block' : 'none' }}>
           <BackupQueue />
