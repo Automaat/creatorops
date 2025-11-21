@@ -1,16 +1,17 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
+import calendarIcon from '../assets/icons/calendar.png'
 
 interface DatePickerProps {
   value: string
   onChange: (date: string) => void
-  label?: string
+  label?: string | ReactNode
   required?: boolean
   id?: string
 }
 
 export function DatePicker({ value, onChange, label, required, id }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(value ? new Date(value) : new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null)
   const [viewDate, setViewDate] = useState(value ? new Date(value) : new Date())
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -19,6 +20,8 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
       const date = new Date(value)
       setSelectedDate(date)
       setViewDate(date)
+    } else {
+      setSelectedDate(null)
     }
   }, [value])
 
@@ -104,6 +107,7 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
   }
 
   const isSelected = (day: number) => {
+    if (!selectedDate) return false
     return (
       day === selectedDate.getDate() &&
       viewDate.getMonth() === selectedDate.getMonth() &&
@@ -130,7 +134,7 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
   return (
     <div className="date-picker-container" ref={containerRef}>
       {label && (
-        <label htmlFor={id} className="font-medium">
+        <label htmlFor={id} className="form-label">
           {label} {required && '*'}
         </label>
       )}
@@ -140,8 +144,10 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
         onClick={() => setIsOpen(!isOpen)}
         id={id}
       >
-        <span className="date-picker-value">{formatDisplayDate(selectedDate)}</span>
-        <span className="date-picker-icon">📅</span>
+        <span className={selectedDate ? 'date-picker-value' : 'date-picker-placeholder'}>
+          {selectedDate ? formatDisplayDate(selectedDate) : 'Select date'}
+        </span>
+        <img src={calendarIcon} alt="Calendar" className="date-picker-icon" />
       </button>
 
       {isOpen && (

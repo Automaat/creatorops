@@ -36,8 +36,14 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
   const [isEditingDeadline, setIsEditingDeadline] = useState(false)
+  const [homeDir, setHomeDir] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
+
+  const replaceHomeWithTilde = (path: string): string => {
+    if (!homeDir) return path
+    return path.startsWith(homeDir) ? path.replace(homeDir, '~') : path
+  }
 
   // IMPORTANT: DOM walk required for list↔detail transitions when containerRef switches elements
   // Simplifying to parent-only scroll breaks project creation flow. Change with caution.
@@ -73,7 +79,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     loadProjects()
     loadDestinations()
     loadArchiveLocation()
+    loadHomeDirectory()
   }, [loadProjects])
+
+  async function loadHomeDirectory() {
+    try {
+      const dir = await invoke<string>('get_home_directory')
+      setHomeDir(dir)
+    } catch (err) {
+      console.error('Failed to load home directory:', err)
+    }
+  }
 
   // Handle initial project selection from navigation
   useEffect(() => {
@@ -496,7 +512,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
-            <span className="folder-path">{selectedProject.folderPath}</span>
+            <span className="folder-path">{replaceHomeWithTilde(selectedProject.folderPath)}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -505,7 +521,11 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               className="btn-icon"
               title="Show in Finder"
             >
-              <img src={folderIcon} alt="Show in Finder" style={{ width: '30px', height: '30px' }} />
+              <img
+                src={folderIcon}
+                alt="Show in Finder"
+                style={{ width: '30px', height: '30px' }}
+              />
             </button>
           </div>
           {importHistory.length > 0 && importHistory[0].status === 'success' && (

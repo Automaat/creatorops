@@ -29,11 +29,7 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   // Handle clicks outside the list to collapse active card
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        activeCardPath &&
-        listRef.current &&
-        !listRef.current.contains(event.target as Node)
-      ) {
+      if (activeCardPath && listRef.current && !listRef.current.contains(event.target as Node)) {
         setActiveCardPath(null)
       }
     }
@@ -375,105 +371,108 @@ function SDCardItem({
     return (
       <>
         <div className="project-list-item">
-          <div className="card card-active" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+          <div
+            className="card card-active"
+            style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}
+          >
             <div className="flex flex-col gap-md">
               <div>
                 <h3>{card.name}</h3>
                 <p className="text-secondary text-sm">Select a project to import into</p>
               </div>
 
-            <div className="project-dropdown-container">
-              <button
-                ref={triggerRef}
-                className="project-dropdown-trigger"
-                onClick={() => setShowProjectSelect(!showProjectSelect)}
-              >
-                {selectedProjectData ? (
-                  <div className="project-dropdown-selected">
-                    <div className="project-select-header">
-                      <h4>{selectedProjectData.name}</h4>
-                      <span
-                        className={`project-status ${getStatusColor(selectedProjectData.status)}`}
-                      >
-                        {selectedProjectData.status}
-                      </span>
-                    </div>
-                    <div className="project-select-info">
-                      <span className="text-secondary text-sm">
-                        {selectedProjectData.clientName} · {selectedProjectData.date} ·{' '}
-                        {selectedProjectData.shootType}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-secondary">Choose a project...</span>
-                )}
-                <span className="dropdown-arrow">{showProjectSelect ? '▲' : '▼'}</span>
-              </button>
-
-              {showProjectSelect && dropdownPosition && (
-                <div
-                  ref={dropdownRef}
-                  className="project-dropdown-list project-dropdown-list-fixed"
-                  style={{
-                    top: `${dropdownPosition.top}px`,
-                    left: `${dropdownPosition.left}px`,
-                    width: `${dropdownPosition.width}px`,
-                  }}
+              <div className="project-dropdown-container">
+                <button
+                  ref={triggerRef}
+                  className="project-dropdown-trigger"
+                  onClick={() => setShowProjectSelect(!showProjectSelect)}
                 >
-                  {projects.length > 0 ? (
-                    <>
-                      {projects.map((project) => (
+                  {selectedProjectData ? (
+                    <div className="project-dropdown-selected">
+                      <div className="project-select-header">
+                        <h4>{selectedProjectData.name}</h4>
+                        <span
+                          className={`project-status ${getStatusColor(selectedProjectData.status)}`}
+                        >
+                          {selectedProjectData.status}
+                        </span>
+                      </div>
+                      <div className="project-select-info">
+                        <span className="text-secondary text-sm">
+                          {selectedProjectData.clientName} · {selectedProjectData.date} ·{' '}
+                          {selectedProjectData.shootType}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-secondary">Choose a project...</span>
+                  )}
+                  <span className="dropdown-arrow">{showProjectSelect ? '▲' : '▼'}</span>
+                </button>
+
+                {showProjectSelect && dropdownPosition && (
+                  <div
+                    ref={dropdownRef}
+                    className="project-dropdown-list project-dropdown-list-fixed"
+                    style={{
+                      top: `${dropdownPosition.top}px`,
+                      left: `${dropdownPosition.left}px`,
+                      width: `${dropdownPosition.width}px`,
+                    }}
+                  >
+                    {projects.length > 0 ? (
+                      <>
+                        {projects.map((project) => (
+                          <div
+                            key={project.id}
+                            className={`project-select-card ${selectedProject === project.id ? 'selected' : ''}`}
+                            onClick={() => {
+                              setSelectedProject(project.id)
+                              setShowProjectSelect(false)
+                            }}
+                          >
+                            <div className="project-select-header">
+                              <h4>{project.name}</h4>
+                              <span className={`project-status ${getStatusColor(project.status)}`}>
+                                {project.status}
+                              </span>
+                            </div>
+                            <div className="project-select-info">
+                              <span className="text-secondary text-sm">
+                                {project.clientName} · {project.date} · {project.shootType}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                         <div
-                          key={project.id}
-                          className={`project-select-card ${selectedProject === project.id ? 'selected' : ''}`}
+                          className="project-select-card create-new"
                           onClick={() => {
-                            setSelectedProject(project.id)
+                            handleProjectSelect('__new__')
                             setShowProjectSelect(false)
                           }}
                         >
                           <div className="project-select-header">
-                            <h4>{project.name}</h4>
-                            <span className={`project-status ${getStatusColor(project.status)}`}>
-                              {project.status}
-                            </span>
-                          </div>
-                          <div className="project-select-info">
-                            <span className="text-secondary text-sm">
-                              {project.clientName} · {project.date} · {project.shootType}
-                            </span>
+                            <h4>+ Create New Project</h4>
                           </div>
                         </div>
-                      ))}
-                      <div
-                        className="project-select-card create-new"
-                        onClick={() => {
-                          handleProjectSelect('__new__')
-                          setShowProjectSelect(false)
-                        }}
-                      >
-                        <div className="project-select-header">
-                          <h4>+ Create New Project</h4>
-                        </div>
+                      </>
+                    ) : (
+                      <div className="empty-state">
+                        <p className="text-secondary">No projects available</p>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setShowCreateNew(true)
+                            setShowProjectSelect(false)
+                          }}
+                        >
+                          Create New Project
+                        </button>
                       </div>
-                    </>
-                  ) : (
-                    <div className="empty-state">
-                      <p className="text-secondary">No projects available</p>
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => {
-                          setShowCreateNew(true)
-                          setShowProjectSelect(false)
-                        }}
-                      >
-                        Create New Project
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
                 <button

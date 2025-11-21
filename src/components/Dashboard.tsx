@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
 import { formatProjectInfo } from '../utils/project'
+import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
   onProjectClick?: (projectId: string) => void
@@ -10,6 +11,7 @@ interface DashboardProps {
 export function Dashboard({ onProjectClick }: DashboardProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [showCreateProject, setShowCreateProject] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -55,6 +57,12 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       return b.updatedAt.localeCompare(a.updatedAt)
     })
 
+  const handleProjectCreated = (project: Project) => {
+    setShowCreateProject(false)
+    loadData() // Refresh the dashboard
+    onProjectClick?.(project.id) // Navigate to the new project
+  }
+
   if (loading) {
     return <div className="loading">Loading...</div>
   }
@@ -66,7 +74,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
           <h1>Dashboard</h1>
           <p className="text-secondary">Overview of your photography workflow</p>
         </div>
-        <button className="btn-primary" onClick={() => onProjectClick?.('new')}>
+        <button className="btn-primary" onClick={() => setShowCreateProject(true)}>
           New Project
         </button>
       </div>
@@ -117,6 +125,18 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
           </section>
         </div>
       </div>
+
+      {showCreateProject && (
+        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>Create New Project</h2>
+            <CreateProject
+              onProjectCreated={handleProjectCreated}
+              onCancel={() => setShowCreateProject(false)}
+            />
+          </div>
+        </div>
+      )}
     </>
   )
 }
