@@ -11,6 +11,8 @@ import type {
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
+import { DatePicker } from './DatePicker'
+import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
   initialSelectedProjectId?: string | null
@@ -33,6 +35,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
 
@@ -395,6 +398,41 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
+  async function handleDeadlineChange(newDeadline: string) {
+    if (!selectedProject) return
+
+    try {
+      const updatedProject = await invoke<Project>('update_project_deadline', {
+        projectId: selectedProject.id,
+        deadline: newDeadline || null,
+      })
+      setSelectedProject(updatedProject)
+      setIsEditingDeadline(false)
+    } catch (error) {
+      console.error('Failed to update deadline:', error)
+      alert(`Failed to update deadline: ${error}`)
+    }
+  }
+
+  function formatDeadlineDisplay(deadline: string): string {
+    const date = new Date(deadline)
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
+  }
+
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -437,12 +475,25 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               {selectedProject.status}
             </span>
           </div>
-          {selectedProject.deadline && (
-            <div className="info-row">
-              <span className="info-label">Deadline:</span>
-              <span>{selectedProject.deadline}</span>
-            </div>
-          )}
+          <div className="info-row">
+            <span className="info-label">Deadline:</span>
+            {isEditingDeadline ? (
+              <DatePicker
+                value={selectedProject.deadline || new Date().toISOString().split('T')[0]}
+                onChange={handleDeadlineChange}
+              />
+            ) : (
+              <span
+                onClick={() => setIsEditingDeadline(true)}
+                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                title="Click to edit deadline"
+              >
+                {selectedProject.deadline
+                  ? formatDeadlineDisplay(selectedProject.deadline)
+                  : 'Not set'}
+              </span>
+            )}
+          </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
             <span className="folder-path">{selectedProject.folderPath}</span>
@@ -454,7 +505,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               className="btn-icon"
               title="Show in Finder"
             >
-              📁
+              <img src={folderIcon} alt="Show in Finder" style={{ width: '30px', height: '30px' }} />
             </button>
           </div>
           {importHistory.length > 0 && importHistory[0].status === 'success' && (

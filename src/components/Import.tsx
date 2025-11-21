@@ -15,6 +15,7 @@ interface ImportProps {
 
 export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   // Reset active card when the active card is no longer in the list
   useEffect(() => {
@@ -23,6 +24,24 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sdCards.length, activeCardPath])
+
+  // Handle clicks outside the list to collapse active card
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        activeCardPath &&
+        listRef.current &&
+        !listRef.current.contains(event.target as Node)
+      ) {
+        setActiveCardPath(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [activeCardPath])
 
   return (
     <>
@@ -33,30 +52,28 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
         </div>
       </div>
       <div className="content-body">
-        <div className="flex flex-col gap-lg">
-          {sdCards.length === 0 ? (
-            <div className="card">
-              <p className="text-secondary">
-                {isScanning
-                  ? 'Scanning for SD cards...'
-                  : 'No SD cards detected. Insert an SD card and click Refresh.'}
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-md">
-              {sdCards.map((card) => (
-                <SDCardItem
-                  key={card.path}
-                  card={card}
-                  onImportComplete={onImportComplete}
-                  isActive={activeCardPath === card.path}
-                  onActivate={() => setActiveCardPath(card.path)}
-                  onDeactivate={() => setActiveCardPath(null)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {sdCards.length === 0 ? (
+          <div className="card">
+            <p className="text-secondary">
+              {isScanning
+                ? 'Scanning for SD cards...'
+                : 'No SD cards detected. Insert an SD card and click Refresh.'}
+            </p>
+          </div>
+        ) : (
+          <div ref={listRef} className="project-list">
+            {sdCards.map((card) => (
+              <SDCardItem
+                key={card.path}
+                card={card}
+                onImportComplete={onImportComplete}
+                isActive={activeCardPath === card.path}
+                onActivate={() => setActiveCardPath(card.path)}
+                onDeactivate={() => setActiveCardPath(null)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </>
   )
@@ -337,21 +354,11 @@ function SDCardItem({
   // Collapsed card view - click to expand
   if (!isActive) {
     return (
-      <div className="card" onClick={handleImportClick} style={{ cursor: 'pointer' }}>
-        <div className="flex flex-col gap-md">
-          <div className="flex" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3>{card.name}</h3>
-            </div>
-            <button
-              className="btn btn-primary"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleImportClick()
-              }}
-            >
-              Import
-            </button>
+      <div className="project-list-item clickable" onClick={handleImportClick}>
+        <div className="project-list-content">
+          <div>
+            <h3>{card.name}</h3>
+            <p className="text-secondary text-sm">Click to import</p>
           </div>
         </div>
       </div>
@@ -364,12 +371,13 @@ function SDCardItem({
 
     return (
       <>
-        <div className="card card-active">
-          <div className="flex flex-col gap-md">
-            <div>
-              <h3>{card.name}</h3>
-              <p className="text-secondary text-sm">Select a project to import into</p>
-            </div>
+        <div className="project-list-item">
+          <div className="card card-active" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+            <div className="flex flex-col gap-md">
+              <div>
+                <h3>{card.name}</h3>
+                <p className="text-secondary text-sm">Select a project to import into</p>
+              </div>
 
             <div className="project-dropdown-container">
               <button
@@ -464,24 +472,25 @@ function SDCardItem({
               )}
             </div>
 
-            <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleStartImport}
-                disabled={!selectedProject || selectedProject === '__new__'}
-              >
-                Start Import
-              </button>
-              <button
-                className="btn"
-                onClick={() => {
-                  setSelectedProject('')
-                  setShowProjectSelect(false)
-                  onDeactivate()
-                }}
-              >
-                Cancel
-              </button>
+              <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleStartImport}
+                  disabled={!selectedProject || selectedProject === '__new__'}
+                >
+                  Start Import
+                </button>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setSelectedProject('')
+                    setShowProjectSelect(false)
+                    onDeactivate()
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -507,31 +516,33 @@ function SDCardItem({
       : 0
 
     return (
-      <div className="card">
-        <div className="flex flex-col gap-md">
-          <div>
-            <h3>{card.name}</h3>
-            <p className="text-secondary text-sm">Importing files...</p>
-          </div>
-
-          {importProgress && (
-            <div className="backup-progress">
-              <div className="progress-info">
-                <span className="progress-file">{importProgress.currentFile}</span>
-                <span className="progress-count">
-                  {importProgress.filesCopied} / {importProgress.totalFiles} files
-                </span>
-              </div>
-
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${percentage}%` }} />
-              </div>
+      <div className="project-list-item">
+        <div className="card" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+          <div className="flex flex-col gap-md">
+            <div>
+              <h3>{card.name}</h3>
+              <p className="text-secondary text-sm">Importing files...</p>
             </div>
-          )}
 
-          <button className="btn" onClick={handleCancelImport}>
-            Cancel Import
-          </button>
+            {importProgress && (
+              <div className="backup-progress">
+                <div className="progress-info">
+                  <span className="progress-file">{importProgress.currentFile}</span>
+                  <span className="progress-count">
+                    {importProgress.filesCopied} / {importProgress.totalFiles} files
+                  </span>
+                </div>
+
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${percentage}%` }} />
+                </div>
+              </div>
+            )}
+
+            <button className="btn" onClick={handleCancelImport}>
+              Cancel Import
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -541,48 +552,50 @@ function SDCardItem({
     const wasCancelled = importResult.error?.includes('cancelled') || false
 
     return (
-      <div className="card">
-        <div className="flex flex-col gap-md">
-          <div>
-            <h3>{card.name}</h3>
-            <p
-              className={`text-sm ${wasCancelled ? 'text-warning' : importResult.success ? 'text-success' : 'text-error'}`}
-            >
-              {wasCancelled
-                ? `Import cancelled (${importResult.filesCopied} files copied)`
-                : importResult.success
-                  ? 'Import completed'
-                  : 'Import failed'}
-            </p>
-          </div>
-
-          {!wasCancelled && (
-            <div className="text-sm">
-              <p>Files copied: {importResult.filesCopied}</p>
-              {importResult.photosCopied > 0 && <p>Photos: {importResult.photosCopied}</p>}
-              {importResult.videosCopied > 0 && <p>Videos: {importResult.videosCopied}</p>}
-              {importResult.filesSkipped > 0 && (
-                <>
-                  <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>
-                  {importResult.skippedFiles.length > 0 && (
-                    <div className="mt-xs">
-                      <p className="font-medium">Skipped files:</p>
-                      <ul className="list-disc ml-md">
-                        {importResult.skippedFiles.map((file, i) => (
-                          <li key={i}>{file}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-              {importResult.error && <p className="text-error mt-xs">{importResult.error}</p>}
+      <div className="project-list-item">
+        <div className="card" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+          <div className="flex flex-col gap-md">
+            <div>
+              <h3>{card.name}</h3>
+              <p
+                className={`text-sm ${wasCancelled ? 'text-warning' : importResult.success ? 'text-success' : 'text-error'}`}
+              >
+                {wasCancelled
+                  ? `Import cancelled (${importResult.filesCopied} files copied)`
+                  : importResult.success
+                    ? 'Import completed'
+                    : 'Import failed'}
+              </p>
             </div>
-          )}
 
-          <button className="btn" onClick={() => setImportResult(null)}>
-            Done
-          </button>
+            {!wasCancelled && (
+              <div className="text-sm">
+                <p>Files copied: {importResult.filesCopied}</p>
+                {importResult.photosCopied > 0 && <p>Photos: {importResult.photosCopied}</p>}
+                {importResult.videosCopied > 0 && <p>Videos: {importResult.videosCopied}</p>}
+                {importResult.filesSkipped > 0 && (
+                  <>
+                    <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>
+                    {importResult.skippedFiles.length > 0 && (
+                      <div className="mt-xs">
+                        <p className="font-medium">Skipped files:</p>
+                        <ul className="list-disc ml-md">
+                          {importResult.skippedFiles.map((file, i) => (
+                            <li key={i}>{file}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                )}
+                {importResult.error && <p className="text-error mt-xs">{importResult.error}</p>}
+              </div>
+            )}
+
+            <button className="btn" onClick={() => setImportResult(null)}>
+              Done
+            </button>
+          </div>
         </div>
       </div>
     )

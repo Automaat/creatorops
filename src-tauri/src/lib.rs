@@ -16,7 +16,8 @@ use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
 use modules::project::{
-    create_project, delete_project, list_projects, refresh_projects, update_project_status,
+    create_project, delete_project, list_projects, refresh_projects, update_project_deadline,
+    update_project_status,
 };
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
@@ -35,6 +36,7 @@ pub fn run() {
             list_projects,
             refresh_projects,
             update_project_status,
+            update_project_deadline,
             delete_project,
             save_import_history,
             get_import_history,

@@ -697,6 +697,7 @@
 
 .info-row {
   display: flex;
+  align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md) 0;
   border-bottom: 1px solid var(--color-border);
@@ -1287,12 +1288,12 @@
   position: absolute;
   top: calc(100% + var(--space-xs));
   left: 0;
-  right: 0;
+  min-width: 320px;
   background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  padding: var(--space-lg);
+  padding: var(--space-md);
   z-index: var(--z-dropdown);
   animation: slideUp 0.2s ease-out;
 }
@@ -1301,7 +1302,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-md);
 }
 
 .date-picker-title {

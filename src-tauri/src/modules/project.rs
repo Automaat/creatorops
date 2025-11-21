@@ -254,6 +254,27 @@ pub async fn update_project_status(
     Ok(project)
 }
 
+#[tauri::command]
+pub async fn update_project_deadline(
+    project_id: String,
+    deadline: Option<String>,
+) -> Result<Project, String> {
+    let (mut project, metadata_path) = find_project_by_id(&project_id)?;
+
+    // Update deadline and timestamp
+    project.deadline = deadline.filter(|d| !d.is_empty());
+    project.updated_at = chrono::Utc::now().to_rfc3339();
+
+    // Save updated project
+    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
+    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
+
+    // Invalidate cache
+    invalidate_cache();
+
+    Ok(project)
+}
+
 mod chrono {
     pub struct Utc;
 

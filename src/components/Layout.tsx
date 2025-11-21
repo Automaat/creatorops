@@ -1,4 +1,18 @@
 import { ReactNode } from 'react'
+import dashboardIcon from '../assets/icons/dashboard.png'
+import dashboardIconSelected from '../assets/icons/dashboard_selected.png'
+import importIcon from '../assets/icons/import.png'
+import importIconSelected from '../assets/icons/import_selected.png'
+import projectsIcon from '../assets/icons/dir.png'
+import projectsIconSelected from '../assets/icons/dir_selected.png'
+import backupIcon from '../assets/icons/archive.png'
+import backupIconSelected from '../assets/icons/archive_selected.png'
+import deliveryIcon from '../assets/icons/delivery.png'
+import deliveryIconSelected from '../assets/icons/delivery_selected.png'
+import historyIcon from '../assets/icons/history.png'
+import historyIconSelected from '../assets/icons/history_selected.png'
+import settingsIcon from '../assets/icons/settings.png'
+import settingsIconSelected from '../assets/icons/settings_selected.png'
 
 interface LayoutProps {
   children: ReactNode
@@ -23,45 +37,52 @@ export function Layout({
         </div>
         <nav className="sidebar-nav">
           <NavItem
-            icon="📊"
+            iconSrc={dashboardIcon}
+            iconSrcSelected={dashboardIconSelected}
             label="Dashboard"
             active={currentView === 'dashboard'}
             onClick={() => onNavigate('dashboard')}
           />
           <NavItem
-            icon="💿"
+            iconSrc={importIcon}
+            iconSrcSelected={importIconSelected}
             label="Import"
             active={currentView === 'import'}
             count={importCount}
             onClick={() => onNavigate('import')}
           />
           <NavItem
-            icon="📁"
+            iconSrc={projectsIcon}
+            iconSrcSelected={projectsIconSelected}
             label="Projects"
             active={currentView === 'projects'}
             count={projectsCount}
             onClick={() => onNavigate('projects')}
           />
           <NavItem
-            icon="💾"
+            iconSrc={backupIcon}
+            iconSrcSelected={backupIconSelected}
             label="Backup Queue"
             active={currentView === 'backup'}
             onClick={() => onNavigate('backup')}
           />
           <NavItem
-            icon="📦"
+            iconSrc={deliveryIcon}
+            iconSrcSelected={deliveryIconSelected}
             label="Delivery"
             active={currentView === 'delivery'}
             onClick={() => onNavigate('delivery')}
           />
           <NavItem
-            icon="📜"
+            iconSrc={historyIcon}
+            iconSrcSelected={historyIconSelected}
             label="History"
             active={currentView === 'history'}
             onClick={() => onNavigate('history')}
           />
           <NavItem
-            icon="⚙️"
+            iconSrc={settingsIcon}
+            iconSrcSelected={settingsIconSelected}
             label="Settings"
             active={currentView === 'settings'}
             onClick={() => onNavigate('settings')}
@@ -74,19 +95,27 @@ export function Layout({
 }
 
 interface NavItemProps {
-  icon: string
+  icon?: string
+  iconSrc?: string
+  iconSrcSelected?: string
   label: string
   active?: boolean
   count?: number
   onClick: () => void
 }
 
-function NavItem({ icon, label, active = false, count, onClick }: NavItemProps) {
+function NavItem({ icon, iconSrc, iconSrcSelected, label, active = false, count, onClick }: NavItemProps) {
+  const currentIcon = active && iconSrcSelected ? iconSrcSelected : iconSrc
+
   return (
     <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
-      <span role="img" aria-label={label}>
-        {icon}
-      </span>
+      {currentIcon ? (
+        <img src={currentIcon} alt={label} className="nav-item-icon" />
+      ) : (
+        <span role="img" aria-label={label}>
+          {icon}
+        </span>
+      )}
       <span>{label}</span>
       {count !== undefined && count > 0 && <span className="nav-item-badge">{count}</span>}
     </div>

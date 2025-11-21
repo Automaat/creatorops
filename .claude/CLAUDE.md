@@ -51,8 +51,8 @@ src/styles/
 
 **Accent:**
 
-- Primary action: `#FF9F40` (orange)
-- Hover: `#FF8C1A`
+- Primary action: `#D68406` (orange)
+- Hover: `#C07605`
 - Success: `#4CAF50`
 - Sidebar highlight: `#FFF9E6` (warm cream)
 
