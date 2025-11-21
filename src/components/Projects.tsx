@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project, BackupDestination, ArchiveJob, ImportHistory } from '../types'
+import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 
 interface ProjectsProps {
@@ -179,6 +180,19 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
     try {
       await invoke(command, { path: selectedProject.folderPath })
+
+      // Auto-update status to Editing if not already Editing, Delivered, or Archived
+      if (
+        selectedProject.status !== ProjectStatus.Editing &&
+        selectedProject.status !== ProjectStatus.Delivered &&
+        selectedProject.status !== ProjectStatus.Archived
+      ) {
+        const updatedProject = await invoke<Project>('update_project_status', {
+          projectId: selectedProject.id,
+          newStatus: ProjectStatus.Editing,
+        })
+        setSelectedProject(updatedProject)
+      }
     } catch (err) {
       alert(`Failed to open ${appName}: ${err}`)
     }

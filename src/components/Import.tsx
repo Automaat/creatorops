@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { SDCard, Project, CopyResult } from '../types'
 import { ProjectStatus } from '../types'
@@ -50,6 +50,7 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
                   onImportComplete={onImportComplete}
                   isActive={activeCardPath === card.path}
                   onActivate={() => setActiveCardPath(card.path)}
+                  onDeactivate={() => setActiveCardPath(null)}
                 />
               ))}
             </div>
@@ -65,9 +66,16 @@ interface SDCardItemProps {
   onImportComplete: (projectId: string) => void
   isActive: boolean
   onActivate: () => void
+  onDeactivate: () => void
 }
 
-function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItemProps) {
+function SDCardItem({
+  card,
+  onImportComplete,
+  isActive,
+  onActivate,
+  onDeactivate,
+}: SDCardItemProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
@@ -75,12 +83,66 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  function getStatusColor(status: string): string {
+    switch (status) {
+      case 'New':
+        return 'status-new'
+      case 'Importing':
+        return 'status-importing'
+      case 'Editing':
+        return 'status-editing'
+      case 'Delivered':
+        return 'status-delivered'
+      case 'Archived':
+        return 'status-archived'
+      default:
+        return ''
+    }
+  }
 
   useEffect(() => {
     if (showProjectSelect) {
       loadProjects()
+      updateDropdownPosition()
     }
   }, [showProjectSelect])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showProjectSelect &&
+        triggerRef.current &&
+        dropdownRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowProjectSelect(false)
+      }
+    }
+
+    if (showProjectSelect) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProjectSelect])
+
+  const updateDropdownPosition = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      })
+    }
+  }
 
   const loadProjects = async () => {
     try {
@@ -93,7 +155,6 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
 
   const handleImportClick = () => {
     onActivate()
-    setShowProjectSelect(true)
   }
 
   const handleProjectSelect = (projectId: string) => {
@@ -256,7 +317,7 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     }
   }
 
-  // Only show expanded view if this card is active
+  // Collapsed card view - click to expand
   if (!isActive) {
     return (
       <div className="card" onClick={handleImportClick} style={{ cursor: 'pointer' }}>
@@ -280,44 +341,128 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     )
   }
 
-  if (showProjectSelect && !isImporting && !importResult) {
+  // Expanded card view - show project dropdown
+  if (isActive && !isImporting && !importResult) {
+    const selectedProjectData = projects.find((p) => p.id === selectedProject)
+
     return (
       <>
-        <div className="card">
+        <div className="card card-active">
           <div className="flex flex-col gap-md">
             <div>
               <h3>{card.name}</h3>
+              <p className="text-secondary text-sm">Select a project to import into</p>
             </div>
 
-            <div className="flex flex-col gap-xs">
-              <label htmlFor={`project-select-${card.path}`} className="text-sm font-medium">
-                Select Project
-              </label>
-              <select
-                id={`project-select-${card.path}`}
-                className="project-select"
-                value={selectedProject}
-                onChange={(e) => handleProjectSelect(e.target.value)}
+            <div className="project-dropdown-container">
+              <button
+                ref={triggerRef}
+                className="project-dropdown-trigger"
+                onClick={() => setShowProjectSelect(!showProjectSelect)}
               >
-                <option value="">Choose a project...</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name} - {project.clientName} ({project.date})
-                  </option>
-                ))}
-                <option value="__new__">+ Create New Project</option>
-              </select>
+                {selectedProjectData ? (
+                  <div className="project-dropdown-selected">
+                    <div className="project-select-header">
+                      <h4>{selectedProjectData.name}</h4>
+                      <span
+                        className={`project-status ${getStatusColor(selectedProjectData.status)}`}
+                      >
+                        {selectedProjectData.status}
+                      </span>
+                    </div>
+                    <div className="project-select-info">
+                      <span className="text-secondary text-sm">
+                        {selectedProjectData.clientName} · {selectedProjectData.date} ·{' '}
+                        {selectedProjectData.shootType}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-secondary">Choose a project...</span>
+                )}
+                <span className="dropdown-arrow">{showProjectSelect ? '▲' : '▼'}</span>
+              </button>
+
+              {showProjectSelect && dropdownPosition && (
+                <div
+                  ref={dropdownRef}
+                  className="project-dropdown-list project-dropdown-list-fixed"
+                  style={{
+                    top: `${dropdownPosition.top}px`,
+                    left: `${dropdownPosition.left}px`,
+                    width: `${dropdownPosition.width}px`,
+                  }}
+                >
+                  {projects.length > 0 ? (
+                    <>
+                      {projects.map((project) => (
+                        <div
+                          key={project.id}
+                          className={`project-select-card ${selectedProject === project.id ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedProject(project.id)
+                            setShowProjectSelect(false)
+                          }}
+                        >
+                          <div className="project-select-header">
+                            <h4>{project.name}</h4>
+                            <span className={`project-status ${getStatusColor(project.status)}`}>
+                              {project.status}
+                            </span>
+                          </div>
+                          <div className="project-select-info">
+                            <span className="text-secondary text-sm">
+                              {project.clientName} · {project.date} · {project.shootType}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      <div
+                        className="project-select-card create-new"
+                        onClick={() => {
+                          handleProjectSelect('__new__')
+                          setShowProjectSelect(false)
+                        }}
+                      >
+                        <div className="project-select-header">
+                          <h4>+ Create New Project</h4>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="empty-state">
+                      <p className="text-secondary">No projects available</p>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => {
+                          setShowCreateNew(true)
+                          setShowProjectSelect(false)
+                        }}
+                      >
+                        Create New Project
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
               <button
                 className="btn btn-primary"
                 onClick={handleStartImport}
-                disabled={!selectedProject}
+                disabled={!selectedProject || selectedProject === '__new__'}
               >
                 Start Import
               </button>
-              <button className="btn" onClick={() => setShowProjectSelect(false)}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setSelectedProject('')
+                  setShowProjectSelect(false)
+                  onDeactivate()
+                }}
+              >
                 Cancel
               </button>
             </div>
