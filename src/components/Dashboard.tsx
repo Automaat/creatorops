@@ -62,27 +62,32 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
   return (
     <>
       <div className="content-header">
-        <h1>Dashboard</h1>
-        <p className="text-secondary">Overview of your photography workflow</p>
+        <div>
+          <h1>Dashboard</h1>
+          <p className="text-secondary">Overview of your photography workflow</p>
+        </div>
+        <button className="btn-primary" onClick={() => onProjectClick?.('new')}>
+          New Project
+        </button>
       </div>
       <div className="content-body">
         <div className="flex flex-col gap-xxl">
           <section>
-            <div className="section-label">My Projects</div>
-            <h2>Active Projects</h2>
-            <div className="flex flex-col gap-md">
+            <div className="section-label">MY PROJECTS</div>
+            <h2>Active projects</h2>
+            <div className="project-list">
               {activeProjects.length === 0 ? (
-                <div className="card">
+                <div className="empty-state">
                   <p className="text-secondary">No active projects</p>
                 </div>
               ) : (
                 activeProjects.map((project) => (
                   <div
                     key={project.id}
-                    className={`card ${onProjectClick ? 'card-clickable' : ''}`}
+                    className={`project-list-item ${onProjectClick ? 'clickable' : ''}`}
                     onClick={() => onProjectClick?.(project.id)}
                   >
-                    <div className="flex flex-between">
+                    <div className="project-list-content">
                       <div>
                         <h3>{project.name}</h3>
                         <p className="text-secondary text-sm">{formatProjectInfo(project)}</p>

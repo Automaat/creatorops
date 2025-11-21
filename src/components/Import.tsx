@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { SDCard, Project, CopyResult } from '../types'
+import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 
 const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
@@ -8,11 +9,10 @@ const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
 interface ImportProps {
   sdCards: SDCard[]
   isScanning: boolean
-  onRefresh: () => void
   onImportComplete: (projectId: string) => void
 }
 
-export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: ImportProps) {
+export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
 
   // Reset active card when the active card is no longer in the list
@@ -26,14 +26,9 @@ export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: Imp
   return (
     <>
       <div className="content-header">
-        <div className="flex" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1>Import from SD Card</h1>
-            <p className="text-secondary">Detect and import files from SD cards</p>
-          </div>
-          <button className="btn btn-primary" onClick={onRefresh} disabled={isScanning}>
-            {isScanning ? 'Scanning...' : 'Refresh'}
-          </button>
+        <div>
+          <h1>Import from SD Card</h1>
+          <p className="text-secondary">Detect and import files from SD cards</p>
         </div>
       </div>
       <div className="content-body">
@@ -128,6 +123,18 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     setImportResult(null)
 
     const startedAt = new Date().toISOString()
+
+    // Update project status to Importing
+    // Note: If this fails, we still proceed with import - status update is non-critical
+    try {
+      await invoke('update_project_status', {
+        projectId: project.id,
+        newStatus: ProjectStatus.Importing,
+      })
+    } catch (err) {
+      console.error('Failed to update project status:', err)
+      // Continue with import - status update failure is not critical
+    }
 
     try {
       // Get all photo/video files from the SD card
