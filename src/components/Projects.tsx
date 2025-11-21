@@ -23,7 +23,15 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
   const scrollToTop = useCallback(() => {
     requestAnimationFrame(() => {
-      containerRef.current?.parentElement?.scrollTo({ top: 0, behavior: 'auto' })
+      let element: HTMLElement | null = containerRef.current
+      while (element) {
+        const style = window.getComputedStyle(element)
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          element.scrollTop = 0
+          break
+        }
+        element = element.parentElement
+      }
     })
   }, [])
 
