@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project, BackupDestination, ArchiveJob, ImportHistory } from '../types'
 import { ProjectStatus } from '../types'
@@ -19,6 +19,21 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const scrollToTop = () => {
+    requestAnimationFrame(() => {
+      let element: HTMLElement | null = containerRef.current
+      while (element) {
+        const style = window.getComputedStyle(element)
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+          element.scrollTop = 0
+          break
+        }
+        element = element.parentElement
+      }
+    })
+  }
 
   const loadProjects = useCallback(async () => {
     try {
@@ -54,10 +69,11 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
     }
   }, [initialSelectedProjectId, loadProjects])
 
-  // Load import history when project is selected
+  // Load import history when project is selected and scroll to top
   useEffect(() => {
     if (selectedProject) {
       loadProjectImportHistory(selectedProject.id)
+      scrollToTop()
     }
   }, [selectedProject])
 
@@ -138,6 +154,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   function handleProjectCreated(project: Project) {
     setShowCreateProject(false)
     setProjects([project, ...projects])
+    setSelectedProject(project)
   }
 
   async function deleteProject() {
@@ -149,6 +166,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       await invoke('delete_project', { projectId: selectedProject.id })
       setShowDeleteDialog(false)
       setSelectedProject(null)
+      scrollToTop()
       loadProjects()
     } catch (err) {
       console.error('Failed to delete project:', err)
@@ -204,7 +222,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
   if (selectedProject) {
     return (
-      <div className="project-detail">
+      <div className="project-detail" ref={containerRef}>
         <div className="project-detail-header">
           <button onClick={() => setSelectedProject(null)} className="btn-back">
             ← Back to Projects
@@ -430,7 +448,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
   return (
     <>
-      <div className="projects">
+      <div className="projects" ref={containerRef}>
         <div className="projects-header">
           <div className="flex flex-between">
             <h1>Projects</h1>
