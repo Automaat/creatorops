@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project, BackupDestination, ArchiveJob, ImportHistory } from '../types'
 import { CreateProject } from './CreateProject'
@@ -19,21 +19,39 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
 
+  const loadProjects = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await invoke<Project[]>('list_projects')
+      setProjects(data)
+      return data
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadProjects()
     loadDestinations()
     loadArchiveLocation()
-  }, [])
+  }, [loadProjects])
 
   // Handle initial project selection from navigation
   useEffect(() => {
-    if (initialSelectedProjectId && projects.length > 0) {
-      const project = projects.find((p) => p.id === initialSelectedProjectId)
-      if (project) {
-        setSelectedProject(project)
-      }
+    if (initialSelectedProjectId) {
+      // Reload projects to get latest status when navigating to a project
+      loadProjects().then((loadedProjects) => {
+        // Find and select the project after reload
+        const project = loadedProjects.find((p) => p.id === initialSelectedProjectId)
+        if (project) {
+          setSelectedProject(project)
+        }
+      })
     }
-  }, [initialSelectedProjectId, projects])
+  }, [initialSelectedProjectId, loadProjects])
 
   // Load import history when project is selected
   useEffect(() => {
@@ -41,18 +59,6 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       loadProjectImportHistory(selectedProject.id)
     }
   }, [selectedProject])
-
-  async function loadProjects() {
-    try {
-      setLoading(true)
-      const data = await invoke<Project[]>('list_projects')
-      setProjects(data)
-    } catch (err) {
-      console.error('Failed to load projects:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function loadDestinations() {
     try {
@@ -153,6 +159,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
 
   function getStatusColor(status: string): string {
     switch (status) {
+      case 'New':
+        return 'status-new'
       case 'Importing':
         return 'status-importing'
       case 'Editing':

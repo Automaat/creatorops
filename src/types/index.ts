@@ -24,6 +24,7 @@ export interface Project {
 }
 
 export enum ProjectStatus {
+  New = 'New',
   Importing = 'Importing',
   Editing = 'Editing',
   Delivered = 'Delivered',

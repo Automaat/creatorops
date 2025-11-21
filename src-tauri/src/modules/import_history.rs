@@ -58,7 +58,7 @@ pub async fn save_import_history(
 
     let history = ImportHistory {
         id: id.clone(),
-        project_id,
+        project_id: project_id.clone(),
         project_name,
         source_path,
         destination_path,

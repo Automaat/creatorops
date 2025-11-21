@@ -22,9 +22,10 @@ pub struct Project {
     pub deadline: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "PascalCase")]
 pub enum ProjectStatus {
+    New,
     Importing,
     Editing,
     Delivered,
@@ -79,7 +80,7 @@ pub async fn create_project(
         client_name,
         date,
         shoot_type,
-        status: ProjectStatus::Editing,
+        status: ProjectStatus::New,
         folder_path: project_path.to_string_lossy().to_string(),
         created_at: now.clone(),
         updated_at: now,
@@ -213,6 +214,52 @@ pub async fn delete_project(project_id: String) -> Result<(), String> {
                     invalidate_cache();
 
                     return Ok(());
+                }
+            }
+        }
+    }
+
+    Err("Project not found".to_string())
+}
+
+#[tauri::command]
+pub async fn update_project_status(
+    project_id: String,
+    new_status: ProjectStatus,
+) -> Result<Project, String> {
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let base_path = home_dir.join("CreatorOps").join("Projects");
+
+    if !base_path.exists() {
+        return Err("Projects directory does not exist".to_string());
+    }
+
+    // Find project by ID
+    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        let metadata_path = path.join("project.json");
+        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+            if let Ok(mut project) = serde_json::from_str::<Project>(&json_data) {
+                if project.id == project_id {
+                    // Update status and timestamp
+                    project.status = new_status;
+                    project.updated_at = chrono::Utc::now().to_rfc3339();
+
+                    // Save updated project
+                    let json_data =
+                        serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
+                    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
+
+                    // Invalidate cache
+                    invalidate_cache();
+
+                    return Ok(project);
                 }
             }
         }

@@ -8,11 +8,10 @@ const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
 interface ImportProps {
   sdCards: SDCard[]
   isScanning: boolean
-  onRefresh: () => void
   onImportComplete: (projectId: string) => void
 }
 
-export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: ImportProps) {
+export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
 
   // Reset active card when the active card is no longer in the list
@@ -26,14 +25,9 @@ export function Import({ sdCards, isScanning, onRefresh, onImportComplete }: Imp
   return (
     <>
       <div className="content-header">
-        <div className="flex" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1>Import from SD Card</h1>
-            <p className="text-secondary">Detect and import files from SD cards</p>
-          </div>
-          <button className="btn btn-primary" onClick={onRefresh} disabled={isScanning}>
-            {isScanning ? 'Scanning...' : 'Refresh'}
-          </button>
+        <div>
+          <h1>Import from SD Card</h1>
+          <p className="text-secondary">Detect and import files from SD cards</p>
         </div>
       </div>
       <div className="content-body">
@@ -128,6 +122,16 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     setImportResult(null)
 
     const startedAt = new Date().toISOString()
+
+    // Update project status to Importing
+    try {
+      await invoke('update_project_status', {
+        projectId: project.id,
+        newStatus: 'Importing',
+      })
+    } catch (err) {
+      console.error('Failed to update project status:', err)
+    }
 
     try {
       // Get all photo/video files from the SD card

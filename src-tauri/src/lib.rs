@@ -15,7 +15,9 @@ use modules::file_system::{
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
-use modules::project::{create_project, delete_project, list_projects, refresh_projects};
+use modules::project::{
+    create_project, delete_project, list_projects, refresh_projects, update_project_status,
+};
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,6 +34,7 @@ pub fn run() {
             create_project,
             list_projects,
             refresh_projects,
+            update_project_status,
             delete_project,
             save_import_history,
             get_import_history,

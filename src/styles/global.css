@@ -31,25 +31,30 @@ h4,
 h5,
 h6 {
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-base);
   margin-bottom: var(--space-md);
 }
 
 h1 {
   font-size: var(--font-size-xxl);
+  line-height: var(--line-height-tight);
 }
 h2 {
   font-size: var(--font-size-xl);
+  line-height: var(--line-height-base);
 }
 h3 {
   font-size: var(--font-size-lg);
+  line-height: var(--line-height-base);
 }
 h4 {
   font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
 }
 
 p {
   margin-bottom: var(--space-md);
+  line-height: var(--line-height-normal);
 }
 
 button {
@@ -151,9 +156,79 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-tertiary);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-xs);
 }
 
 .align-self-start {
   align-self: flex-start;
+}
+
+/* Project List */
+
+.project-list {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.project-list-item {
+  position: relative;
+  border-bottom: 1px solid var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.project-list-item:last-child {
+  border-bottom: none;
+}
+
+.project-list-item.clickable {
+  cursor: pointer;
+}
+
+.project-list-item.clickable:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.project-list-item.clickable:hover::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--color-accent-primary);
+}
+
+.project-list-item.clickable:active {
+  background-color: rgba(255, 159, 64, 0.08);
+}
+
+.project-list-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  gap: 16px;
+}
+
+.project-list-content > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-list-content h3 {
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 4px 0;
+  color: var(--color-text-primary);
+  line-height: var(--line-height-base);
+}
+
+.project-list-content p {
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-base);
 }

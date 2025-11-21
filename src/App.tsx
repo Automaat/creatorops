@@ -137,7 +137,6 @@ function App() {
           <Import
             sdCards={sdCards}
             isScanning={isScanning}
-            onRefresh={scanForSDCards}
             onImportComplete={handleNavigateToProject}
           />
         </div>
