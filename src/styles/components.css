@@ -571,7 +571,7 @@
   box-shadow: var(--shadow-lg);
   max-height: 400px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: var(--z-dropdown);
   padding: var(--space-xs);
   display: flex;
   flex-direction: column;
@@ -1154,7 +1154,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: var(--z-index-modal);
+  z-index: var(--z-modal);
 }
 
 .dialog {

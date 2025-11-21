@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event'
 import type { SDCard, Project, CopyResult, ImportProgress } from '../types'
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
+import { sortProjectsByStatus } from '../utils/project'
 
 const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
 
@@ -180,7 +181,8 @@ function SDCardItem({
   const loadProjects = async () => {
     try {
       const projectList = await invoke<Project[]>('list_projects')
-      setProjects(projectList)
+      const sortedProjects = sortProjectsByStatus(projectList)
+      setProjects(sortedProjects)
     } catch (error) {
       console.error('Failed to load projects:', error)
     }
@@ -201,7 +203,8 @@ function SDCardItem({
   const handleProjectCreated = (project: Project) => {
     setShowCreateNew(false)
     setSelectedProject(project.id)
-    setProjects([project, ...projects])
+    const updatedProjects = sortProjectsByStatus([project, ...projects])
+    setProjects(updatedProjects)
   }
 
   const handleStartImport = async () => {
