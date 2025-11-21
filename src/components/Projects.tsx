@@ -21,6 +21,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // IMPORTANT: DOM walk required for list↔detail transitions when containerRef switches elements
+  // Simplifying to parent-only scroll breaks project creation flow. Change with caution.
   const scrollToTop = useCallback(() => {
     requestAnimationFrame(() => {
       let element: HTMLElement | null = containerRef.current
