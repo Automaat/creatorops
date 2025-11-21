@@ -10,6 +10,7 @@ import { History } from './components/History'
 import { Settings } from './components/Settings'
 import { NotificationToast } from './components/NotificationToast'
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp'
+import { CommandPalette } from './components/CommandPalette'
 import { useTheme } from './hooks/useTheme'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -20,6 +21,7 @@ type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'histo
 function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [projectsCount, setProjectsCount] = useState<number>(0)
 
@@ -59,6 +61,12 @@ function App() {
         metaKey: true,
         description: 'Show Keyboard Shortcuts',
         action: () => setShowShortcuts(true),
+      },
+      {
+        key: 'k',
+        metaKey: true,
+        description: 'Open Command Palette',
+        action: () => setShowCommandPalette(true),
       },
       {
         key: '1',
@@ -158,6 +166,11 @@ function App() {
       </Layout>
       <NotificationToast />
       <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        onSelectProject={handleNavigateToProject}
+      />
     </>
   )
 }
