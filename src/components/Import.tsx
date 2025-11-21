@@ -83,7 +83,11 @@ function SDCardItem({
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
-  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number
+    left: number
+    width: number
+  } | null>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 

@@ -21,19 +21,11 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const scrollToTop = () => {
+  const scrollToTop = useCallback(() => {
     requestAnimationFrame(() => {
-      let element: HTMLElement | null = containerRef.current
-      while (element) {
-        const style = window.getComputedStyle(element)
-        if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-          element.scrollTop = 0
-          break
-        }
-        element = element.parentElement
-      }
+      containerRef.current?.parentElement?.scrollTo({ top: 0, behavior: 'auto' })
     })
-  }
+  }, [])
 
   const loadProjects = useCallback(async () => {
     try {
@@ -75,7 +67,7 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       loadProjectImportHistory(selectedProject.id)
       scrollToTop()
     }
-  }, [selectedProject])
+  }, [selectedProject, scrollToTop])
 
   async function loadDestinations() {
     try {
@@ -166,8 +158,8 @@ export function Projects({ initialSelectedProjectId }: ProjectsProps) {
       await invoke('delete_project', { projectId: selectedProject.id })
       setShowDeleteDialog(false)
       setSelectedProject(null)
+      await loadProjects()
       scrollToTop()
-      loadProjects()
     } catch (err) {
       console.error('Failed to delete project:', err)
       alert(`Failed to delete project: ${err}`)
