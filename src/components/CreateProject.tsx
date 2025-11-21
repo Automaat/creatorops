@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
+import { DatePicker } from './DatePicker'
 
 interface CreateProjectProps {
   onProjectCreated?: (project: Project) => void
@@ -85,15 +86,11 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
           </div>
 
           <div className="flex flex-col gap-xs">
-            <label htmlFor="date" className="font-medium">
-              Shoot Date *
-            </label>
-            <input
+            <DatePicker
               id="date"
-              type="date"
-              className="input"
+              label="Shoot Date"
               value={formData.date}
-              onChange={(e) => handleChange('date', e.target.value)}
+              onChange={(value) => handleChange('date', value)}
               required
             />
           </div>
@@ -113,15 +110,11 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
           </div>
 
           <div className="flex flex-col gap-xs">
-            <label htmlFor="deadline" className="font-medium">
-              Deadline (optional)
-            </label>
-            <input
+            <DatePicker
               id="deadline"
-              type="date"
-              className="input"
+              label="Deadline (optional)"
               value={formData.deadline}
-              onChange={(e) => handleChange('deadline', e.target.value)}
+              onChange={(value) => handleChange('deadline', value)}
             />
           </div>
 
