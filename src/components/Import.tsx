@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { SDCard, Project, CopyResult } from '../types'
+import { listen } from '@tauri-apps/api/event'
+import type { SDCard, Project, CopyResult, ImportProgress } from '../types'
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 
@@ -83,6 +84,7 @@ function SDCardItem({
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number
     left: number
@@ -107,6 +109,16 @@ function SDCardItem({
         return ''
     }
   }
+
+  useEffect(() => {
+    const unlistenProgress = listen<ImportProgress>('import-progress', (event) => {
+      setImportProgress(event.payload)
+    })
+
+    return () => {
+      unlistenProgress.then((fn) => fn())
+    }
+  }, [])
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -186,6 +198,7 @@ function SDCardItem({
     setImportId(currentImportId)
     setIsImporting(true)
     setImportResult(null)
+    setImportProgress(null)
 
     const startedAt = new Date().toISOString()
 
@@ -489,6 +502,10 @@ function SDCardItem({
   }
 
   if (isImporting) {
+    const percentage = importProgress
+      ? (importProgress.filesCopied / importProgress.totalFiles) * 100
+      : 0
+
     return (
       <div className="card">
         <div className="flex flex-col gap-md">
@@ -496,6 +513,22 @@ function SDCardItem({
             <h3>{card.name}</h3>
             <p className="text-secondary text-sm">Importing files...</p>
           </div>
+
+          {importProgress && (
+            <div className="backup-progress">
+              <div className="progress-info">
+                <span className="progress-file">{importProgress.currentFile}</span>
+                <span className="progress-count">
+                  {importProgress.filesCopied} / {importProgress.totalFiles} files
+                </span>
+              </div>
+
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${percentage}%` }} />
+              </div>
+            </div>
+          )}
+
           <button className="btn" onClick={handleCancelImport}>
             Cancel Import
           </button>
