@@ -116,9 +116,8 @@ pub fn get_timestamp() -> String {
 
 #[tauri::command]
 pub fn get_home_directory() -> Result<String, String> {
-    get_home_dir().and_then(|path| {
-        path.to_str()
-            .map(|s| s.to_string())
-            .ok_or_else(|| "Failed to convert path to string".to_string())
-    })
+    get_home_dir()?
+        .to_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| "Failed to convert path to string".to_string())
 }

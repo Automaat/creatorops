@@ -37,7 +37,10 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
     }
   }
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = <K extends keyof typeof formData>(
+    field: K,
+    value: (typeof formData)[K]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -84,12 +87,7 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
           />
         </div>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--color-border)',
-            margin: 'var(--space-md) 0',
-          }}
-        />
+        <hr className="form-section-separator" />
 
         <div className="flex flex-col gap-xxs">
           <label htmlFor="shootType" className="form-label">

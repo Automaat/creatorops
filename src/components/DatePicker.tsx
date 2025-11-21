@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import calendarIcon from '../assets/icons/calendar.png'
+import { formatDisplayDate, MONTH_NAMES_FULL } from '../utils/formatting'
 
 interface DatePickerProps {
   value: string
@@ -11,15 +12,21 @@ interface DatePickerProps {
 
 export function DatePicker({ value, onChange, label, required, id }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null)
-  const [viewDate, setViewDate] = useState(value ? new Date(value) : new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(
+    value && value.trim() ? new Date(value) : null
+  )
+  const [viewDate, setViewDate] = useState(
+    value && value.trim() ? new Date(value) : new Date()
+  )
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (value) {
+    if (value && value.trim()) {
       const date = new Date(value)
-      setSelectedDate(date)
-      setViewDate(date)
+      if (!isNaN(date.getTime())) {
+        setSelectedDate(date)
+        setViewDate(date)
+      }
     } else {
       setSelectedDate(null)
     }
@@ -42,24 +49,6 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${date.getFullYear()}-${month}-${day}`
-  }
-
-  const formatDisplayDate = (date: Date) => {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ]
-    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
   }
 
   const handleDateSelect = (day: number) => {
@@ -115,20 +104,6 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
     )
   }
 
-  const months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ]
   const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
   return (
@@ -157,7 +132,7 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
               ←
             </button>
             <span className="date-picker-title">
-              {months[viewDate.getMonth()]} {viewDate.getFullYear()}
+              {MONTH_NAMES_FULL[viewDate.getMonth()]} {viewDate.getFullYear()}
             </span>
             <button type="button" onClick={nextMonth} className="date-picker-nav">
               →

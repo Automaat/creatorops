@@ -1428,6 +1428,14 @@
   font-weight: var(--font-weight-normal);
 }
 
+/* Form Section Separator */
+
+.form-section-separator {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-md) 0;
+}
+
 /* Command Palette */
 
 .command-palette-overlay {

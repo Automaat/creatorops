@@ -12,6 +12,7 @@ import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { DatePicker } from './DatePicker'
+import { formatDisplayDate } from '../utils/formatting'
 import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
@@ -42,7 +43,11 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   const replaceHomeWithTilde = (path: string): string => {
     if (!homeDir) return path
-    return path.startsWith(homeDir) ? path.replace(homeDir, '~') : path
+    const normalizedHome = homeDir.replace(/\/$/, '')
+    const normalizedPath = path.replace(/\/$/, '')
+    return normalizedPath.startsWith(normalizedHome)
+      ? normalizedPath.replace(normalizedHome, '~')
+      : path
   }
 
   // IMPORTANT: DOM walk required for list↔detail transitions when containerRef switches elements
@@ -430,25 +435,6 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
-  function formatDeadlineDisplay(deadline: string): string {
-    const date = new Date(deadline)
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ]
-    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-  }
-
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -504,9 +490,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                 style={{ cursor: 'pointer', textDecoration: 'underline' }}
                 title="Click to edit deadline"
               >
-                {selectedProject.deadline
-                  ? formatDeadlineDisplay(selectedProject.deadline)
-                  : 'Not set'}
+                {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
               </span>
             )}
           </div>
