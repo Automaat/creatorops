@@ -12,6 +12,7 @@ import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { DatePicker } from './DatePicker'
+import { formatDisplayDate } from '../utils/formatting'
 import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
@@ -36,8 +37,18 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [importResult, setImportResult] = useState<CopyResult | null>(null)
   const [importId, setImportId] = useState<string | null>(null)
   const [isEditingDeadline, setIsEditingDeadline] = useState(false)
+  const [homeDir, setHomeDir] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
+
+  const replaceHomeWithTilde = (path: string): string => {
+    if (!homeDir) return path
+    const normalizedHome = homeDir.replace(/\/$/, '')
+    const normalizedPath = path.replace(/\/$/, '')
+    return normalizedPath.startsWith(normalizedHome)
+      ? normalizedPath.replace(normalizedHome, '~')
+      : path
+  }
 
   // IMPORTANT: DOM walk required for list↔detail transitions when containerRef switches elements
   // Simplifying to parent-only scroll breaks project creation flow. Change with caution.
@@ -73,7 +84,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     loadProjects()
     loadDestinations()
     loadArchiveLocation()
+    loadHomeDirectory()
   }, [loadProjects])
+
+  async function loadHomeDirectory() {
+    try {
+      const dir = await invoke<string>('get_home_directory')
+      setHomeDir(dir)
+    } catch (err) {
+      console.error('Failed to load home directory:', err)
+    }
+  }
 
   // Handle initial project selection from navigation
   useEffect(() => {
@@ -414,25 +435,6 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
-  function formatDeadlineDisplay(deadline: string): string {
-    const date = new Date(deadline)
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ]
-    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`
-  }
-
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -488,15 +490,13 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                 style={{ cursor: 'pointer', textDecoration: 'underline' }}
                 title="Click to edit deadline"
               >
-                {selectedProject.deadline
-                  ? formatDeadlineDisplay(selectedProject.deadline)
-                  : 'Not set'}
+                {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
               </span>
             )}
           </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
-            <span className="folder-path">{selectedProject.folderPath}</span>
+            <span className="folder-path">{replaceHomeWithTilde(selectedProject.folderPath)}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -505,7 +505,11 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               className="btn-icon"
               title="Show in Finder"
             >
-              <img src={folderIcon} alt="Show in Finder" style={{ width: '30px', height: '30px' }} />
+              <img
+                src={folderIcon}
+                alt="Show in Finder"
+                style={{ width: '30px', height: '30px' }}
+              />
             </button>
           </div>
           {importHistory.length > 0 && importHistory[0].status === 'success' && (

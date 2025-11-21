@@ -53,3 +53,40 @@ export function formatDateShort(dateString: string): string {
     return dateString
   }
 }
+
+const MONTH_NAMES_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const
+
+const MONTH_NAMES_FULL = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const
+
+export function formatDisplayDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  return `${MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
+
+export { MONTH_NAMES_SHORT, MONTH_NAMES_FULL }

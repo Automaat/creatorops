@@ -113,3 +113,11 @@ pub fn get_timestamp() -> String {
         .expect("System time before UNIX epoch");
     format!("{}", duration.as_secs())
 }
+
+#[tauri::command]
+pub fn get_home_directory() -> Result<String, String> {
+    get_home_dir()?
+        .to_str()
+        .map(ToString::to_string)
+        .ok_or_else(|| "Failed to convert path to string".to_string())
+}

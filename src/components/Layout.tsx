@@ -104,7 +104,15 @@ interface NavItemProps {
   onClick: () => void
 }
 
-function NavItem({ icon, iconSrc, iconSrcSelected, label, active = false, count, onClick }: NavItemProps) {
+function NavItem({
+  icon,
+  iconSrc,
+  iconSrcSelected,
+  label,
+  active = false,
+  count,
+  onClick,
+}: NavItemProps) {
   const currentIcon = active && iconSrcSelected ? iconSrcSelected : iconSrc
 
   return (

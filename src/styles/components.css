@@ -94,19 +94,25 @@
 .btn-ghost {
   background-color: transparent;
   color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .btn-ghost:hover {
   background-color: var(--color-bg-tertiary);
 }
 
+.btn-ghost:disabled {
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+}
+
 /* Inputs */
 
 .input {
-  padding: var(--space-sm) var(--space-md);
+  padding: 6px var(--space-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   transition: border-color var(--transition-fast);
   font-size: var(--font-size-md);
@@ -114,13 +120,17 @@
   line-height: var(--line-height-base);
 }
 
+.input:hover {
+  border-color: var(--color-text-tertiary);
+}
+
 .input:focus {
   outline: none;
-  border-color: var(--color-accent-primary);
+  border-color: var(--color-text-tertiary);
 }
 
 .input::placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-placeholder);
 }
 
 /* Date Input Styling */
@@ -137,8 +147,7 @@
 }
 
 .input[type='date']:hover {
-  border-color: var(--color-accent-primary);
-  box-shadow: var(--shadow-xs);
+  border-color: var(--color-text-tertiary);
 }
 
 .input[type='date']::-webkit-calendar-picker-indicator {
@@ -1150,7 +1159,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.15);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1159,20 +1168,28 @@
 
 .dialog {
   background-color: var(--color-bg-primary);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl) var(--space-xxl);
   max-width: 500px;
   width: 90%;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .dialog h2 {
-  margin: 0 0 var(--space-md) 0;
+  margin: 0 0 var(--space-lg) 0;
   font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  padding: 0;
 }
 
 .dialog p {
   margin-bottom: var(--space-md);
+  color: var(--color-text-secondary);
+}
+
+.dialog label {
+  font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
 
@@ -1244,9 +1261,8 @@
 
 .date-picker-input {
   width: 100%;
-  min-height: 40px;
-  padding: var(--space-md) var(--space-lg);
-  background-color: var(--color-bg-secondary);
+  padding: 6px var(--space-md);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -1256,27 +1272,36 @@
   align-items: center;
   gap: var(--space-md);
   text-align: left;
+  font-size: var(--font-size-md);
+  font-family: var(--font-family);
+  line-height: var(--line-height-base);
 }
 
 .date-picker-input:hover {
-  border-color: var(--color-accent-primary);
-  box-shadow: var(--shadow-xs);
+  border-color: var(--color-text-tertiary);
 }
 
 .date-picker-input:focus {
   outline: none;
-  border-color: var(--color-accent-primary);
+  border-color: var(--color-text-tertiary);
 }
 
 .date-picker-value {
   font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-normal);
   color: var(--color-text-primary);
+}
+
+.date-picker-placeholder {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-placeholder);
 }
 
 .date-picker-icon {
   opacity: 0.4;
-  font-size: var(--font-size-md);
+  width: 16px;
+  height: 16px;
   transition: opacity var(--transition-fast);
 }
 
@@ -1388,6 +1413,29 @@
   cursor: default;
 }
 
+/* Form Labels */
+
+.form-label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+/* Optional Field Label */
+
+.text-optional {
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-normal);
+}
+
+/* Form Section Separator */
+
+.form-section-separator {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-md) 0;
+}
+
 /* Command Palette */
 
 .command-palette-overlay {
@@ -1433,7 +1481,7 @@
 }
 
 .command-palette-input::placeholder {
-  color: var(--color-text-tertiary);
+  color: var(--color-text-placeholder);
 }
 
 .command-palette-results {
