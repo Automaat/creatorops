@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
 
@@ -47,6 +47,14 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
     setSelectedIndex(0)
   }, [searchQuery])
 
+  const handleSelectProject = useCallback(
+    (projectId: string) => {
+      onSelectProject(projectId)
+      onClose()
+    },
+    [onSelectProject, onClose]
+  )
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -67,12 +75,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, selectedIndex, filteredProjects, onClose])
-
-  const handleSelectProject = (projectId: string) => {
-    onSelectProject(projectId)
-    onClose()
-  }
+  }, [isOpen, selectedIndex, filteredProjects, onClose, handleSelectProject])
 
   function getStatusColor(status: string): string {
     switch (status) {
