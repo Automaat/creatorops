@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { Layout } from './components/Layout'
 import { Dashboard } from './components/Dashboard'
 import { Import } from './components/Import'
@@ -12,6 +13,7 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp'
 import { useTheme } from './hooks/useTheme'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import type { Project } from './types'
 
 type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'history' | 'settings'
 
@@ -19,9 +21,24 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [projectsCount, setProjectsCount] = useState<number>(0)
 
   // Apply theme on app load
   useTheme()
+
+  // Load and refresh project count for badge
+  const loadProjectCount = async () => {
+    try {
+      const projects = await invoke<Project[]>('list_projects')
+      setProjectsCount(projects.length)
+    } catch (err) {
+      console.error('Failed to load project count:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadProjectCount()
+  }, [])
 
   // Global SD card scanner - runs in background across all pages
   const { sdCards, isScanning, scanForSDCards } = useSDCardScanner({
@@ -90,6 +107,7 @@ function App() {
   const handleNavigateToProject = (projectId: string) => {
     setSelectedProjectId(projectId)
     setCurrentView('projects')
+    loadProjectCount() // Refresh count after project creation
   }
 
   const handleViewChange = (view: string) => {
@@ -98,11 +116,20 @@ function App() {
       setSelectedProjectId(null)
     }
     setCurrentView(view as View)
+    // Refresh count when switching to views that show projects
+    if (view === 'dashboard' || view === 'projects') {
+      loadProjectCount()
+    }
   }
 
   return (
     <>
-      <Layout currentView={currentView} onNavigate={handleViewChange}>
+      <Layout
+        currentView={currentView}
+        onNavigate={handleViewChange}
+        importCount={sdCards.length}
+        projectsCount={projectsCount}
+      >
         <div style={{ display: currentView === 'dashboard' ? 'block' : 'none' }}>
           <Dashboard onProjectClick={handleNavigateToProject} />
         </div>

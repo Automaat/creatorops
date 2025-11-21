@@ -66,8 +66,9 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
         <p className="text-secondary">Overview of your photography workflow</p>
       </div>
       <div className="content-body">
-        <div className="flex flex-col gap-xl">
+        <div className="flex flex-col gap-xxl">
           <section>
+            <div className="section-label">My Projects</div>
             <h2>Active Projects</h2>
             <div className="flex flex-col gap-md">
               {activeProjects.length === 0 ? (
@@ -98,16 +99,14 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
 
           <section>
             <h2>Quick Stats</h2>
-            <div className="card">
-              <div className="flex flex-col gap-md">
-                <div className="flex flex-between">
-                  <span className="text-secondary">Total Projects:</span>
-                  <span className="font-medium">{projects.length}</span>
-                </div>
-                <div className="flex flex-between">
-                  <span className="text-secondary">Active Projects:</span>
-                  <span className="font-medium">{activeProjects.length}</span>
-                </div>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-value">{projects.length}</div>
+                <div className="stat-label">Total Projects</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{activeProjects.length}</div>
+                <div className="stat-label">Active Projects</div>
               </div>
             </div>
           </section>

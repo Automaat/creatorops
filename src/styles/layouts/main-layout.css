@@ -31,7 +31,8 @@
   align-items: center;
   gap: var(--space-md);
   padding: var(--space-md);
-  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius-lg);
   color: var(--color-text-primary);
   transition: background-color var(--transition-fast);
   cursor: pointer;
@@ -44,6 +45,18 @@
 .nav-item.active {
   background-color: var(--color-cream-highlight);
   font-weight: var(--font-weight-medium);
+}
+
+.nav-item-badge {
+  margin-left: auto;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-lg);
+  min-width: 24px;
+  text-align: center;
 }
 
 .main-content {

@@ -4,9 +4,17 @@ interface LayoutProps {
   children: ReactNode
   currentView: string
   onNavigate: (view: string) => void
+  importCount?: number
+  projectsCount?: number
 }
 
-export function Layout({ children, currentView, onNavigate }: LayoutProps) {
+export function Layout({
+  children,
+  currentView,
+  onNavigate,
+  importCount,
+  projectsCount,
+}: LayoutProps) {
   return (
     <div className="app-container">
       <aside className="sidebar">
@@ -24,12 +32,14 @@ export function Layout({ children, currentView, onNavigate }: LayoutProps) {
             icon="💿"
             label="Import"
             active={currentView === 'import'}
+            count={importCount}
             onClick={() => onNavigate('import')}
           />
           <NavItem
             icon="📁"
             label="Projects"
             active={currentView === 'projects'}
+            count={projectsCount}
             onClick={() => onNavigate('projects')}
           />
           <NavItem
@@ -67,16 +77,18 @@ interface NavItemProps {
   icon: string
   label: string
   active?: boolean
+  count?: number
   onClick: () => void
 }
 
-function NavItem({ icon, label, active = false, onClick }: NavItemProps) {
+function NavItem({ icon, label, active = false, count, onClick }: NavItemProps) {
   return (
     <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
       <span role="img" aria-label={label}>
         {icon}
       </span>
       <span>{label}</span>
+      {count !== undefined && count > 0 && <span className="nav-item-badge">{count}</span>}
     </div>
   )
 }
