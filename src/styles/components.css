@@ -655,8 +655,15 @@
 .project-detail-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
   margin-bottom: var(--space-xxl);
+}
+
+.project-detail-header > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
 }
 
 .project-detail-header h1 {
@@ -748,6 +755,11 @@
 .destination-button:hover {
   border-color: var(--color-accent-primary);
   background-color: var(--color-bg-tertiary);
+}
+
+.destination-button.selected {
+  border-color: var(--color-accent-primary);
+  background-color: var(--color-highlight);
 }
 
 .destination-name {

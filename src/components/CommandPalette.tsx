@@ -13,6 +13,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const selectedItemRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -46,6 +47,10 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   useEffect(() => {
     setSelectedIndex(0)
   }, [searchQuery])
+
+  useEffect(() => {
+    selectedItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedIndex])
 
   const handleSelectProject = useCallback(
     (projectId: string) => {
@@ -115,6 +120,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
             filteredProjects.map((project, index) => (
               <div
                 key={project.id}
+                ref={index === selectedIndex ? selectedItemRef : null}
                 className={`command-palette-item ${index === selectedIndex ? 'selected' : ''}`}
                 onClick={() => handleSelectProject(project.id)}
                 onMouseEnter={() => setSelectedIndex(index)}

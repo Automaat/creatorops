@@ -19,6 +19,7 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
   const [isScanning, setIsScanning] = useState(false)
   const previousCardPaths = useRef<Set<string>>(new Set())
   const permissionGranted = useRef<boolean | null>(null)
+  const isInitialScan = useRef(true)
   const { info } = useNotification()
   const onCardDetected = options?.onCardDetected
 
@@ -31,8 +32,8 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
       const currentPaths = new Set(cards.map((c) => c.path))
       const newCards = cards.filter((card) => !previousCardPaths.current.has(card.path))
 
-      // Send notification for newly detected cards
-      if (previousCardPaths.current.size > 0 && newCards.length > 0) {
+      // Send notification for newly detected cards (skip initial scan to avoid spam on startup)
+      if (!isInitialScan.current && newCards.length > 0) {
         for (const card of newCards) {
           // In-app toast notification
           info(`SD Card detected: ${card.name}`)
@@ -66,6 +67,7 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
 
       previousCardPaths.current = currentPaths
       setSdCards(cards)
+      isInitialScan.current = false
     } catch (error) {
       console.error('Failed to scan SD cards:', error)
     } finally {

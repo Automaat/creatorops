@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, BackupDestination, ArchiveJob, ImportHistory } from '../types'
+import type {
+  Project,
+  BackupDestination,
+  ArchiveJob,
+  ImportHistory,
+  SDCard,
+  CopyResult,
+} from '../types'
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
+import { useSDCardScanner } from '../hooks/useSDCardScanner'
 
 interface ProjectsProps {
   initialSelectedProjectId?: string | null
@@ -20,7 +28,13 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [selectedSDCard, setSelectedSDCard] = useState<SDCard | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResult, setImportResult] = useState<CopyResult | null>(null)
+  const [importId, setImportId] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { sdCards, isScanning } = useSDCardScanner()
 
   // IMPORTANT: DOM walk required for list↔detail transitions when containerRef switches elements
   // Simplifying to parent-only scroll breaks project creation flow. Change with caution.
@@ -244,6 +258,143 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
+  const createEmptyResult = (error?: string): CopyResult => ({
+    success: false,
+    error,
+    filesCopied: 0,
+    filesSkipped: 0,
+    skippedFiles: [],
+    totalBytes: 0,
+    photosCopied: 0,
+    videosCopied: 0,
+  })
+
+  async function handleStartImport() {
+    if (!selectedProject || !selectedSDCard) return
+
+    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    setImportId(currentImportId)
+    setIsImporting(true)
+    setImportResult(null)
+
+    const startedAt = new Date().toISOString()
+
+    try {
+      await invoke('update_project_status', {
+        projectId: selectedProject.id,
+        newStatus: ProjectStatus.Importing,
+      })
+    } catch (err) {
+      console.error('Failed to update project status:', err)
+    }
+
+    try {
+      const sourcePaths = await invoke<string[]>('list_sd_card_files', {
+        cardPath: selectedSDCard.path,
+      })
+
+      if (sourcePaths.length === 0) {
+        const result = createEmptyResult('No photo or video files found on SD card')
+        setImportResult(result)
+        setIsImporting(false)
+        setImportId(null)
+
+        await invoke('save_import_history', {
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          filesCopied: 0,
+          filesSkipped: 0,
+          totalBytes: 0,
+          photosCopied: 0,
+          videosCopied: 0,
+          startedAt,
+          errorMessage: result.error,
+        })
+
+        return
+      }
+
+      const destination = `${selectedProject.folderPath}/RAW`
+
+      const result = await invoke<CopyResult>('copy_files', {
+        importId: currentImportId,
+        sourcePaths,
+        destination,
+      })
+
+      setImportResult(result)
+
+      const wasCancelled = result.error?.includes('cancelled') ?? false
+
+      if (!wasCancelled) {
+        await invoke('save_import_history', {
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          destinationPath: destination,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          totalBytes: result.totalBytes,
+          photosCopied: result.photosCopied,
+          videosCopied: result.videosCopied,
+          startedAt,
+          errorMessage: result.error || null,
+        })
+      }
+
+      if (result.success && result.filesCopied > 0) {
+        await loadProjectImportHistory(selectedProject.id)
+
+        // Update project status to Editing after successful import
+        try {
+          const updatedProject = await invoke<Project>('update_project_status', {
+            projectId: selectedProject.id,
+            newStatus: ProjectStatus.Editing,
+          })
+          setSelectedProject(updatedProject)
+        } catch (err) {
+          console.error('Failed to update project status after import:', err)
+        }
+      }
+    } catch (error) {
+      console.error('Import failed:', error)
+      setImportResult(createEmptyResult(String(error)))
+
+      try {
+        await invoke('save_import_history', {
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          filesCopied: 0,
+          filesSkipped: 0,
+          totalBytes: 0,
+          photosCopied: 0,
+          videosCopied: 0,
+          startedAt,
+          errorMessage: String(error),
+        })
+      } catch (historyError) {
+        console.error('Failed to save import history:', historyError)
+      }
+    } finally {
+      setIsImporting(false)
+      setImportId(null)
+    }
+  }
+
+  async function handleCancelImport() {
+    if (!importId) return
+
+    try {
+      await invoke('cancel_import', { importId })
+    } catch (error) {
+      console.error('Failed to cancel import:', error)
+    }
+  }
+
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -252,10 +403,19 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return (
       <div className="project-detail" ref={containerRef}>
         <div className="project-detail-header">
-          <button onClick={handleBackToList} className="btn-back">
-            ← Back
+          <div>
+            <button onClick={handleBackToList} className="btn-back">
+              ← Back
+            </button>
+            <h1>{selectedProject.name}</h1>
+          </div>
+          <button
+            onClick={() => setShowImportDialog(true)}
+            className="btn btn-primary"
+            title="Import from SD Card"
+          >
+            Import
           </button>
-          <h1>{selectedProject.name}</h1>
         </div>
 
         <div className="project-info">
@@ -467,6 +627,127 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {showImportDialog && (
+          <div
+            className="dialog-overlay"
+            onClick={() => !isImporting && setShowImportDialog(false)}
+          >
+            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+              {!isImporting && !importResult ? (
+                <>
+                  <h2>Import from SD Card</h2>
+                  <p className="text-secondary">Select an SD card to import files from</p>
+
+                  {isScanning && sdCards.length === 0 ? (
+                    <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
+                      <p className="text-secondary">Scanning for SD cards...</p>
+                    </div>
+                  ) : sdCards.length === 0 ? (
+                    <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
+                      <p className="text-secondary">
+                        No SD cards detected. Insert an SD card to continue.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-sm" style={{ marginTop: 'var(--space-md)' }}>
+                      {sdCards.map((card) => (
+                        <div
+                          key={card.path}
+                          className={`destination-button ${selectedSDCard?.path === card.path ? 'selected' : ''}`}
+                          onClick={() => setSelectedSDCard(card)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <span className="destination-name">{card.name}</span>
+                          <span className="destination-path">
+                            {card.fileCount} files · {(card.size / 1024 / 1024 / 1024).toFixed(1)}{' '}
+                            GB
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="dialog-actions">
+                    <button
+                      onClick={() => {
+                        setShowImportDialog(false)
+                        setSelectedSDCard(null)
+                      }}
+                      className="btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleStartImport}
+                      className="btn-primary"
+                      disabled={!selectedSDCard}
+                    >
+                      Start Import
+                    </button>
+                  </div>
+                </>
+              ) : isImporting ? (
+                <>
+                  <h2>Importing Files</h2>
+                  <div
+                    className="flex flex-col gap-md"
+                    style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
+                  >
+                    <div className="spinner"></div>
+                    <p className="text-secondary">Importing from {selectedSDCard?.name}...</p>
+                  </div>
+                  <div className="dialog-actions">
+                    <button onClick={handleCancelImport} className="btn-secondary">
+                      Cancel Import
+                    </button>
+                  </div>
+                </>
+              ) : importResult ? (
+                <>
+                  <h2>Import Complete</h2>
+                  <div className="flex flex-col gap-sm" style={{ padding: 'var(--space-md)' }}>
+                    {importResult.success ? (
+                      <>
+                        <p className="text-success">
+                          Successfully imported {importResult.filesCopied} files
+                        </p>
+                        {importResult.photosCopied > 0 && (
+                          <p>Photos: {importResult.photosCopied}</p>
+                        )}
+                        {importResult.videosCopied > 0 && (
+                          <p>Videos: {importResult.videosCopied}</p>
+                        )}
+                        {importResult.filesSkipped > 0 && (
+                          <p className="text-warning">Files skipped: {importResult.filesSkipped}</p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-error">Import failed</p>
+                        {importResult.error && (
+                          <p className="text-secondary">{importResult.error}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="dialog-actions">
+                    <button
+                      onClick={() => {
+                        setShowImportDialog(false)
+                        setSelectedSDCard(null)
+                        setImportResult(null)
+                      }}
+                      className="btn-primary"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         )}
