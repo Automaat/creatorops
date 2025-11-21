@@ -8,16 +8,22 @@ interface DatePickerProps {
   label?: string | ReactNode
   required?: boolean
   id?: string
+  autoOpen?: boolean
 }
 
-export function DatePicker({ value, onChange, label, required, id }: DatePickerProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function DatePicker({
+  value,
+  onChange,
+  label,
+  required,
+  id,
+  autoOpen = false,
+}: DatePickerProps) {
+  const [isOpen, setIsOpen] = useState(autoOpen)
   const [selectedDate, setSelectedDate] = useState<Date | null>(
     value && value.trim() ? new Date(value) : null
   )
-  const [viewDate, setViewDate] = useState(
-    value && value.trim() ? new Date(value) : new Date()
-  )
+  const [viewDate, setViewDate] = useState(value && value.trim() ? new Date(value) : new Date())
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

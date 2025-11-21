@@ -483,6 +483,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               <DatePicker
                 value={selectedProject.deadline || new Date().toISOString().split('T')[0]}
                 onChange={handleDeadlineChange}
+                autoOpen={true}
               />
             ) : (
               <span
