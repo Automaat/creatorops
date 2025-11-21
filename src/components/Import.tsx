@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { SDCard, Project, CopyResult } from '../types'
+import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 
 const POST_IMPORT_DELAY_MS = 1500 // Allow user to see success message
@@ -124,13 +125,15 @@ function SDCardItem({ card, onImportComplete, isActive, onActivate }: SDCardItem
     const startedAt = new Date().toISOString()
 
     // Update project status to Importing
+    // Note: If this fails, we still proceed with import - status update is non-critical
     try {
       await invoke('update_project_status', {
         projectId: project.id,
-        newStatus: 'Importing',
+        newStatus: ProjectStatus.Importing,
       })
     } catch (err) {
       console.error('Failed to update project status:', err)
+      // Continue with import - status update failure is not critical
     }
 
     try {

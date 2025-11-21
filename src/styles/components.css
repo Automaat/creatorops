@@ -402,28 +402,6 @@
   letter-spacing: 0.02em;
 }
 
-.status-select {
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.status-select:hover {
-  border-color: var(--color-accent-primary);
-}
-
-.status-select:focus {
-  outline: 2px solid var(--color-accent-primary);
-  outline-offset: 2px;
-  border-color: var(--color-accent-primary);
-}
-
 .status-new {
   background-color: rgba(156, 163, 175, 0.12);
   color: #6b7280;

@@ -173,6 +173,36 @@ fn scan_projects_directory() -> Result<Vec<Project>, String> {
     Ok(projects)
 }
 
+/// Find project by ID and return (project, metadata_path)
+fn find_project_by_id(project_id: &str) -> Result<(Project, std::path::PathBuf), String> {
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let base_path = home_dir.join("CreatorOps").join("Projects");
+
+    if !base_path.exists() {
+        return Err("Projects directory does not exist".to_string());
+    }
+
+    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        let metadata_path = path.join("project.json");
+        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
+            if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
+                if project.id == project_id {
+                    return Ok((project, metadata_path));
+                }
+            }
+        }
+    }
+
+    Err("Project not found".to_string())
+}
+
 /// Add dirs crate dependency
 mod dirs {
     use std::path::PathBuf;
@@ -186,40 +216,21 @@ mod dirs {
 
 #[tauri::command]
 pub async fn delete_project(project_id: String) -> Result<(), String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    let base_path = home_dir.join("CreatorOps").join("Projects");
+    let (_, metadata_path) = find_project_by_id(&project_id)?;
 
-    if !base_path.exists() {
-        return Err("Projects directory does not exist".to_string());
-    }
+    // Get project folder path from metadata path
+    let project_folder = metadata_path
+        .parent()
+        .ok_or("Failed to get project folder")?;
 
-    // Find project by ID using fs::read_dir (faster than WalkDir)
-    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
+    // Delete entire project folder
+    fs::remove_dir_all(project_folder)
+        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
 
-        if !path.is_dir() {
-            continue;
-        }
+    // Invalidate cache since we deleted a project
+    invalidate_cache();
 
-        let metadata_path = path.join("project.json");
-        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-            if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
-                if project.id == project_id {
-                    // Delete entire project folder
-                    fs::remove_dir_all(path)
-                        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
-
-                    // Invalidate cache since we deleted a project
-                    invalidate_cache();
-
-                    return Ok(());
-                }
-            }
-        }
-    }
-
-    Err("Project not found".to_string())
+    Ok(())
 }
 
 #[tauri::command]
@@ -227,45 +238,20 @@ pub async fn update_project_status(
     project_id: String,
     new_status: ProjectStatus,
 ) -> Result<Project, String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    let base_path = home_dir.join("CreatorOps").join("Projects");
+    let (mut project, metadata_path) = find_project_by_id(&project_id)?;
 
-    if !base_path.exists() {
-        return Err("Projects directory does not exist".to_string());
-    }
+    // Update status and timestamp
+    project.status = new_status;
+    project.updated_at = chrono::Utc::now().to_rfc3339();
 
-    // Find project by ID
-    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
+    // Save updated project
+    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
+    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
 
-        if !path.is_dir() {
-            continue;
-        }
+    // Invalidate cache
+    invalidate_cache();
 
-        let metadata_path = path.join("project.json");
-        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-            if let Ok(mut project) = serde_json::from_str::<Project>(&json_data) {
-                if project.id == project_id {
-                    // Update status and timestamp
-                    project.status = new_status;
-                    project.updated_at = chrono::Utc::now().to_rfc3339();
-
-                    // Save updated project
-                    let json_data =
-                        serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-                    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
-
-                    // Invalidate cache
-                    invalidate_cache();
-
-                    return Ok(project);
-                }
-            }
-        }
-    }
-
-    Err("Project not found".to_string())
+    Ok(project)
 }
 
 mod chrono {
