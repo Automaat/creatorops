@@ -119,10 +119,11 @@ src/styles/
 
 **Cards:**
 
-- White background
-- Subtle shadow
-- No visible border
-- Hover: Lift with increased shadow
+- White background (`var(--color-bg-primary)`)
+- Subtle 1px border (`var(--color-border)`)
+- Default shadow: `var(--shadow-card)` - `0 1px 3px rgba(0,0,0,0.08)`
+- Hover shadow: `var(--shadow-card-hover)` - `0 4px 12px rgba(0,0,0,0.12)`
+- Border radius: 8px (`var(--radius-lg)`)
 
 **Layout:**
 
@@ -178,7 +179,7 @@ src/styles/
 - Selected item: Warm cream background (`#FFF9E6`)
 
 **Content Area:**
-- Max width: 1200px for readability
+- Max width: 1000px for readability
 - Padding: 32px minimum
 - No edge-to-edge content
 

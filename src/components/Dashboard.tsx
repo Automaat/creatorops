@@ -97,10 +97,8 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
   return (
     <>
       <div className="content-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="text-secondary">Overview of your photography workflow</p>
-        </div>
+        <h1>Dashboard</h1>
+        <p className="text-secondary">Overview of your photography workflow</p>
         <button className="btn-primary" onClick={() => setShowCreateProject(true)}>
           New Project
         </button>

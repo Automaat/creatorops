@@ -213,13 +213,13 @@ export function Settings() {
   }
 
   return (
-    <>
-      <div className="content-header">
+    <div className="content-body">
+      <div className="settings-header">
         <h1>Settings</h1>
         <p className="text-secondary">Configure CreatorOps preferences</p>
       </div>
-      <div className="content-body">
-        <div className="flex flex-col gap-xl">
+      <div className="settings-content">
+        <div className="flex flex-col">
           <section>
             <h2>Appearance</h2>
             <div className="card">
@@ -359,23 +359,26 @@ export function Settings() {
           <section>
             <h2>Storage Paths</h2>
             <div className="card">
-              <div className="flex flex-col gap-md">
-                <div className="flex flex-col gap-xs">
-                  <label className="font-medium">Default Import Location</label>
+              <div className="flex flex-col">
+                <div className="card-section">
+                  <h4 className="card-section-label">Default Import Location</h4>
                   <p className="text-secondary text-sm">~/CreatorOps/Projects</p>
                 </div>
-                <div className="flex flex-col gap-md">
-                  <label className="font-medium">Archive Location</label>
-                  <p className="text-secondary text-sm">{archiveLocation || 'Not configured'}</p>
-                  <div className="flex gap-sm">
-                    <button onClick={selectArchiveLocation} className="btn btn-primary">
-                      {archiveLocation ? 'Change Location' : 'Select Location'}
-                    </button>
-                    {archiveLocation && (
-                      <button onClick={clearArchiveLocation} className="btn btn-secondary">
-                        Clear
+
+                <div className="card-section">
+                  <h4 className="card-section-label">Archive Location</h4>
+                  <div className="flex flex-col gap-md">
+                    <p className="text-secondary text-sm">{archiveLocation || 'Not configured'}</p>
+                    <div className="flex gap-sm align-center justify-end">
+                      <button onClick={selectArchiveLocation} className="btn btn-primary">
+                        {archiveLocation ? 'Change Location' : 'Select Location'}
                       </button>
-                    )}
+                      {archiveLocation && (
+                        <button onClick={clearArchiveLocation} className="btn btn-secondary">
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -385,44 +388,52 @@ export function Settings() {
           <section>
             <h2>Folder Templates</h2>
             <div className="card">
-              <div className="flex flex-col gap-md">
-                <div className="flex flex-col gap-xs">
-                  <label className="font-medium">Project Folder Template</label>
-                  <p className="text-secondary text-sm">
-                    Available variables: {'{YYYY}'}, {'{MM}'}, {'{DD}'}, {'{ClientName}'},{' '}
-                    {'{Type}'}
-                  </p>
-                  <input
-                    type="text"
-                    className="input"
-                    value={folderTemplate}
-                    onChange={(e) => saveFolderTemplate(e.target.value)}
-                    placeholder="{YYYY}-{MM}-{DD}_{ClientName}_{Type}"
-                  />
-                  <p className="text-secondary text-sm">Preview: 2024-01-15_JohnDoe_Wedding</p>
+              <div className="flex flex-col">
+                <div className="card-section">
+                  <h4 className="card-section-label">Project Folder</h4>
+                  <div className="flex flex-col gap-xs">
+                    <p className="text-secondary text-sm">
+                      Available variables: {'{YYYY}'}, {'{MM}'}, {'{DD}'}, {'{ClientName}'},{' '}
+                      {'{Type}'}
+                    </p>
+                    <input
+                      type="text"
+                      className="input"
+                      value={folderTemplate}
+                      onChange={(e) => saveFolderTemplate(e.target.value)}
+                      placeholder="{YYYY}-{MM}-{DD}_{ClientName}_{Type}"
+                    />
+                    <p className="text-secondary text-sm">Preview: 2024-01-15_JohnDoe_Wedding</p>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-xs">
-                  <label className="font-medium">File Rename Template</label>
-                  <p className="text-secondary text-sm">
-                    Available variables: {'{original}'}, {'{index}'}, {'{name}'}, {'{ext}'}
-                  </p>
-                  <input
-                    type="text"
-                    className="input"
-                    value={fileRenameTemplate}
-                    onChange={(e) => saveFileRenameTemplate(e.target.value)}
-                    placeholder="{original}"
-                  />
-                  <p className="text-secondary text-sm">
-                    Preview:{' '}
-                    {fileRenameTemplate === '{original}'
-                      ? 'IMG_1234.jpg (unchanged)'
-                      : 'CustomName_001.jpg'}
-                  </p>
+
+                <div className="card-section">
+                  <h4 className="card-section-label">File Rename</h4>
+                  <div className="flex flex-col gap-xs">
+                    <p className="text-secondary text-sm">
+                      Available variables: {'{original}'}, {'{index}'}, {'{name}'}, {'{ext}'}
+                    </p>
+                    <input
+                      type="text"
+                      className="input"
+                      value={fileRenameTemplate}
+                      onChange={(e) => saveFileRenameTemplate(e.target.value)}
+                      placeholder="{original}"
+                    />
+                    <p className="text-secondary text-sm">
+                      Preview:{' '}
+                      {fileRenameTemplate === '{original}'
+                        ? 'IMG_1234.jpg (unchanged)'
+                        : 'CustomName_001.jpg'}
+                    </p>
+                  </div>
                 </div>
-                <button onClick={resetTemplates} className="btn btn-secondary align-self-start">
-                  Reset to Defaults
-                </button>
+
+                <div className="card-section">
+                  <button onClick={resetTemplates} className="btn btn-secondary align-self-end">
+                    Reset to Defaults
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -438,15 +449,13 @@ export function Settings() {
                     checked={autoEject}
                     onChange={toggleAutoEject}
                   />
-                  <label htmlFor="auto-eject">
-                    Auto-eject SD cards after successful import
-                  </label>
+                  <label htmlFor="auto-eject">Auto-eject SD cards after successful import</label>
                 </div>
               </div>
             </div>
           </section>
         </div>
       </div>
-    </>
+    </div>
   )
 }

@@ -10,16 +10,17 @@
 }
 
 .stat-card {
-  background-color: var(--color-bg-secondary);
-  padding: var(--space-lg);
+  background-color: var(--color-bg-primary);
+  padding: var(--space-xl);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
   transition: all var(--transition-fast);
 }
 
 .stat-card:hover {
   border-color: var(--color-accent-primary);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .stat-value {
@@ -41,6 +42,7 @@
   min-height: 40px;
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   transition: all var(--transition-fast);
   cursor: pointer;
@@ -60,6 +62,7 @@
   color: white;
   border: none;
   border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -83,6 +86,7 @@
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -260,16 +264,39 @@ input[type='checkbox'] + label {
 /* Cards */
 
 .card {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-card);
   transition: all var(--transition-base);
   overflow: visible;
 }
 
 .card:hover {
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.card-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.card-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.card-section-label {
+  font-size: var(--type-subheading-size);
+  font-weight: var(--type-subheading-weight);
+  line-height: var(--type-subheading-height);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-md);
 }
 
 /* Progress Bar */
@@ -353,10 +380,11 @@ input[type='checkbox'] + label {
 }
 
 .backup-job {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .backup-job-header {
@@ -479,10 +507,59 @@ input[type='checkbox'] + label {
   margin-top: var(--space-md);
 }
 
+/* Settings Styles */
+
+.settings-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xxl);
+}
+
+.settings-header h1 {
+  font-size: var(--type-title-size);
+  font-weight: var(--type-title-weight);
+  line-height: var(--type-title-height);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.settings-header p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: var(--type-title-height);
+}
+
+.settings-content section {
+  margin-top: var(--space-xxl);
+}
+
+.settings-content section:first-child {
+  margin-top: 0;
+}
+
+.settings-content section:last-child {
+  margin-bottom: var(--space-xxl);
+}
+
+.settings-content section h2 {
+  font-size: var(--type-subheading-size);
+  font-weight: var(--type-subheading-weight);
+  line-height: var(--type-subheading-height);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-md) 0;
+}
+
 /* Projects Styles */
 
 .projects {
   padding: 40px 32px 32px 32px;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
 }
 
 .projects-header {
@@ -490,9 +567,11 @@ input[type='checkbox'] + label {
 }
 
 .projects-header h1 {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-title-size);
+  font-weight: var(--type-title-weight);
+  line-height: var(--type-title-height);
   color: var(--color-text-primary);
+  margin: 0;
 }
 
 .projects-list {
@@ -502,16 +581,17 @@ input[type='checkbox'] + label {
 }
 
 .project-card {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   transition: all var(--transition-base);
 }
 
 .project-card:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card-hover);
   border-color: var(--color-accent-primary);
 }
 
@@ -709,8 +789,9 @@ input[type='checkbox'] + label {
   padding: 40px 32px 32px 32px;
   height: 100%;
   overflow-y: auto;
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
+  width: 100%;
 }
 
 .project-detail-header {
@@ -789,11 +870,12 @@ input[type='checkbox'] + label {
 }
 
 .project-info {
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: var(--space-xl);
   margin: 0 var(--space-xl) var(--space-xxl) var(--space-xl);
+  box-shadow: var(--shadow-card);
 }
 
 .info-row {
@@ -893,9 +975,10 @@ input[type='checkbox'] + label {
   flex-direction: column;
   align-items: flex-start;
   padding: var(--space-sm) var(--space-md);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   cursor: pointer;
   transition: all var(--transition-fast);
   gap: var(--space-xs);
@@ -903,7 +986,7 @@ input[type='checkbox'] + label {
 
 .destination-button:hover:not(:disabled) {
   border-color: var(--color-accent-primary);
-  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .destination-button:disabled {
@@ -969,11 +1052,14 @@ input[type='checkbox'] + label {
 
 .add-destination {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-md);
+  align-items: center;
 }
 
 .add-destination .input {
   flex: 1;
+  min-width: 0;
+  max-width: 400px;
 }
 
 .btn-sm {
@@ -1001,11 +1087,12 @@ input[type='checkbox'] + label {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-md);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
   margin: 0 var(--space-xl);
-  background-color: var(--color-bg-secondary);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .empty-state-card.horizontal {
@@ -1185,10 +1272,11 @@ input[type='checkbox'] + label {
 }
 
 .job-card {
-  padding: var(--space-lg);
-  background-color: var(--color-bg-secondary);
+  padding: var(--space-xl);
+  background-color: var(--color-bg-primary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .job-header {
@@ -1285,7 +1373,7 @@ input[type='checkbox'] + label {
   margin-top: var(--space-xxl);
   margin-left: var(--space-xl);
   margin-right: var(--space-xl);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1332,6 +1420,7 @@ input[type='checkbox'] + label {
   color: white;
   border: none;
   border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: opacity var(--transition-fast);

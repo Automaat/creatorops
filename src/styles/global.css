@@ -167,6 +167,14 @@ a:hover {
   align-self: flex-start;
 }
 
+.align-self-end {
+  align-self: flex-end;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
 /* Project List */
 
 .project-list {

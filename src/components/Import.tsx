@@ -43,10 +43,8 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   return (
     <>
       <div className="content-header">
-        <div>
-          <h1>Import from SD Card</h1>
-          <p className="text-secondary">Detect and import files from SD cards</p>
-        </div>
+        <h1>Import from SD Card</h1>
+        <p className="text-secondary">Detect and import files from SD cards</p>
       </div>
       <div className="content-body">
         {sdCards.length === 0 ? (
