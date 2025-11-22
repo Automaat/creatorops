@@ -37,10 +37,7 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
     }
   }
 
-  const handleChange = <K extends keyof typeof formData>(
-    field: K,
-    value: (typeof formData)[K]
-  ) => {
+  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 

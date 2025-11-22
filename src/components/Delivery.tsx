@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes } from '../utils/formatting'
+import { sortProjectsByStatus } from '../utils/project'
 import type {
   Project,
   ProjectFile,
@@ -19,6 +20,14 @@ export function Delivery() {
   const [deliveryJobs, setDeliveryJobs] = useState<DeliveryJob[]>([])
   const [namingTemplate, setNamingTemplate] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showProjectSelect, setShowProjectSelect] = useState(false)
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number
+    left: number
+    width: number
+  } | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadProjects()
@@ -52,11 +61,51 @@ export function Delivery() {
     }
   }, [selectedProject])
 
+  useEffect(() => {
+    if (showProjectSelect) {
+      updateDropdownPosition()
+    }
+  }, [showProjectSelect])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        showProjectSelect &&
+        triggerRef.current &&
+        dropdownRef.current &&
+        !triggerRef.current.contains(event.target as Node) &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowProjectSelect(false)
+      }
+    }
+
+    if (showProjectSelect) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showProjectSelect])
+
+  const updateDropdownPosition = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      })
+    }
+  }
+
   async function loadProjects() {
     try {
       setLoading(true)
       const data = await invoke<Project[]>('list_projects')
-      setProjects(data)
+      const sortedProjects = sortProjectsByStatus(data)
+      setProjects(sortedProjects)
     } catch (err) {
       console.error('Failed to load projects:', err)
     } finally {
@@ -159,6 +208,23 @@ export function Delivery() {
     }
   }
 
+  function getProjectStatusColor(status: string): string {
+    switch (status) {
+      case 'New':
+        return 'status-new'
+      case 'Importing':
+        return 'status-importing'
+      case 'Editing':
+        return 'status-editing'
+      case 'Delivered':
+        return 'status-delivered'
+      case 'Archived':
+        return 'status-archived'
+      default:
+        return ''
+    }
+  }
+
   if (loading) {
     return <div className="loading">Loading...</div>
   }
@@ -172,21 +238,76 @@ export function Delivery() {
       <div className="delivery-content">
         <section className="delivery-section">
           <h2>1. Select Project</h2>
-          <select
-            value={selectedProject?.id || ''}
-            onChange={(e) => {
-              const project = projects.find((p) => p.id === e.target.value)
-              setSelectedProject(project || null)
-            }}
-            className="project-select"
-          >
-            <option value="">Choose a project...</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name} - {project.clientName}
-              </option>
-            ))}
-          </select>
+          <div className="project-dropdown-container">
+            <button
+              ref={triggerRef}
+              className="project-dropdown-trigger"
+              onClick={() => setShowProjectSelect(!showProjectSelect)}
+            >
+              {selectedProject ? (
+                <div className="project-dropdown-selected">
+                  <div className="project-select-header">
+                    <h4>{selectedProject.name}</h4>
+                    <span
+                      className={`project-status ${getProjectStatusColor(selectedProject.status)}`}
+                    >
+                      {selectedProject.status}
+                    </span>
+                  </div>
+                  <div className="project-select-info">
+                    <span className="text-secondary text-sm">
+                      {selectedProject.clientName} · {selectedProject.date} ·{' '}
+                      {selectedProject.shootType}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-secondary">Choose a project...</span>
+              )}
+              <span className="dropdown-arrow">{showProjectSelect ? '▲' : '▼'}</span>
+            </button>
+
+            {showProjectSelect && dropdownPosition && (
+              <div
+                ref={dropdownRef}
+                className="project-dropdown-list project-dropdown-list-fixed"
+                style={{
+                  top: `${dropdownPosition.top}px`,
+                  left: `${dropdownPosition.left}px`,
+                  width: `${dropdownPosition.width}px`,
+                }}
+              >
+                {projects.length > 0 ? (
+                  projects.map((project) => (
+                    <div
+                      key={project.id}
+                      className={`project-select-card ${selectedProject?.id === project.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedProject(project)
+                        setShowProjectSelect(false)
+                      }}
+                    >
+                      <div className="project-select-header">
+                        <h4>{project.name}</h4>
+                        <span className={`project-status ${getProjectStatusColor(project.status)}`}>
+                          {project.status}
+                        </span>
+                      </div>
+                      <div className="project-select-info">
+                        <span className="text-secondary text-sm">
+                          {project.clientName} · {project.date} · {project.shootType}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty-state">
+                    <p className="text-secondary">No projects available</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </section>
 
         {selectedProject && (
