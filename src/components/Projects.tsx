@@ -526,7 +526,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             ) : (
               <span
                 onClick={() => setIsEditingDeadline(true)}
-                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                className="info-row-clickable"
                 title="Click to edit deadline"
               >
                 {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
@@ -535,7 +535,13 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
-            <span className="folder-path">{replaceHomeWithTilde(selectedProject.folderPath)}</span>
+            <span
+              className="folder-path info-row-clickable"
+              onClick={() => invoke('reveal_in_finder', { path: selectedProject.folderPath })}
+              title="Click to show in Finder"
+            >
+              {replaceHomeWithTilde(selectedProject.folderPath)}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
