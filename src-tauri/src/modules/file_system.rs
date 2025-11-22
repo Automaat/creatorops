@@ -178,3 +178,14 @@ pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
         Some("/opt/resolve/bin/resolve"),
     )
 }
+
+#[tauri::command]
+pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
+    open_in_external_app(
+        &path,
+        "Videos",
+        "Final Cut Pro",
+        &[],
+        Some("/Applications/Final Cut Pro.app/Contents/MacOS/Final Cut Pro"),
+    )
+}

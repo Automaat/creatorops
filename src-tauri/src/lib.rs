@@ -10,15 +10,16 @@ use modules::delivery::{
 };
 use modules::file_copy::{cancel_import, copy_files};
 use modules::file_system::{
-    open_in_aftershoot, open_in_davinci_resolve, open_in_lightroom, reveal_in_finder,
+    open_in_aftershoot, open_in_davinci_resolve, open_in_final_cut_pro, open_in_lightroom,
+    reveal_in_finder,
 };
 use modules::file_utils::get_home_directory;
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
 use modules::project::{
-    create_project, delete_project, list_projects, migrate_projects_to_db, refresh_projects,
-    update_project_deadline, update_project_status,
+    create_project, delete_project, get_project, list_projects, migrate_projects_to_db,
+    refresh_projects, update_project_deadline, update_project_status,
 };
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
@@ -38,6 +39,7 @@ pub fn run() {
             cancel_import,
             create_project,
             list_projects,
+            get_project,
             refresh_projects,
             update_project_status,
             update_project_deadline,
@@ -66,6 +68,7 @@ pub fn run() {
             open_in_lightroom,
             open_in_aftershoot,
             open_in_davinci_resolve,
+            open_in_final_cut_pro,
             get_home_directory,
         ])
         .run(tauri::generate_context!())

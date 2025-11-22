@@ -102,19 +102,19 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     if (initialSelectedProjectId) {
       // External navigation from dashboard/import
       isInternalSelection.current = false
-      // Reload projects to get latest status when navigating to a project
-      loadProjects().then((loadedProjects) => {
-        // Find and select the project after reload
-        const project = loadedProjects.find((p) => p.id === initialSelectedProjectId)
-        if (project) {
+      // Fetch single project instead of loading all projects
+      invoke<Project>('get_project', { projectId: initialSelectedProjectId })
+        .then((project) => {
           setSelectedProject(project)
-        }
-      })
+        })
+        .catch((err) => {
+          console.error('Failed to load project:', err)
+        })
     } else {
       // Clear selection when navigating to projects list
       setSelectedProject(null)
     }
-  }, [initialSelectedProjectId, loadProjects])
+  }, [initialSelectedProjectId])
 
   // Load import history when project is selected and scroll to top
   useEffect(() => {
@@ -545,34 +545,31 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           <h2>Actions</h2>
 
           <div className="action-group">
-            <h4 className="action-group-heading">Photos</h4>
+            <h4 className="action-group-heading">Edit</h4>
             <div className="destination-list">
               <button
                 onClick={() => handleOpenInApp('open_in_lightroom', 'Lightroom Classic')}
                 className="destination-button destination-button-primary"
               >
                 <span className="destination-name">Lightroom Classic</span>
-                <span className="destination-path">Photo editing application</span>
               </button>
               <button
                 onClick={() => handleOpenInApp('open_in_aftershoot', 'AfterShoot')}
                 className="destination-button"
               >
                 <span className="destination-name">AfterShoot</span>
-                <span className="destination-path">Photo culling & editing</span>
               </button>
-            </div>
-          </div>
-
-          <div className="action-group">
-            <h4 className="action-group-heading">Videos</h4>
-            <div className="destination-list">
               <button
                 onClick={() => handleOpenInApp('open_in_davinci_resolve', 'DaVinci Resolve')}
-                className="destination-button destination-button-primary"
+                className="destination-button"
               >
                 <span className="destination-name">DaVinci Resolve</span>
-                <span className="destination-path">Video editing & color grading</span>
+              </button>
+              <button
+                onClick={() => handleOpenInApp('open_in_final_cut_pro', 'Final Cut Pro')}
+                className="destination-button"
+              >
+                <span className="destination-name">Final Cut Pro</span>
               </button>
             </div>
           </div>
@@ -597,29 +594,35 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             ) : (
               <div className="empty-state-card">
                 <p className="empty-state-message">No backup destinations configured.</p>
-                <p className="empty-state-message">Add destinations in Settings to enable backup.</p>
+                <p className="empty-state-message">
+                  Add destinations in Settings to enable backup.
+                </p>
               </div>
             )}
           </div>
 
-          <div className="archive-action">
-            <h3>Archive Project</h3>
-            <p className="action-hint">Move to archive and mark as Archived</p>
-            <button
-              onClick={() => setShowArchiveDialog(true)}
-              className="btn-archive"
-              disabled={selectedProject.status === 'Archived'}
-            >
-              {selectedProject.status === 'Archived' ? 'Already Archived' : 'Archive Project'}
-            </button>
+          <div className="action-group">
+            <h4 className="action-group-heading">Archive Project</h4>
+            <div className="empty-state-card horizontal">
+              <p className="empty-state-message">Move to archive and mark as Archived</p>
+              <button
+                onClick={() => setShowArchiveDialog(true)}
+                className="btn-secondary"
+                disabled={selectedProject.status === 'Archived'}
+              >
+                {selectedProject.status === 'Archived' ? 'Already Archived' : 'Archive'}
+              </button>
+            </div>
           </div>
 
-          <div className="delete-action">
-            <h3>Delete Project</h3>
-            <p className="action-hint">Permanently delete project and all files</p>
-            <button onClick={() => setShowDeleteDialog(true)} className="btn-danger">
-              Delete Project
-            </button>
+          <div className="action-group">
+            <h4 className="action-group-heading">Delete Project</h4>
+            <div className="empty-state-card horizontal">
+              <p className="empty-state-message">Permanently delete project and all files</p>
+              <button onClick={() => setShowDeleteDialog(true)} className="btn-danger">
+                Delete Project
+              </button>
+            </div>
           </div>
         </section>
 

@@ -273,6 +273,11 @@ fn get_project_by_id(project_id: &str) -> Result<Project, String> {
     .map_err(|e| format!("Database error: {}", e))
 }
 
+#[tauri::command]
+pub async fn get_project(project_id: String) -> Result<Project, String> {
+    get_project_by_id(&project_id)
+}
+
 /// Migrate existing projects from JSON files to SQLite
 #[tauri::command]
 pub async fn migrate_projects_to_db() -> Result<usize, String> {
