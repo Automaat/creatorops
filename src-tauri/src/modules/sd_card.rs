@@ -139,6 +139,30 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
     Ok(file_paths)
 }
 
+/// Eject an SD card by volume path
+#[tauri::command]
+pub async fn eject_sd_card(volume_path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let output = Command::new("diskutil")
+            .args(["eject", &volume_path])
+            .output()
+            .map_err(|e| format!("Failed to execute diskutil: {}", e))?;
+
+        if output.status.success() {
+            Ok(())
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            Err(format!("Failed to eject SD card: {}", error))
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("SD card ejection is only supported on macOS".to_string())
+    }
+}
+
 /// Get device type and removability using diskutil (macOS)
 fn get_device_info(volume_name: &str) -> (String, bool) {
     #[cfg(target_os = "macos")]

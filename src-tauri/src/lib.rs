@@ -21,7 +21,7 @@ use modules::project::{
     create_project, delete_project, get_project, list_projects, migrate_projects_to_db,
     refresh_projects, update_project_deadline, update_project_status,
 };
-use modules::sd_card::{list_sd_card_files, scan_sd_cards};
+use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -35,6 +35,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_sd_cards,
             list_sd_card_files,
+            eject_sd_card,
             copy_files,
             cancel_import,
             create_project,

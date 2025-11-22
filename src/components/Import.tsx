@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { SDCard, Project, CopyResult, ImportProgress } from '../types'
@@ -122,6 +122,27 @@ function SDCardItem({
     }
   }
 
+  const loadProjects = useCallback(async () => {
+    try {
+      const projectList = await invoke<Project[]>('list_projects')
+      const sortedProjects = sortProjectsByStatus(projectList)
+      setProjects(sortedProjects)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+    }
+  }, [])
+
+  const updateDropdownPosition = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: rect.width,
+      })
+    }
+  }
+
   useEffect(() => {
     const unlistenProgress = listen<ImportProgress>('import-progress', (event) => {
       setImportProgress(event.payload)
@@ -132,9 +153,15 @@ function SDCardItem({
     }
   }, [])
 
+  // Load projects when card becomes active (expanded)
+  useEffect(() => {
+    if (isActive) {
+      loadProjects()
+    }
+  }, [isActive, loadProjects])
+
   useEffect(() => {
     if (showProjectSelect) {
-      loadProjects()
       updateDropdownPosition()
     }
   }, [showProjectSelect])
@@ -160,27 +187,6 @@ function SDCardItem({
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showProjectSelect])
-
-  const updateDropdownPosition = () => {
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: rect.width,
-      })
-    }
-  }
-
-  const loadProjects = async () => {
-    try {
-      const projectList = await invoke<Project[]>('list_projects')
-      const sortedProjects = sortProjectsByStatus(projectList)
-      setProjects(sortedProjects)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-    }
-  }
 
   const handleImportClick = () => {
     onActivate()
@@ -297,8 +303,17 @@ function SDCardItem({
         })
       }
 
-      // Navigate to project view on successful import
+      // Auto-eject SD card if enabled
       if (result.success && result.filesCopied > 0) {
+        const autoEject = localStorage.getItem('auto_eject') === 'true'
+        if (autoEject) {
+          try {
+            await invoke('eject_sd_card', { volumePath: card.path })
+          } catch (ejectError) {
+            console.error('Failed to eject SD card:', ejectError)
+          }
+        }
+
         setTimeout(() => onImportComplete(project.id), POST_IMPORT_DELAY_MS)
       }
     } catch (error) {

@@ -1059,7 +1059,12 @@ input[type='checkbox'] + label {
 .add-destination .input {
   flex: 1;
   min-width: 0;
-  max-width: 400px;
+  height: 40px;
+}
+
+.add-destination .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-sm {
