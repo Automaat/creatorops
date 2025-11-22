@@ -17,13 +17,16 @@ use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
 };
 use modules::project::{
-    create_project, delete_project, list_projects, refresh_projects, update_project_deadline,
-    update_project_status,
+    create_project, delete_project, list_projects, migrate_projects_to_db, refresh_projects,
+    update_project_deadline, update_project_status,
 };
 use modules::sd_card::{list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize database
+    modules::db::init_db().expect("Failed to initialize database");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -39,6 +42,7 @@ pub fn run() {
             update_project_status,
             update_project_deadline,
             delete_project,
+            migrate_projects_to_db,
             save_import_history,
             get_import_history,
             get_project_import_history,

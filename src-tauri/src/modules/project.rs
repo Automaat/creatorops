@@ -1,10 +1,9 @@
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::sync::Mutex;
 use uuid::Uuid;
 
-// Cached project list to avoid repeated directory scans
-static PROJECT_CACHE: Mutex<Option<Vec<Project>>> = Mutex::new(None);
+use crate::modules::db::with_db;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +29,34 @@ pub enum ProjectStatus {
     Editing,
     Delivered,
     Archived,
+}
+
+impl std::fmt::Display for ProjectStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ProjectStatus::New => "New",
+            ProjectStatus::Importing => "Importing",
+            ProjectStatus::Editing => "Editing",
+            ProjectStatus::Delivered => "Delivered",
+            ProjectStatus::Archived => "Archived",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl std::str::FromStr for ProjectStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "New" => Ok(ProjectStatus::New),
+            "Importing" => Ok(ProjectStatus::Importing),
+            "Editing" => Ok(ProjectStatus::Editing),
+            "Delivered" => Ok(ProjectStatus::Delivered),
+            "Archived" => Ok(ProjectStatus::Archived),
+            _ => Err(format!("Invalid project status: {}", s)),
+        }
+    }
 }
 
 fn sanitize_path_component(s: &str) -> String {
@@ -87,69 +114,196 @@ pub async fn create_project(
         deadline: deadline.filter(|d| !d.is_empty()),
     };
 
-    // Save project metadata to a JSON file
-    let metadata_path = project_path.join("project.json");
-    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
-
-    // Invalidate cache since we created a new project
-    invalidate_cache();
+    // Insert into database
+    with_db(|conn| {
+        conn.execute(
+            "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                &project.id,
+                &project.name,
+                &project.client_name,
+                &project.date,
+                &project.shoot_type,
+                project.status.to_string(),
+                &project.folder_path,
+                &project.created_at,
+                &project.updated_at,
+                &project.deadline,
+            ],
+        )?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to insert project: {}", e))?;
 
     Ok(project)
 }
 
 #[tauri::command]
 pub async fn list_projects() -> Result<Vec<Project>, String> {
-    // Check cache first
-    {
-        let cache = PROJECT_CACHE.lock().unwrap();
-        if let Some(projects) = &*cache {
-            return Ok(projects.clone());
-        }
-    }
+    with_db(|conn| {
+        let mut stmt = conn
+            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC")?;
 
-    // Cache miss - scan directory
-    let projects = scan_projects_directory()?;
+        let projects = stmt
+            .query_map([], |row| {
+                let status_str: String = row.get(5)?;
+                let status = status_str
+                    .parse::<ProjectStatus>()
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+                    ))?;
 
-    // Update cache
-    {
-        let mut cache = PROJECT_CACHE.lock().unwrap();
-        *cache = Some(projects.clone());
-    }
+                Ok(Project {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    client_name: row.get(2)?,
+                    date: row.get(3)?,
+                    shoot_type: row.get(4)?,
+                    status,
+                    folder_path: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                    deadline: row.get(9)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(projects)
+        Ok(projects)
+    })
+    .map_err(|e| format!("Database error: {}", e))
 }
 
-/// Invalidate cache (call after project mutations)
-fn invalidate_cache() {
-    let mut cache = PROJECT_CACHE.lock().unwrap();
-    *cache = None;
-}
-
-/// Public function to invalidate cache from other modules
+/// Public function to invalidate cache from other modules (now no-op with SQLite)
 pub fn invalidate_project_cache() {
-    invalidate_cache();
+    // No-op: SQLite handles consistency automatically
 }
 
-/// Force refresh project cache
+/// Force refresh project cache (now just returns list)
 #[tauri::command]
 pub async fn refresh_projects() -> Result<Vec<Project>, String> {
-    invalidate_cache();
     list_projects().await
 }
 
-/// Scan projects directory (expensive operation)
-fn scan_projects_directory() -> Result<Vec<Project>, String> {
+#[tauri::command]
+pub async fn delete_project(project_id: String) -> Result<(), String> {
+    // Get project folder path before deletion
+    let folder_path = with_db(|conn| {
+        let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
+
+        let path: String = stmt.query_row(params![project_id], |row| row.get(0))?;
+
+        Ok(path)
+    })
+    .map_err(|e| format!("Database error: {}", e))?;
+
+    // Delete from database
+    with_db(|conn| {
+        conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to delete project from database: {}", e))?;
+
+    // Delete project folder
+    fs::remove_dir_all(&folder_path)
+        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn update_project_status(
+    project_id: String,
+    new_status: ProjectStatus,
+) -> Result<Project, String> {
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Update in database
+    with_db(|conn| {
+        conn.execute(
+            "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![new_status.to_string(), now, project_id],
+        )?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to update project status: {}", e))?;
+
+    // Fetch and return updated project
+    get_project_by_id(&project_id).await
+}
+
+#[tauri::command]
+pub async fn update_project_deadline(
+    project_id: String,
+    deadline: Option<String>,
+) -> Result<Project, String> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let deadline_value = deadline.filter(|d| !d.is_empty());
+
+    // Update in database
+    with_db(|conn| {
+        conn.execute(
+            "UPDATE projects SET deadline = ?1, updated_at = ?2 WHERE id = ?3",
+            params![deadline_value, now, project_id],
+        )?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to update project deadline: {}", e))?;
+
+    // Fetch and return updated project
+    get_project_by_id(&project_id).await
+}
+
+/// Helper function to get project by ID
+async fn get_project_by_id(project_id: &str) -> Result<Project, String> {
+    with_db(|conn| {
+        let mut stmt = conn
+            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
+
+        let project = stmt
+            .query_row(params![project_id], |row| {
+                let status_str: String = row.get(5)?;
+                let status = status_str
+                    .parse::<ProjectStatus>()
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        rusqlite::types::Type::Text,
+                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+                    ))?;
+
+                Ok(Project {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    client_name: row.get(2)?,
+                    date: row.get(3)?,
+                    shoot_type: row.get(4)?,
+                    status,
+                    folder_path: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                    deadline: row.get(9)?,
+                })
+            })?;
+
+        Ok(project)
+    })
+    .map_err(|e| format!("Database error: {}", e))
+}
+
+/// Migrate existing projects from JSON files to SQLite
+#[tauri::command]
+pub async fn migrate_projects_to_db() -> Result<usize, String> {
     let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
     let base_path = home_dir.join("CreatorOps").join("Projects");
 
     if !base_path.exists() {
-        return Ok(Vec::new());
+        return Ok(0);
     }
 
-    let mut projects = Vec::new();
+    let mut migrated = 0;
 
-    // Use fs::read_dir instead of WalkDir - much faster, only reads top-level
     for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
@@ -162,48 +316,51 @@ fn scan_projects_directory() -> Result<Vec<Project>, String> {
         let metadata_path = path.join("project.json");
         if let Ok(json_data) = fs::read_to_string(&metadata_path) {
             if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
-                projects.push(project);
-            }
-        }
-    }
+                // Check if already exists
+                let exists = with_db(|conn| {
+                    let count: i64 = conn
+                        .query_row(
+                            "SELECT COUNT(*) FROM projects WHERE id = ?1",
+                            params![project.id],
+                            |row| row.get(0),
+                        )
+                        .unwrap_or(0);
+                    Ok(count > 0)
+                })
+                .unwrap_or(false);
 
-    // Sort by updated_at descending
-    projects.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+                if !exists {
+                    // Insert into database
+                    with_db(|conn| {
+                        conn.execute(
+                            "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                            params![
+                                project.id,
+                                project.name,
+                                project.client_name,
+                                project.date,
+                                project.shoot_type,
+                                project.status.to_string(),
+                                project.folder_path,
+                                project.created_at,
+                                project.updated_at,
+                                project.deadline,
+                            ],
+                        )?;
+                        Ok(())
+                    })
+                    .map_err(|e| format!("Failed to insert project: {}", e))?;
 
-    Ok(projects)
-}
-
-/// Find project by ID and return (project, metadata_path)
-fn find_project_by_id(project_id: &str) -> Result<(Project, std::path::PathBuf), String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
-    let base_path = home_dir.join("CreatorOps").join("Projects");
-
-    if !base_path.exists() {
-        return Err("Projects directory does not exist".to_string());
-    }
-
-    for entry in fs::read_dir(&base_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-
-        if !path.is_dir() {
-            continue;
-        }
-
-        let metadata_path = path.join("project.json");
-        if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-            if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
-                if project.id == project_id {
-                    return Ok((project, metadata_path));
+                    migrated += 1;
                 }
             }
         }
     }
 
-    Err("Project not found".to_string())
+    Ok(migrated)
 }
 
-/// Add dirs crate dependency
 mod dirs {
     use std::path::PathBuf;
 
@@ -211,87 +368,5 @@ mod dirs {
         std::env::var_os("HOME")
             .and_then(|h| if h.is_empty() { None } else { Some(h) })
             .map(PathBuf::from)
-    }
-}
-
-#[tauri::command]
-pub async fn delete_project(project_id: String) -> Result<(), String> {
-    let (_, metadata_path) = find_project_by_id(&project_id)?;
-
-    // Get project folder path from metadata path
-    let project_folder = metadata_path
-        .parent()
-        .ok_or("Failed to get project folder")?;
-
-    // Delete entire project folder
-    fs::remove_dir_all(project_folder)
-        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
-
-    // Invalidate cache since we deleted a project
-    invalidate_cache();
-
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn update_project_status(
-    project_id: String,
-    new_status: ProjectStatus,
-) -> Result<Project, String> {
-    let (mut project, metadata_path) = find_project_by_id(&project_id)?;
-
-    // Update status and timestamp
-    project.status = new_status;
-    project.updated_at = chrono::Utc::now().to_rfc3339();
-
-    // Save updated project
-    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
-
-    // Invalidate cache
-    invalidate_cache();
-
-    Ok(project)
-}
-
-#[tauri::command]
-pub async fn update_project_deadline(
-    project_id: String,
-    deadline: Option<String>,
-) -> Result<Project, String> {
-    let (mut project, metadata_path) = find_project_by_id(&project_id)?;
-
-    // Update deadline and timestamp
-    project.deadline = deadline.filter(|d| !d.is_empty());
-    project.updated_at = chrono::Utc::now().to_rfc3339();
-
-    // Save updated project
-    let json_data = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&metadata_path, json_data).map_err(|e| e.to_string())?;
-
-    // Invalidate cache
-    invalidate_cache();
-
-    Ok(project)
-}
-
-mod chrono {
-    pub struct Utc;
-
-    impl Utc {
-        pub fn now() -> DateTime {
-            DateTime
-        }
-    }
-
-    pub struct DateTime;
-
-    impl DateTime {
-        pub fn to_rfc3339(&self) -> String {
-            // Simple timestamp for now
-            use std::time::{SystemTime, UNIX_EPOCH};
-            let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-            format!("{}", duration.as_secs())
-        }
     }
 }
