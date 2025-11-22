@@ -1,5 +1,6 @@
 pub mod archive;
 pub mod backup;
+pub mod db;
 pub mod delivery;
 pub mod file_copy;
 pub mod file_system;
