@@ -44,17 +44,30 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
     }
   }
 
+  const statusOrder: Record<string, number> = {
+    Importing: 0,
+    Editing: 1,
+    Delivered: 2,
+  }
+
   const activeProjects = projects
     .filter((p) => p.status !== 'Archived')
     .sort((a, b) => {
-      // Projects with deadlines come first, sorted by deadline (earliest first)
+      // 1. Sort by deadline (earliest first)
       if (a.deadline && b.deadline) {
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+        if (deadlineDiff) return deadlineDiff
       }
       if (a.deadline) return -1
       if (b.deadline) return 1
-      // No deadline: sort by updated date descending
-      return b.updatedAt.localeCompare(a.updatedAt)
+
+      // 2. Sort by status
+      const statusA = statusOrder[a.status] ?? 999
+      const statusB = statusOrder[b.status] ?? 999
+      if (statusA !== statusB) return statusA - statusB
+
+      // 3. Sort alphabetically by name
+      return a.name.localeCompare(b.name)
     })
 
   const handleProjectCreated = (project: Project) => {
