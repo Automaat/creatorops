@@ -466,6 +466,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             <span className="metadata-label">Client</span>
             <span className="metadata-value">{selectedProject.clientName}</span>
           </div>
+          {selectedProject.shootType && (
+            <div className="metadata-item">
+              <span className="metadata-label">Type</span>
+              <span className="metadata-value">{selectedProject.shootType}</span>
+            </div>
+          )}
           <div className="metadata-item">
             <span className="metadata-label">Date</span>
             <span className="metadata-value">{selectedProject.date}</span>
@@ -497,10 +503,6 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         </div>
 
         <div className="project-info">
-          <div className="info-row">
-            <span className="info-label">Type:</span>
-            <span>{selectedProject.shootType}</span>
-          </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
             <span
@@ -857,13 +859,15 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <span className="info-label">Client:</span>
                     <span>{project.clientName}</span>
                   </div>
+                  {project.shootType && (
+                    <div className="info-item">
+                      <span className="info-label">Type:</span>
+                      <span>{project.shootType}</span>
+                    </div>
+                  )}
                   <div className="info-item">
                     <span className="info-label">Date:</span>
                     <span>{project.date}</span>
-                  </div>
-                  <div className="info-item">
-                    <span className="info-label">Type:</span>
-                    <span>{project.shootType}</span>
                   </div>
                 </div>
               </div>
