@@ -156,13 +156,11 @@ function App() {
           />
         </div>
         <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
-          {currentView === 'projects' && (
-            <Projects
-              key={selectedProjectId || 'projects-list'}
-              initialSelectedProjectId={selectedProjectId}
-              onBackFromProject={handleBackFromProject}
-            />
-          )}
+          <Projects
+            key={selectedProjectId || 'projects-list'}
+            initialSelectedProjectId={selectedProjectId}
+            onBackFromProject={handleBackFromProject}
+          />
         </div>
         <div style={{ display: currentView === 'backup' ? 'block' : 'none' }}>
           <BackupQueue />
