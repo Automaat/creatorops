@@ -8,10 +8,11 @@ interface DatePickerProps {
   label?: string | ReactNode
   required?: boolean
   id?: string
+  autoOpen?: boolean
 }
 
-export function DatePicker({ value, onChange, label, required, id }: DatePickerProps) {
-  const [isOpen, setIsOpen] = useState(false)
+export function DatePicker({ value, onChange, label, required, id, autoOpen }: DatePickerProps) {
+  const [isOpen, setIsOpen] = useState(autoOpen ?? false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(
     value && value.trim() ? new Date(value) : null
   )
@@ -35,6 +36,9 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (selectedDate) {
+          onChange(formatDate(selectedDate))
+        }
         setIsOpen(false)
       }
     }
@@ -43,7 +47,7 @@ export function DatePicker({ value, onChange, label, required, id }: DatePickerP
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen])
+  }, [isOpen, selectedDate, onChange])
 
   const formatDate = (date: Date) => {
     const month = String(date.getMonth() + 1).padStart(2, '0')
