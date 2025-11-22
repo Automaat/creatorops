@@ -159,6 +159,10 @@ a:hover {
   margin-bottom: var(--space-xs);
 }
 
+.align-center {
+  align-items: center;
+}
+
 .align-self-start {
   align-self: flex-start;
 }

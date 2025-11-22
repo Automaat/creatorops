@@ -428,7 +428,7 @@ export function Settings() {
           </section>
 
           <section>
-            <h2>Import Settings</h2>
+            <h2>Import</h2>
             <div className="card">
               <div className="flex flex-col gap-md">
                 <div className="flex align-center gap-sm">
@@ -438,7 +438,7 @@ export function Settings() {
                     checked={autoEject}
                     onChange={toggleAutoEject}
                   />
-                  <label htmlFor="auto-eject" className="font-medium">
+                  <label htmlFor="auto-eject">
                     Auto-eject SD cards after successful import
                   </label>
                 </div>
