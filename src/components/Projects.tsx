@@ -25,6 +25,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const isInternalSelection = useRef(false)
   const [archiveLocation, setArchiveLocation] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
   const [showCreateProject, setShowCreateProject] = useState(false)
@@ -99,6 +100,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   // Handle initial project selection from navigation
   useEffect(() => {
     if (initialSelectedProjectId) {
+      // External navigation from dashboard/import
+      isInternalSelection.current = false
       // Reload projects to get latest status when navigating to a project
       loadProjects().then((loadedProjects) => {
         // Find and select the project after reload
@@ -122,7 +125,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }, [selectedProject, scrollToTop])
 
   const handleBackToList = useCallback(() => {
-    if (onBackFromProject) {
+    // If internal selection (clicked from Projects list), just clear selection
+    // If external selection (from dashboard/import), use callback to go back
+    if (!isInternalSelection.current && onBackFromProject) {
       onBackFromProject()
     } else {
       setSelectedProject(null)
@@ -834,7 +839,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               <div
                 key={project.id}
                 className="project-card"
-                onClick={() => setSelectedProject(project)}
+                onClick={() => {
+                  isInternalSelection.current = true
+                  setSelectedProject(project)
+                }}
               >
                 <div className="project-card-header">
                   <h3>{project.name}</h3>

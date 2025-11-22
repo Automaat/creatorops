@@ -16,9 +16,7 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
   const [selectedDate, setSelectedDate] = useState<Date | null>(
     value && value.trim() ? new Date(value) : null
   )
-  const [viewDate, setViewDate] = useState(
-    value && value.trim() ? new Date(value) : new Date()
-  )
+  const [viewDate, setViewDate] = useState(value && value.trim() ? new Date(value) : new Date())
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
