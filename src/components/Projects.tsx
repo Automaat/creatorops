@@ -448,12 +448,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return (
       <div className="project-detail" ref={containerRef}>
         <div className="project-detail-header">
-          <div>
-            <button onClick={handleBackToList} className="btn-back">
-              ← Back
-            </button>
-            <h1>{selectedProject.name}</h1>
-          </div>
+          <button onClick={handleBackToList} className="btn-back">
+            ← Back
+          </button>
+          <h1>{selectedProject.name}</h1>
           <button
             onClick={() => setShowImportDialog(true)}
             className="btn btn-primary"
@@ -461,6 +459,41 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           >
             Import
           </button>
+        </div>
+
+        <div className="project-metadata-row">
+          <div className="metadata-item">
+            <span className="metadata-label">Client</span>
+            <span className="metadata-value">{selectedProject.clientName}</span>
+          </div>
+          <div className="metadata-item">
+            <span className="metadata-label">Date</span>
+            <span className="metadata-value">{selectedProject.date}</span>
+          </div>
+          <div className="metadata-item">
+            <span className="metadata-label">Status</span>
+            <span className={`project-status ${getStatusColor(selectedProject.status)}`}>
+              {selectedProject.status}
+            </span>
+          </div>
+          <div className="metadata-item">
+            <span className="metadata-label">Deadline</span>
+            {isEditingDeadline ? (
+              <DatePicker
+                value={selectedProject.deadline || new Date().toISOString().split('T')[0]}
+                onChange={handleDeadlineChange}
+                autoOpen
+              />
+            ) : (
+              <span
+                className="metadata-value metadata-value-link"
+                onClick={() => setIsEditingDeadline(true)}
+                title="Click to edit deadline"
+              >
+                {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="project-info">
