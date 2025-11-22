@@ -47,6 +47,7 @@
   --font-size-lg: 18px;
   --font-size-xl: 20px;
   --font-size-xxl: 24px;
+  --font-size-2xl: 32px;
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
@@ -56,7 +57,39 @@
   --line-height-tight: 1.3;
   --line-height-base: 1.4;
   --line-height-normal: 1.5;
-  --line-height-loose: 1.6;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.75;
+
+  /* Type Scale - Semantic Typography */
+  /* Title: Page/project title (32px/bold/1.3) */
+  --type-title-size: var(--font-size-2xl);
+  --type-title-weight: var(--font-weight-bold);
+  --type-title-height: var(--line-height-tight);
+
+  /* Section Heading: Major sections like "Actions" (18px/medium/1.4) */
+  --type-section-size: var(--font-size-lg);
+  --type-section-weight: var(--font-weight-medium);
+  --type-section-height: var(--line-height-base);
+
+  /* Subheading: Group labels like "Photos", "Videos" (13px/semibold/1.4) */
+  --type-subheading-size: var(--font-size-sm);
+  --type-subheading-weight: var(--font-weight-semibold);
+  --type-subheading-height: var(--line-height-base);
+
+  /* Body: Primary content text (16px/semibold/1.5) */
+  --type-body-size: var(--font-size-base);
+  --type-body-weight: var(--font-weight-semibold);
+  --type-body-height: var(--line-height-normal);
+
+  /* Caption: Secondary descriptive text (14px/normal/1.6) */
+  --type-caption-size: var(--font-size-md);
+  --type-caption-weight: var(--font-weight-normal);
+  --type-caption-height: var(--line-height-relaxed);
+
+  /* Meta: Field labels, small UI text (12px/medium/1.4) */
+  --type-meta-size: var(--font-size-xs);
+  --type-meta-weight: var(--font-weight-medium);
+  --type-meta-height: var(--line-height-base);
 
   /* Border Radius */
   --radius-sm: 4px;

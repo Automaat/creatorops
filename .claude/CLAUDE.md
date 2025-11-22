@@ -62,18 +62,27 @@ src/styles/
 
 ## Typography
 
-**Scale:**
+**Semantic Type Scale:**
 
-- Large heading: 24px / 600 weight
-- Section heading: 18px / 600 weight
-- Card title: 16-18px / 500 weight
-- Body text: 14px / 400 weight
-- Small text: 13px / 400 weight
-- Micro text: 11px / 400 weight
+- **Title**: 32px / 700 bold / 1.3 line-height — Page/project titles
+- **Section Heading**: 18px / 500 medium / 1.4 line-height — Major sections (e.g., "Actions")
+- **Subheading**: 13px / 600 semibold / 1.4 line-height — Group labels (e.g., "Photos", "Videos")
+- **Body**: 16px / 600 semibold / 1.5 line-height — Primary content, action names
+- **Caption**: 14px / 400 normal / 1.6 line-height — Secondary descriptive text
+- **Meta**: 12px / 500 medium / 1.4 line-height — Field labels, small UI text
 
 **Font Family:** System font stack (-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)
 
-**Principle:** Clear hierarchy through size and weight, not color variations.
+**Usage:** Use semantic type tokens from `variables.css`:
+
+- `var(--type-title-size)`, `var(--type-title-weight)`, `var(--type-title-height)`
+- `var(--type-section-size)`, `var(--type-section-weight)`, `var(--type-section-height)`
+- `var(--type-subheading-size)`, `var(--type-subheading-weight)`, `var(--type-subheading-height)`
+- `var(--type-body-size)`, `var(--type-body-weight)`, `var(--type-body-height)`
+- `var(--type-caption-size)`, `var(--type-caption-weight)`, `var(--type-caption-height)`
+- `var(--type-meta-size)`, `var(--type-meta-weight)`, `var(--type-meta-height)`
+
+**Principle:** Clear hierarchy through size and weight, not color variations. Apply consistently across all components.
 
 ## Visual Weight
 
