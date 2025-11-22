@@ -36,57 +36,68 @@ export function Layout({
           <h2>CreatorOps</h2>
         </div>
         <nav className="sidebar-nav">
-          <NavItem
-            iconSrc={dashboardIcon}
-            iconSrcSelected={dashboardIconSelected}
-            label="Dashboard"
-            active={currentView === 'dashboard'}
-            onClick={() => onNavigate('dashboard')}
-          />
-          <NavItem
-            iconSrc={importIcon}
-            iconSrcSelected={importIconSelected}
-            label="Import"
-            active={currentView === 'import'}
-            count={importCount}
-            onClick={() => onNavigate('import')}
-          />
-          <NavItem
-            iconSrc={projectsIcon}
-            iconSrcSelected={projectsIconSelected}
-            label="Projects"
-            active={currentView === 'projects'}
-            count={projectsCount}
-            onClick={() => onNavigate('projects')}
-          />
-          <NavItem
-            iconSrc={backupIcon}
-            iconSrcSelected={backupIconSelected}
-            label="Backup Queue"
-            active={currentView === 'backup'}
-            onClick={() => onNavigate('backup')}
-          />
-          <NavItem
-            iconSrc={deliveryIcon}
-            iconSrcSelected={deliveryIconSelected}
-            label="Delivery"
-            active={currentView === 'delivery'}
-            onClick={() => onNavigate('delivery')}
-          />
-          <NavItem
-            iconSrc={historyIcon}
-            iconSrcSelected={historyIconSelected}
-            label="History"
-            active={currentView === 'history'}
-            onClick={() => onNavigate('history')}
-          />
-          <NavItem
-            iconSrc={settingsIcon}
-            iconSrcSelected={settingsIconSelected}
-            label="Settings"
-            active={currentView === 'settings'}
-            onClick={() => onNavigate('settings')}
-          />
+          <NavSection title="Main">
+            <NavItem
+              iconSrc={dashboardIcon}
+              iconSrcSelected={dashboardIconSelected}
+              label="Dashboard"
+              active={currentView === 'dashboard'}
+              onClick={() => onNavigate('dashboard')}
+            />
+            <NavItem
+              iconSrc={importIcon}
+              iconSrcSelected={importIconSelected}
+              label="Import"
+              active={currentView === 'import'}
+              count={importCount}
+              onClick={() => onNavigate('import')}
+            />
+            <NavItem
+              iconSrc={projectsIcon}
+              iconSrcSelected={projectsIconSelected}
+              label="Projects"
+              active={currentView === 'projects'}
+              count={projectsCount}
+              onClick={() => onNavigate('projects')}
+            />
+          </NavSection>
+
+          <NavSection title="Queues">
+            <NavItem
+              iconSrc={backupIcon}
+              iconSrcSelected={backupIconSelected}
+              label="Backup Queue"
+              active={currentView === 'backup'}
+              onClick={() => onNavigate('backup')}
+            />
+            <NavItem
+              iconSrc={deliveryIcon}
+              iconSrcSelected={deliveryIconSelected}
+              label="Delivery"
+              active={currentView === 'delivery'}
+              onClick={() => onNavigate('delivery')}
+            />
+          </NavSection>
+
+          <NavSection title="History">
+            <NavItem
+              iconSrc={historyIcon}
+              iconSrcSelected={historyIconSelected}
+              label="History"
+              active={currentView === 'history'}
+              onClick={() => onNavigate('history')}
+            />
+          </NavSection>
+
+          <NavSection title="Settings">
+            <NavItem
+              iconSrc={settingsIcon}
+              iconSrcSelected={settingsIconSelected}
+              label="Settings"
+              active={currentView === 'settings'}
+              onClick={() => onNavigate('settings')}
+            />
+          </NavSection>
         </nav>
       </aside>
       <main className="main-content">{children}</main>
@@ -126,6 +137,20 @@ function NavItem({
       )}
       <span>{label}</span>
       {count !== undefined && count > 0 && <span className="nav-item-badge">{count}</span>}
+    </div>
+  )
+}
+
+interface NavSectionProps {
+  title: string
+  children: ReactNode
+}
+
+function NavSection({ title, children }: NavSectionProps) {
+  return (
+    <div className="nav-section">
+      <div className="nav-section-title">{title}</div>
+      {children}
     </div>
   )
 }

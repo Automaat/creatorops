@@ -448,12 +448,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return (
       <div className="project-detail" ref={containerRef}>
         <div className="project-detail-header">
-          <div>
-            <button onClick={handleBackToList} className="btn-back">
-              ← Back
-            </button>
-            <h1>{selectedProject.name}</h1>
-          </div>
+          <button onClick={handleBackToList} className="btn-back">
+            ← Back
+          </button>
+          <h1>{selectedProject.name}</h1>
           <button
             onClick={() => setShowImportDialog(true)}
             className="btn btn-primary"
@@ -463,27 +461,23 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           </button>
         </div>
 
-        <div className="project-info">
-          <div className="info-row">
-            <span className="info-label">Client:</span>
-            <span>{selectedProject.clientName}</span>
+        <div className="project-metadata-row">
+          <div className="metadata-item">
+            <span className="metadata-label">Client</span>
+            <span className="metadata-value">{selectedProject.clientName}</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Date:</span>
-            <span>{selectedProject.date}</span>
+          <div className="metadata-item">
+            <span className="metadata-label">Date</span>
+            <span className="metadata-value">{selectedProject.date}</span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Type:</span>
-            <span>{selectedProject.shootType}</span>
-          </div>
-          <div className="info-row">
-            <span className="info-label">Status:</span>
+          <div className="metadata-item">
+            <span className="metadata-label">Status</span>
             <span className={`project-status ${getStatusColor(selectedProject.status)}`}>
               {selectedProject.status}
             </span>
           </div>
-          <div className="info-row">
-            <span className="info-label">Deadline:</span>
+          <div className="metadata-item">
+            <span className="metadata-label">Deadline</span>
             {isEditingDeadline ? (
               <DatePicker
                 value={selectedProject.deadline || new Date().toISOString().split('T')[0]}
@@ -492,17 +486,30 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               />
             ) : (
               <span
+                className="metadata-value metadata-value-link"
                 onClick={() => setIsEditingDeadline(true)}
-                style={{ cursor: 'pointer', textDecoration: 'underline' }}
                 title="Click to edit deadline"
               >
                 {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
               </span>
             )}
           </div>
+        </div>
+
+        <div className="project-info">
+          <div className="info-row">
+            <span className="info-label">Type:</span>
+            <span>{selectedProject.shootType}</span>
+          </div>
           <div className="info-row">
             <span className="info-label">Location:</span>
-            <span className="folder-path">{replaceHomeWithTilde(selectedProject.folderPath)}</span>
+            <span
+              className="folder-path info-row-clickable"
+              onClick={() => invoke('reveal_in_finder', { path: selectedProject.folderPath })}
+              title="Click to show in Finder"
+            >
+              {replaceHomeWithTilde(selectedProject.folderPath)}
+            </span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -535,13 +542,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         <section className="project-actions">
           <h2>Actions</h2>
 
-          <div className="backup-destinations">
-            <h3>Open Photos In</h3>
-            <p className="action-hint">Open this project's photos in your editing app</p>
+          <div className="action-group">
+            <h4 className="action-group-heading">Photos</h4>
             <div className="destination-list">
               <button
                 onClick={() => handleOpenInApp('open_in_lightroom', 'Lightroom Classic')}
-                className="destination-button"
+                className="destination-button destination-button-primary"
               >
                 <span className="destination-name">Lightroom Classic</span>
                 <span className="destination-path">Photo editing application</span>
@@ -556,13 +562,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             </div>
           </div>
 
-          <div className="backup-destinations">
-            <h3>Open Videos In</h3>
-            <p className="action-hint">Open this project's videos in your editing app</p>
+          <div className="action-group">
+            <h4 className="action-group-heading">Videos</h4>
             <div className="destination-list">
               <button
                 onClick={() => handleOpenInApp('open_in_davinci_resolve', 'DaVinci Resolve')}
-                className="destination-button"
+                className="destination-button destination-button-primary"
               >
                 <span className="destination-name">DaVinci Resolve</span>
                 <span className="destination-path">Video editing & color grading</span>
@@ -570,9 +575,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             </div>
           </div>
 
-          {destinations.length > 0 ? (
-            <div className="backup-destinations">
-              <h3>Backup to:</h3>
+          <div className="action-group">
+            <h4 className="action-group-heading">Backup</h4>
+            {destinations.length > 0 ? (
               <div className="destination-list">
                 {destinations
                   .filter((d) => d.enabled)
@@ -587,19 +592,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     </button>
                   ))}
               </div>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <p>No backup destinations configured</p>
-              <p className="empty-state-hint">Add destinations in Settings to enable backup</p>
-            </div>
-          )}
+            ) : (
+              <div className="empty-state-card">
+                <p className="empty-state-message">No backup destinations configured.</p>
+                <p className="empty-state-message">Add destinations in Settings to enable backup.</p>
+              </div>
+            )}
+          </div>
 
           <div className="archive-action">
             <h3>Archive Project</h3>
-            <p className="action-hint">
-              Move this project to the archive location and update status to Archived
-            </p>
+            <p className="action-hint">Move to archive and mark as Archived</p>
             <button
               onClick={() => setShowArchiveDialog(true)}
               className="btn-archive"
@@ -611,9 +614,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
           <div className="delete-action">
             <h3>Delete Project</h3>
-            <p className="action-hint">
-              Permanently delete this project and all its files. This action cannot be undone.
-            </p>
+            <p className="action-hint">Permanently delete project and all files</p>
             <button onClick={() => setShowDeleteDialog(true)} className="btn-danger">
               Delete Project
             </button>
