@@ -14,15 +14,21 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
   const [showCreateProject, setShowCreateProject] = useState(false)
 
   useEffect(() => {
-    // Auto-migrate on first load
-    invoke<number>('migrate_projects_to_db')
-      .then((count) => {
-        if (count > 0) {
-          console.log(`Migrated ${count} projects to database`)
-        }
-      })
-      .catch((err) => console.error('Migration failed:', err))
-      .finally(() => loadData())
+    // Auto-migrate on first load (run once per app session)
+    const migrated = localStorage.getItem('db_migrated')
+    if (!migrated) {
+      invoke<number>('migrate_projects_to_db')
+        .then((count) => {
+          if (count > 0) {
+            console.log(`Migrated ${count} projects to database`)
+          }
+          localStorage.setItem('db_migrated', 'true')
+        })
+        .catch((err) => console.error('Migration failed:', err))
+        .finally(() => loadData())
+    } else {
+      loadData()
+    }
   }, [])
 
   async function loadData() {

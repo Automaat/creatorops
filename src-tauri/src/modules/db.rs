@@ -8,11 +8,12 @@ lazy_static::lazy_static! {
 
 /// Initialize database connection and create schema
 pub fn init_db() -> Result<()> {
-    let db_path = get_db_path();
+    let db_path = get_db_path()?;
 
     // Create parent directory if it doesn't exist
     if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent).ok();
+        std::fs::create_dir_all(parent)
+            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
     }
 
     let conn = Connection::open(&db_path)?;
@@ -56,20 +57,24 @@ pub fn init_db() -> Result<()> {
     )?;
 
     // Store connection in global state
-    let mut db = DB_CONNECTION.lock().unwrap();
+    let mut db = DB_CONNECTION
+        .lock()
+        .map_err(|_| rusqlite::Error::InvalidQuery)?;
     *db = Some(conn);
 
     Ok(())
 }
 
 /// Get database file path
-fn get_db_path() -> PathBuf {
-    let home_dir = std::env::var_os("HOME")
-        .and_then(|h| if h.is_empty() { None } else { Some(h) })
-        .map(PathBuf::from)
-        .expect("Failed to get home directory");
+fn get_db_path() -> Result<PathBuf> {
+    let home_dir = crate::modules::file_utils::get_home_dir().map_err(|e| {
+        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            e,
+        )))
+    })?;
 
-    home_dir.join("CreatorOps").join("creatorops.db")
+    Ok(home_dir.join("CreatorOps").join("creatorops.db"))
 }
 
 /// Execute a query with the database connection
@@ -77,7 +82,9 @@ pub fn with_db<F, R>(f: F) -> Result<R>
 where
     F: FnOnce(&Connection) -> Result<R>,
 {
-    let db = DB_CONNECTION.lock().unwrap();
-    let conn = db.as_ref().expect("Database not initialized");
+    let db = DB_CONNECTION
+        .lock()
+        .map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let conn = db.as_ref().ok_or(rusqlite::Error::InvalidQuery)?;
     f(conn)
 }

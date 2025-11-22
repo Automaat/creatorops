@@ -4,6 +4,7 @@ use std::fs;
 use uuid::Uuid;
 
 use crate::modules::db::with_db;
+use crate::modules::file_utils::get_home_dir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,6 +69,31 @@ fn sanitize_path_component(s: &str) -> String {
         .collect()
 }
 
+/// Map a database row to a Project struct
+fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
+    let status_str: String = row.get(5)?;
+    let status = status_str.parse::<ProjectStatus>().map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(
+            5,
+            rusqlite::types::Type::Text,
+            Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+        )
+    })?;
+
+    Ok(Project {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        client_name: row.get(2)?,
+        date: row.get(3)?,
+        shoot_type: row.get(4)?,
+        status,
+        folder_path: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+        deadline: row.get(9)?,
+    })
+}
+
 #[tauri::command]
 pub async fn create_project(
     name: String,
@@ -88,7 +114,7 @@ pub async fn create_project(
     };
 
     // Default location (should be configurable in settings)
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let home_dir = get_home_dir()?;
     let base_path = home_dir.join("CreatorOps").join("Projects");
     let project_path = base_path.join(&folder_name);
 
@@ -146,29 +172,7 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC")?;
 
         let projects = stmt
-            .query_map([], |row| {
-                let status_str: String = row.get(5)?;
-                let status = status_str
-                    .parse::<ProjectStatus>()
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                        5,
-                        rusqlite::types::Type::Text,
-                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
-                    ))?;
-
-                Ok(Project {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    client_name: row.get(2)?,
-                    date: row.get(3)?,
-                    shoot_type: row.get(4)?,
-                    status,
-                    folder_path: row.get(6)?,
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
-                    deadline: row.get(9)?,
-                })
-            })?
+            .query_map([], map_project_row)?
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(projects)
@@ -199,16 +203,16 @@ pub async fn delete_project(project_id: String) -> Result<(), String> {
     })
     .map_err(|e| format!("Database error: {}", e))?;
 
-    // Delete from database
+    // Delete project folder first (if this fails, DB remains consistent)
+    fs::remove_dir_all(&folder_path)
+        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
+
+    // Delete from database (only after filesystem deletion succeeds)
     with_db(|conn| {
         conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
         Ok(())
     })
     .map_err(|e| format!("Failed to delete project from database: {}", e))?;
-
-    // Delete project folder
-    fs::remove_dir_all(&folder_path)
-        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
 
     Ok(())
 }
@@ -231,7 +235,7 @@ pub async fn update_project_status(
     .map_err(|e| format!("Failed to update project status: {}", e))?;
 
     // Fetch and return updated project
-    get_project_by_id(&project_id).await
+    get_project_by_id(&project_id)
 }
 
 #[tauri::command]
@@ -253,39 +257,16 @@ pub async fn update_project_deadline(
     .map_err(|e| format!("Failed to update project deadline: {}", e))?;
 
     // Fetch and return updated project
-    get_project_by_id(&project_id).await
+    get_project_by_id(&project_id)
 }
 
 /// Helper function to get project by ID
-async fn get_project_by_id(project_id: &str) -> Result<Project, String> {
+fn get_project_by_id(project_id: &str) -> Result<Project, String> {
     with_db(|conn| {
         let mut stmt = conn
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
 
-        let project = stmt
-            .query_row(params![project_id], |row| {
-                let status_str: String = row.get(5)?;
-                let status = status_str
-                    .parse::<ProjectStatus>()
-                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(
-                        5,
-                        rusqlite::types::Type::Text,
-                        Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
-                    ))?;
-
-                Ok(Project {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    client_name: row.get(2)?,
-                    date: row.get(3)?,
-                    shoot_type: row.get(4)?,
-                    status,
-                    folder_path: row.get(6)?,
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
-                    deadline: row.get(9)?,
-                })
-            })?;
+        let project = stmt.query_row(params![project_id], map_project_row)?;
 
         Ok(project)
     })
@@ -295,7 +276,7 @@ async fn get_project_by_id(project_id: &str) -> Result<Project, String> {
 /// Migrate existing projects from JSON files to SQLite
 #[tauri::command]
 pub async fn migrate_projects_to_db() -> Result<usize, String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let home_dir = get_home_dir()?;
     let base_path = home_dir.join("CreatorOps").join("Projects");
 
     if !base_path.exists() {
@@ -318,16 +299,14 @@ pub async fn migrate_projects_to_db() -> Result<usize, String> {
             if let Ok(project) = serde_json::from_str::<Project>(&json_data) {
                 // Check if already exists
                 let exists = with_db(|conn| {
-                    let count: i64 = conn
-                        .query_row(
-                            "SELECT COUNT(*) FROM projects WHERE id = ?1",
-                            params![project.id],
-                            |row| row.get(0),
-                        )
-                        .unwrap_or(0);
+                    let count: i64 = conn.query_row(
+                        "SELECT COUNT(*) FROM projects WHERE id = ?1",
+                        params![project.id],
+                        |row| row.get(0),
+                    )?;
                     Ok(count > 0)
                 })
-                .unwrap_or(false);
+                .map_err(|e| format!("Failed to check project existence: {}", e))?;
 
                 if !exists {
                     // Insert into database
@@ -359,14 +338,4 @@ pub async fn migrate_projects_to_db() -> Result<usize, String> {
     }
 
     Ok(migrated)
-}
-
-mod dirs {
-    use std::path::PathBuf;
-
-    pub fn home_dir() -> Option<PathBuf> {
-        std::env::var_os("HOME")
-            .and_then(|h| if h.is_empty() { None } else { Some(h) })
-            .map(PathBuf::from)
-    }
 }
