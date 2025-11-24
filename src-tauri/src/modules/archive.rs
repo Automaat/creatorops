@@ -304,3 +304,111 @@ pub async fn remove_archive_job(job_id: String) -> Result<(), String> {
     queue.remove(&job_id);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_archive_status_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ArchiveStatus::Pending).unwrap(),
+            r#""pending""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArchiveStatus::InProgress).unwrap(),
+            r#""inprogress""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArchiveStatus::Completed).unwrap(),
+            r#""completed""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ArchiveStatus::Failed).unwrap(),
+            r#""failed""#
+        );
+    }
+
+    #[test]
+    fn test_archive_job_serialization() {
+        let job = ArchiveJob {
+            id: "arch-123".to_string(),
+            project_id: "proj-456".to_string(),
+            project_name: "Archive Test".to_string(),
+            source_path: "/source/project".to_string(),
+            archive_path: "/archive/project".to_string(),
+            compress: false,
+            compression_format: None,
+            status: ArchiveStatus::Pending,
+            total_files: 100,
+            files_archived: 0,
+            total_bytes: 1024000,
+            bytes_transferred: 0,
+            created_at: "2024-01-01".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+        };
+
+        let json = serde_json::to_string(&job).unwrap();
+        assert!(json.contains("arch-123"));
+        assert!(json.contains("Archive Test"));
+        assert!(json.contains("pending"));
+    }
+
+    #[test]
+    fn test_archive_job_with_compression() {
+        let job = ArchiveJob {
+            id: "arch-456".to_string(),
+            project_id: "proj-789".to_string(),
+            project_name: "Compressed Archive".to_string(),
+            source_path: "/source".to_string(),
+            archive_path: "/archive".to_string(),
+            compress: true,
+            compression_format: Some("zip".to_string()),
+            status: ArchiveStatus::Pending,
+            total_files: 50,
+            files_archived: 0,
+            total_bytes: 512000,
+            bytes_transferred: 0,
+            created_at: "2024-01-01".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+        };
+
+        assert!(job.compress);
+        assert_eq!(job.compression_format, Some("zip".to_string()));
+    }
+
+    #[test]
+    fn test_archive_progress_serialization() {
+        let progress = ArchiveProgress {
+            job_id: "arch-123".to_string(),
+            file_name: "document.pdf".to_string(),
+            current_file: 25,
+            total_files: 100,
+            bytes_transferred: 256000,
+            total_bytes: 1024000,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+        assert!(json.contains("arch-123"));
+        assert!(json.contains("document.pdf"));
+        assert!(json.contains("25"));
+    }
+
+    #[test]
+    fn test_count_files_and_size() {
+        let temp_dir = std::env::temp_dir().join("test_archive_count");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::write(temp_dir.join("file1.txt"), b"12345").unwrap();
+        std::fs::write(temp_dir.join("file2.txt"), b"1234567890").unwrap();
+
+        let (count, size) = count_files_and_size(temp_dir.to_str().unwrap()).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(size, 15);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+}

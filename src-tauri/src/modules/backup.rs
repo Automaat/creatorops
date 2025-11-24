@@ -472,3 +472,128 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backup_status_serialization() {
+        assert_eq!(
+            serde_json::to_string(&BackupStatus::Pending).unwrap(),
+            r#""pending""#
+        );
+        assert_eq!(
+            serde_json::to_string(&BackupStatus::InProgress).unwrap(),
+            r#""inprogress""#
+        );
+        assert_eq!(
+            serde_json::to_string(&BackupStatus::Completed).unwrap(),
+            r#""completed""#
+        );
+        assert_eq!(
+            serde_json::to_string(&BackupStatus::Failed).unwrap(),
+            r#""failed""#
+        );
+        assert_eq!(
+            serde_json::to_string(&BackupStatus::Cancelled).unwrap(),
+            r#""cancelled""#
+        );
+    }
+
+    #[test]
+    fn test_backup_job_serialization() {
+        let job = BackupJob {
+            id: "job-123".to_string(),
+            project_id: "proj-456".to_string(),
+            project_name: "Test Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-789".to_string(),
+            destination_name: "Backup Drive".to_string(),
+            destination_path: "/backup".to_string(),
+            status: BackupStatus::Pending,
+            total_files: 100,
+            files_copied: 0,
+            files_skipped: 0,
+            total_bytes: 1024000,
+            bytes_transferred: 0,
+            created_at: "2024-01-01".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+        };
+
+        let json = serde_json::to_string(&job).unwrap();
+        assert!(json.contains("job-123"));
+        assert!(json.contains("Test Project"));
+        assert!(json.contains("pending"));
+    }
+
+    #[test]
+    fn test_backup_progress_serialization() {
+        let progress = BackupProgress {
+            job_id: "job-123".to_string(),
+            file_name: "test.jpg".to_string(),
+            current_file: 5,
+            total_files: 10,
+            bytes_transferred: 512,
+            total_bytes: 1024,
+            speed: 100.5,
+            eta: 5,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+        assert!(json.contains("job-123"));
+        assert!(json.contains("test.jpg"));
+        assert!(json.contains("100.5"));
+    }
+
+    #[test]
+    fn test_backup_history_serialization() {
+        let history = BackupHistory {
+            id: "hist-123".to_string(),
+            project_id: "proj-456".to_string(),
+            project_name: "Test Project".to_string(),
+            destination_name: "Backup Drive".to_string(),
+            destination_path: "/backup".to_string(),
+            files_copied: 100,
+            files_skipped: 5,
+            total_bytes: 1024000,
+            started_at: "2024-01-01T10:00:00Z".to_string(),
+            completed_at: "2024-01-01T11:00:00Z".to_string(),
+            status: BackupStatus::Completed,
+            error_message: None,
+        };
+
+        let json = serde_json::to_string(&history).unwrap();
+        assert!(json.contains("hist-123"));
+        assert!(json.contains("completed"));
+    }
+
+    #[test]
+    fn test_backup_job_with_error() {
+        let job = BackupJob {
+            id: "job-fail".to_string(),
+            project_id: "proj-456".to_string(),
+            project_name: "Failed Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-789".to_string(),
+            destination_name: "Backup Drive".to_string(),
+            destination_path: "/backup".to_string(),
+            status: BackupStatus::Failed,
+            total_files: 100,
+            files_copied: 50,
+            files_skipped: 50,
+            total_bytes: 1024000,
+            bytes_transferred: 512000,
+            created_at: "2024-01-01".to_string(),
+            started_at: Some("2024-01-01T10:00:00Z".to_string()),
+            completed_at: Some("2024-01-01T10:30:00Z".to_string()),
+            error_message: Some("Disk full".to_string()),
+        };
+
+        let json = serde_json::to_string(&job).unwrap();
+        assert!(json.contains("failed"));
+        assert!(json.contains("Disk full"));
+    }
+}

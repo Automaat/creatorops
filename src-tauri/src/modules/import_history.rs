@@ -152,3 +152,89 @@ mod chrono {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_import_status_serialization() {
+        assert_eq!(
+            serde_json::to_string(&ImportStatus::Success).unwrap(),
+            r#""success""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ImportStatus::Partial).unwrap(),
+            r#""partial""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ImportStatus::Failed).unwrap(),
+            r#""failed""#
+        );
+    }
+
+    #[test]
+    fn test_import_status_deserialization() {
+        assert!(matches!(
+            serde_json::from_str::<ImportStatus>(r#""success""#).unwrap(),
+            ImportStatus::Success
+        ));
+        assert!(matches!(
+            serde_json::from_str::<ImportStatus>(r#""partial""#).unwrap(),
+            ImportStatus::Partial
+        ));
+        assert!(matches!(
+            serde_json::from_str::<ImportStatus>(r#""failed""#).unwrap(),
+            ImportStatus::Failed
+        ));
+    }
+
+    #[test]
+    fn test_import_history_serialization() {
+        let history = ImportHistory {
+            id: "test-id".to_string(),
+            project_id: "proj-123".to_string(),
+            project_name: "Test Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_path: "/dest".to_string(),
+            files_copied: 10,
+            files_skipped: 2,
+            total_bytes: 1024,
+            photos_copied: 8,
+            videos_copied: 2,
+            started_at: "2024-01-01".to_string(),
+            completed_at: "2024-01-01".to_string(),
+            status: ImportStatus::Success,
+            error_message: None,
+        };
+
+        let json = serde_json::to_string(&history).unwrap();
+        assert!(json.contains("test-id"));
+        assert!(json.contains("proj-123"));
+        assert!(json.contains("Test Project"));
+    }
+
+    #[test]
+    fn test_import_history_with_error() {
+        let history = ImportHistory {
+            id: "test-id".to_string(),
+            project_id: "proj-123".to_string(),
+            project_name: "Test Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_path: "/dest".to_string(),
+            files_copied: 5,
+            files_skipped: 5,
+            total_bytes: 512,
+            photos_copied: 5,
+            videos_copied: 0,
+            started_at: "2024-01-01".to_string(),
+            completed_at: "2024-01-01".to_string(),
+            status: ImportStatus::Partial,
+            error_message: Some("Some files failed".to_string()),
+        };
+
+        let json = serde_json::to_string(&history).unwrap();
+        assert!(json.contains("Some files failed"));
+        assert!(json.contains(r#""status":"partial""#));
+    }
+}

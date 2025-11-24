@@ -203,3 +203,64 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
     // Fallback for non-macOS or if diskutil fails
     ("Unknown".to_string(), true)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sd_card_serialization() {
+        let card = SDCard {
+            name: "SD_CARD".to_string(),
+            path: "/Volumes/SD_CARD".to_string(),
+            size: 32000000000,
+            free_space: 16000000000,
+            file_count: 150,
+            device_type: "SD Card".to_string(),
+            is_removable: true,
+        };
+
+        let json = serde_json::to_string(&card).unwrap();
+        assert!(json.contains("SD_CARD"));
+        assert!(json.contains("32000000000"));
+        assert!(json.contains("true"));
+    }
+
+    #[test]
+    fn test_sd_card_deserialization() {
+        let json = r#"{
+            "name": "USB_DRIVE",
+            "path": "/Volumes/USB_DRIVE",
+            "size": 64000000000,
+            "freeSpace": 32000000000,
+            "fileCount": 200,
+            "deviceType": "USB Drive",
+            "isRemovable": true
+        }"#;
+
+        let card: SDCard = serde_json::from_str(json).unwrap();
+        assert_eq!(card.name, "USB_DRIVE");
+        assert_eq!(card.size, 64000000000);
+        assert!(card.is_removable);
+    }
+
+    #[test]
+    fn test_count_files() {
+        let temp_dir = std::env::temp_dir().join("test_sd_count");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::write(temp_dir.join("file1.txt"), b"test").unwrap();
+        std::fs::write(temp_dir.join("file2.txt"), b"test").unwrap();
+
+        let count = count_files(&temp_dir);
+        assert_eq!(count, 2);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_device_info_returns_tuple() {
+        let (device_type, _) = get_device_info("TestVolume");
+        assert!(!device_type.is_empty());
+    }
+}
