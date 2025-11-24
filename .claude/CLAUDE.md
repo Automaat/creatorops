@@ -255,6 +255,24 @@ src/styles/
 
 **Naming:** Components PascalCase, hooks camelCase (use*), utils camelCase, styles kebab-case.
 
+## Testing
+
+**Always write tests for:**
+- New features
+- Bug fixes
+- New components
+- New hooks
+- New utilities
+
+**Bug fix workflow:**
+1. Write test that reproduces bug
+2. Fix bug
+3. Verify test passes
+
+**Test location:** Co-located with code (`Component.test.tsx`, `hook.test.ts`)
+
+**Test framework:** Vitest + React Testing Library
+
 ## UI Principles
 
 1. **Spacious Minimalism** - every element breathes with whitespace
