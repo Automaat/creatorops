@@ -15,10 +15,16 @@ vi.mock('@tauri-apps/plugin-notification', () => ({
 }))
 
 describe('Import', () => {
+  const mockProps = {
+    sdCards: [],
+    isScanning: false,
+    onImportComplete: vi.fn(),
+  }
+
   it('renders without crashing', async () => {
     render(
       <NotificationProvider>
-        <Import />
+        <Import {...mockProps} />
       </NotificationProvider>
     )
 
@@ -30,7 +36,7 @@ describe('Import', () => {
   it('displays import section', async () => {
     render(
       <NotificationProvider>
-        <Import />
+        <Import {...mockProps} />
       </NotificationProvider>
     )
 
@@ -42,7 +48,7 @@ describe('Import', () => {
   it('displays history section', async () => {
     render(
       <NotificationProvider>
-        <Import />
+        <Import {...mockProps} />
       </NotificationProvider>
     )
 

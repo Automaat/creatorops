@@ -29,8 +29,7 @@ describe('useSDCardScanner', () => {
     vi.useRealTimers()
   })
 
-  it('initializes with empty sdCards array', () => {
-    
+  it('initializes with empty sdCards array', async () => {
     mockInvoke.mockResolvedValue([])
 
     const { result } = renderHook(() => useSDCardScanner(), {
@@ -38,7 +37,11 @@ describe('useSDCardScanner', () => {
     })
 
     expect(result.current.sdCards).toEqual([])
-    expect(result.current.isScanning).toBe(false)
+
+    // Wait for initial scan to complete
+    await waitFor(() => {
+      expect(result.current.isScanning).toBe(false)
+    })
   })
 
   it('scans for SD cards on mount', async () => {
@@ -59,9 +62,8 @@ describe('useSDCardScanner', () => {
   })
 
   it('sets isScanning state during scan', async () => {
-    
     let resolveInvoke: (value: SDCard[]) => void
-    invoke.mockReturnValue(
+    mockInvoke.mockReturnValue(
       new Promise((resolve) => {
         resolveInvoke = resolve
       })
@@ -75,8 +77,9 @@ describe('useSDCardScanner', () => {
       expect(result.current.isScanning).toBe(true)
     })
 
-    act(() => {
+    await act(async () => {
       resolveInvoke!([])
+      await Promise.resolve()
     })
 
     await waitFor(() => {
@@ -90,7 +93,6 @@ describe('useSDCardScanner', () => {
       { name: 'Card 1', path: '/path/1', size: 1000, free_space: 500 },
     ]
 
-    
     mockInvoke.mockResolvedValueOnce([])
     mockInvoke.mockResolvedValueOnce(mockCards)
 
@@ -102,8 +104,8 @@ describe('useSDCardScanner', () => {
       expect(result.current.sdCards).toEqual([])
     })
 
-    act(() => {
-      result.current.scanForSDCards()
+    await act(async () => {
+      await result.current.scanForSDCards()
     })
 
     await waitFor(() => {
@@ -165,7 +167,6 @@ describe('useSDCardScanner', () => {
       { name: 'Card 1', path: '/path/1', size: 1000, free_space: 500 },
     ]
 
-    
     mockInvoke.mockResolvedValue(mockCards)
 
     const { result } = renderHook(() => useSDCardScanner(), {
@@ -182,8 +183,8 @@ describe('useSDCardScanner', () => {
 
     mockInvoke.mockResolvedValue(mockCards2)
 
-    act(() => {
-      result.current.scanForSDCards()
+    await act(async () => {
+      await result.current.scanForSDCards()
     })
 
     await waitFor(() => {
