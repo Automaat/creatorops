@@ -204,7 +204,7 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
                 let _ = window_clone.emit("backup-job-updated", j.clone());
             }
         } else {
-            log::error!("Failed to lock backup queue in background task");
+            eprintln!("Failed to lock backup queue in background task");
         }
     });
 
@@ -332,7 +332,7 @@ async fn perform_backup(
                 files_copied += 1;
             }
             Err(e) => {
-                log::error!("Failed to copy {} after retries: {}", file_name, e);
+                eprintln!("Failed to copy {} after retries: {}", file_name, e);
                 files_skipped += 1;
             }
         }
@@ -382,7 +382,7 @@ async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
         match verify_checksum(src, dest).await {
             Ok(true) => Ok(size),
             Ok(false) => {
-                log::warn!("Checksum mismatch for {:?}, retrying...", src);
+                eprintln!("Checksum mismatch for {:?}, retrying...", src);
                 let _ = tokio::fs::remove_file(dest).await;
                 Err("Checksum verification failed".to_string())
             }

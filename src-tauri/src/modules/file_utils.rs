@@ -107,11 +107,11 @@ pub fn get_home_dir() -> Result<PathBuf, String> {
 
 /// Get timestamp as string
 pub fn get_timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("System time before UNIX epoch");
-    format!("{}", duration.as_secs())
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("System time before UNIX epoch")
+        .as_secs()
+        .to_string()
 }
 
 #[tauri::command]
@@ -140,7 +140,10 @@ mod tests {
         let hash = calculate_file_hash(&test_file).await.unwrap();
 
         // SHA-256 of "Hello, World!"
-        assert_eq!(hash, "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f");
+        assert_eq!(
+            hash,
+            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+        );
 
         std::fs::remove_file(test_file).ok();
     }

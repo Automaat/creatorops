@@ -1,5 +1,5 @@
-use crate::modules::file_utils::{get_home_dir, get_timestamp};
-use crate::modules::project::{invalidate_project_cache, Project, ProjectStatus};
+use crate::modules::file_utils::{count_files_and_size, get_timestamp};
+use crate::modules::project::ProjectStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -230,64 +230,19 @@ async fn move_directory_recursive(
     Ok(())
 }
 
-fn count_files_and_size(path: &str) -> Result<(usize, u64), String> {
-    let mut total_files = 0;
-    let mut total_bytes = 0u64;
-
-    fn count_recursive(path: &Path, files: &mut usize, bytes: &mut u64) -> Result<(), String> {
-        for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let metadata = entry.metadata().map_err(|e| e.to_string())?;
-
-            if metadata.is_dir() {
-                count_recursive(&entry.path(), files, bytes)?;
-            } else if metadata.is_file() {
-                *files += 1;
-                *bytes += metadata.len();
-            }
-        }
-        Ok(())
-    }
-
-    count_recursive(Path::new(path), &mut total_files, &mut total_bytes)?;
-
-    Ok((total_files, total_bytes))
-}
-
 fn update_project_status(project_id: &str, new_status: ProjectStatus) -> Result<(), String> {
-    let home_dir = get_home_dir()?;
-    let projects_path = home_dir.join("CreatorOps").join("Projects");
+    use crate::modules::db::with_db;
+    use rusqlite::params;
 
-    // Find project metadata file
-    for entry in fs::read_dir(&projects_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        let metadata_path = path.join("project.json");
-
-        if metadata_path.exists() {
-            if let Ok(json_data) = fs::read_to_string(&metadata_path) {
-                if let Ok(mut project) = serde_json::from_str::<Project>(&json_data) {
-                    if project.id == project_id {
-                        // Update status
-                        project.status = new_status;
-                        project.updated_at = get_timestamp();
-
-                        // Save back to file
-                        let updated_json =
-                            serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-                        fs::write(&metadata_path, updated_json).map_err(|e| e.to_string())?;
-
-                        // Invalidate project cache since we updated project status
-                        invalidate_project_cache();
-
-                        return Ok(());
-                    }
-                }
-            }
-        }
-    }
-
-    Err("Project not found".to_string())
+    let now = get_timestamp();
+    with_db(|conn| {
+        conn.execute(
+            "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
+            params![new_status.to_string(), now, project_id],
+        )?;
+        Ok(())
+    })
+    .map_err(|e| format!("Failed to update project status: {}", e))
 }
 
 /// Get archive queue
@@ -396,19 +351,5 @@ mod tests {
         assert!(json.contains("arch-123"));
         assert!(json.contains("document.pdf"));
         assert!(json.contains("25"));
-    }
-
-    #[test]
-    fn test_count_files_and_size() {
-        let temp_dir = std::env::temp_dir().join("test_archive_count");
-        std::fs::create_dir_all(&temp_dir).unwrap();
-        std::fs::write(temp_dir.join("file1.txt"), b"12345").unwrap();
-        std::fs::write(temp_dir.join("file2.txt"), b"1234567890").unwrap();
-
-        let (count, size) = count_files_and_size(temp_dir.to_str().unwrap()).unwrap();
-        assert_eq!(count, 2);
-        assert_eq!(size, 15);
-
-        std::fs::remove_dir_all(temp_dir).ok();
     }
 }

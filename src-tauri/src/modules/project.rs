@@ -180,11 +180,6 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
     .map_err(|e| format!("Database error: {}", e))
 }
 
-/// Public function to invalidate cache from other modules (now no-op with SQLite)
-pub fn invalidate_project_cache() {
-    // No-op: SQLite handles consistency automatically
-}
-
 /// Force refresh project cache (now just returns list)
 #[tauri::command]
 pub async fn refresh_projects() -> Result<Vec<Project>, String> {
@@ -361,10 +356,22 @@ mod tests {
     #[test]
     fn test_project_status_from_str() {
         assert_eq!("New".parse::<ProjectStatus>().unwrap(), ProjectStatus::New);
-        assert_eq!("Importing".parse::<ProjectStatus>().unwrap(), ProjectStatus::Importing);
-        assert_eq!("Editing".parse::<ProjectStatus>().unwrap(), ProjectStatus::Editing);
-        assert_eq!("Delivered".parse::<ProjectStatus>().unwrap(), ProjectStatus::Delivered);
-        assert_eq!("Archived".parse::<ProjectStatus>().unwrap(), ProjectStatus::Archived);
+        assert_eq!(
+            "Importing".parse::<ProjectStatus>().unwrap(),
+            ProjectStatus::Importing
+        );
+        assert_eq!(
+            "Editing".parse::<ProjectStatus>().unwrap(),
+            ProjectStatus::Editing
+        );
+        assert_eq!(
+            "Delivered".parse::<ProjectStatus>().unwrap(),
+            ProjectStatus::Delivered
+        );
+        assert_eq!(
+            "Archived".parse::<ProjectStatus>().unwrap(),
+            ProjectStatus::Archived
+        );
     }
 
     #[test]
@@ -377,11 +384,17 @@ mod tests {
     #[test]
     fn test_sanitize_path_component() {
         assert_eq!(sanitize_path_component("John Doe"), "JohnDoe");
-        assert_eq!(sanitize_path_component("Test-Project_123"), "Test-Project_123");
+        assert_eq!(
+            sanitize_path_component("Test-Project_123"),
+            "Test-Project_123"
+        );
         assert_eq!(sanitize_path_component("Hello  World"), "HelloWorld");
         assert_eq!(sanitize_path_component("Test@#$%Project"), "TestProject");
         assert_eq!(sanitize_path_component("Wedding2024"), "Wedding2024");
-        assert_eq!(sanitize_path_component("Multiple   Spaces"), "MultipleSpaces");
+        assert_eq!(
+            sanitize_path_component("Multiple   Spaces"),
+            "MultipleSpaces"
+        );
     }
 
     #[test]

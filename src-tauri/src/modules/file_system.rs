@@ -212,13 +212,7 @@ mod tests {
         let project_path = temp_dir.to_str().unwrap();
 
         // Test with non-existent subdirectory
-        let result = open_in_external_app(
-            project_path,
-            "NonExistent",
-            "TestApp",
-            &[],
-            None,
-        );
+        let result = open_in_external_app(project_path, "NonExistent", "TestApp", &[], None);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));

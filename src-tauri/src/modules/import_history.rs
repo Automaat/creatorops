@@ -1,3 +1,4 @@
+use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -46,7 +47,7 @@ pub async fn save_import_history(
     error_message: Option<String>,
 ) -> Result<ImportHistory, String> {
     let id = Uuid::new_v4().to_string();
-    let completed_at = chrono::Utc::now().to_rfc3339();
+    let completed_at = get_timestamp();
 
     let status = if files_copied == 0 {
         ImportStatus::Failed
@@ -117,40 +118,10 @@ async fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
 }
 
 fn get_history_file_path() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let home_dir = get_home_dir()?;
     let base_path = home_dir.join("CreatorOps");
     fs::create_dir_all(&base_path).map_err(|e| e.to_string())?;
     Ok(base_path.join("import_history.json"))
-}
-
-mod dirs {
-    use std::path::PathBuf;
-
-    pub fn home_dir() -> Option<PathBuf> {
-        std::env::var_os("HOME")
-            .and_then(|h| if h.is_empty() { None } else { Some(h) })
-            .map(PathBuf::from)
-    }
-}
-
-mod chrono {
-    pub struct Utc;
-
-    impl Utc {
-        pub fn now() -> DateTime {
-            DateTime
-        }
-    }
-
-    pub struct DateTime;
-
-    impl DateTime {
-        pub fn to_rfc3339(&self) -> String {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-            format!("{}", duration.as_secs())
-        }
-    }
 }
 
 #[cfg(test)]
