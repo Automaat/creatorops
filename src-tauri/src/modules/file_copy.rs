@@ -248,3 +248,84 @@ pub async fn cancel_import(import_id: String) -> Result<(), String> {
         Err("Import not found or already completed".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_file_type_photos() {
+        assert_eq!(get_file_type(Path::new("test.jpg")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.JPG")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.png")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.raw")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.cr2")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.nef")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("test.heic")), Some("photo"));
+    }
+
+    #[test]
+    fn test_get_file_type_videos() {
+        assert_eq!(get_file_type(Path::new("test.mp4")), Some("video"));
+        assert_eq!(get_file_type(Path::new("test.MP4")), Some("video"));
+        assert_eq!(get_file_type(Path::new("test.mov")), Some("video"));
+        assert_eq!(get_file_type(Path::new("test.avi")), Some("video"));
+        assert_eq!(get_file_type(Path::new("test.mkv")), Some("video"));
+    }
+
+    #[test]
+    fn test_get_file_type_unknown() {
+        assert_eq!(get_file_type(Path::new("test.txt")), None);
+        assert_eq!(get_file_type(Path::new("test.pdf")), None);
+        assert_eq!(get_file_type(Path::new("test")), None);
+        assert_eq!(get_file_type(Path::new("test.unknown")), None);
+    }
+
+    #[test]
+    fn test_copy_result_serialization() {
+        let result = CopyResult {
+            success: true,
+            error: None,
+            files_copied: 10,
+            files_skipped: 2,
+            skipped_files: vec!["file1.jpg".to_string()],
+            total_bytes: 1024,
+            photos_copied: 8,
+            videos_copied: 2,
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("true"));
+        assert!(json.contains("10"));
+        assert!(json.contains("file1.jpg"));
+    }
+
+    #[test]
+    fn test_import_progress_serialization() {
+        let progress = ImportProgress {
+            files_copied: 5,
+            total_files: 10,
+            current_file: "test.jpg".to_string(),
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+        assert!(json.contains("5"));
+        assert!(json.contains("10"));
+        assert!(json.contains("test.jpg"));
+    }
+
+    #[test]
+    fn test_photo_extensions() {
+        assert!(PHOTO_EXTENSIONS.contains(&"jpg"));
+        assert!(PHOTO_EXTENSIONS.contains(&"png"));
+        assert!(PHOTO_EXTENSIONS.contains(&"raw"));
+        assert!(PHOTO_EXTENSIONS.contains(&"heic"));
+    }
+
+    #[test]
+    fn test_video_extensions() {
+        assert!(VIDEO_EXTENSIONS.contains(&"mp4"));
+        assert!(VIDEO_EXTENSIONS.contains(&"mov"));
+        assert!(VIDEO_EXTENSIONS.contains(&"avi"));
+    }
+}

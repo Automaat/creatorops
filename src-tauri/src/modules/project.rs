@@ -344,3 +344,121 @@ pub async fn migrate_projects_to_db() -> Result<usize, String> {
 
     Ok(migrated)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_project_status_to_string() {
+        assert_eq!(ProjectStatus::New.to_string(), "New");
+        assert_eq!(ProjectStatus::Importing.to_string(), "Importing");
+        assert_eq!(ProjectStatus::Editing.to_string(), "Editing");
+        assert_eq!(ProjectStatus::Delivered.to_string(), "Delivered");
+        assert_eq!(ProjectStatus::Archived.to_string(), "Archived");
+    }
+
+    #[test]
+    fn test_project_status_from_str() {
+        assert_eq!("New".parse::<ProjectStatus>().unwrap(), ProjectStatus::New);
+        assert_eq!("Importing".parse::<ProjectStatus>().unwrap(), ProjectStatus::Importing);
+        assert_eq!("Editing".parse::<ProjectStatus>().unwrap(), ProjectStatus::Editing);
+        assert_eq!("Delivered".parse::<ProjectStatus>().unwrap(), ProjectStatus::Delivered);
+        assert_eq!("Archived".parse::<ProjectStatus>().unwrap(), ProjectStatus::Archived);
+    }
+
+    #[test]
+    fn test_project_status_from_str_invalid() {
+        assert!("InvalidStatus".parse::<ProjectStatus>().is_err());
+        assert!("".parse::<ProjectStatus>().is_err());
+        assert!("new".parse::<ProjectStatus>().is_err()); // Case sensitive
+    }
+
+    #[test]
+    fn test_sanitize_path_component() {
+        assert_eq!(sanitize_path_component("John Doe"), "JohnDoe");
+        assert_eq!(sanitize_path_component("Test-Project_123"), "Test-Project_123");
+        assert_eq!(sanitize_path_component("Hello  World"), "HelloWorld");
+        assert_eq!(sanitize_path_component("Test@#$%Project"), "TestProject");
+        assert_eq!(sanitize_path_component("Wedding2024"), "Wedding2024");
+        assert_eq!(sanitize_path_component("Multiple   Spaces"), "MultipleSpaces");
+    }
+
+    #[test]
+    fn test_sanitize_path_component_special_chars() {
+        assert_eq!(sanitize_path_component("Test/Path\\Name"), "TestPathName");
+        assert_eq!(sanitize_path_component("Name<>:\"?*"), "Name");
+        assert_eq!(sanitize_path_component("name|with|pipes"), "namewithpipes");
+    }
+
+    #[test]
+    fn test_sanitize_path_component_empty() {
+        assert_eq!(sanitize_path_component(""), "");
+        assert_eq!(sanitize_path_component("   "), "");
+    }
+
+    #[test]
+    fn test_sanitize_path_component_unicode() {
+        // Unicode characters are preserved by is_alphanumeric
+        assert_eq!(sanitize_path_component("Café"), "Café");
+        assert_eq!(sanitize_path_component("José García"), "JoséGarcía");
+    }
+
+    #[test]
+    fn test_project_status_serialization() {
+        let status = ProjectStatus::Editing;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, r#""Editing""#);
+    }
+
+    #[test]
+    fn test_project_status_deserialization() {
+        let json = r#""Delivered""#;
+        let status: ProjectStatus = serde_json::from_str(json).unwrap();
+        assert_eq!(status, ProjectStatus::Delivered);
+    }
+
+    #[test]
+    fn test_project_serialization() {
+        let project = Project {
+            id: "test-123".to_string(),
+            name: "Test Project".to_string(),
+            client_name: "Test Client".to_string(),
+            date: "2024-01-15".to_string(),
+            shoot_type: "Wedding".to_string(),
+            status: ProjectStatus::New,
+            folder_path: "/path/to/project".to_string(),
+            created_at: "2024-01-15T10:00:00Z".to_string(),
+            updated_at: "2024-01-15T10:00:00Z".to_string(),
+            deadline: Some("2024-02-01".to_string()),
+        };
+
+        let json = serde_json::to_string(&project).unwrap();
+        assert!(json.contains("test-123"));
+        assert!(json.contains("Test Project"));
+        assert!(json.contains("clientName")); // Check for camelCase serialization
+        assert!(json.contains("shootType"));
+        assert!(json.contains("folderPath"));
+    }
+
+    #[test]
+    fn test_project_deserialization() {
+        let json = r#"{
+            "id": "test-456",
+            "name": "Another Project",
+            "clientName": "Client Name",
+            "date": "2024-01-20",
+            "shootType": "Portrait",
+            "status": "Editing",
+            "folderPath": "/projects/test",
+            "createdAt": "2024-01-20T12:00:00Z",
+            "updatedAt": "2024-01-20T12:00:00Z"
+        }"#;
+
+        let project: Project = serde_json::from_str(json).unwrap();
+        assert_eq!(project.id, "test-456");
+        assert_eq!(project.name, "Another Project");
+        assert_eq!(project.status, ProjectStatus::Editing);
+        assert_eq!(project.deadline, None);
+    }
+}

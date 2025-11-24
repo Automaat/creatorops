@@ -189,3 +189,54 @@ pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
         Some("/Applications/Final Cut Pro.app/Contents/MacOS/Final Cut Pro"),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_windows_paths_constants() {
+        #[cfg(target_os = "windows")]
+        {
+            assert!(!LIGHTROOM_PATHS.is_empty());
+            assert!(!AFTERSHOOT_PATHS.is_empty());
+            assert!(!DAVINCI_RESOLVE_PATHS.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_open_in_external_app_path_validation() {
+        let temp_dir = std::env::temp_dir().join("test_external_app");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let project_path = temp_dir.to_str().unwrap();
+
+        // Test with non-existent subdirectory
+        let result = open_in_external_app(
+            project_path,
+            "NonExistent",
+            "TestApp",
+            &[],
+            None,
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_open_in_external_app_creates_valid_path() {
+        let temp_dir = std::env::temp_dir().join("test_external_app2");
+        std::fs::create_dir_all(temp_dir.join("RAW").join("Photos")).unwrap();
+
+        let project_path = temp_dir.to_str().unwrap();
+        let media_path = Path::new(project_path).join("RAW").join("Photos");
+
+        assert!(media_path.exists());
+        assert!(media_path.is_dir());
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+}

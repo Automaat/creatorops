@@ -121,3 +121,131 @@ pub fn get_home_directory() -> Result<String, String> {
         .map(ToString::to_string)
         .ok_or_else(|| "Failed to convert path to string".to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[tokio::test]
+    async fn test_calculate_file_hash() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_hash.txt");
+
+        // Create test file with known content
+        let mut file = std::fs::File::create(&test_file).unwrap();
+        file.write_all(b"Hello, World!").unwrap();
+        drop(file);
+
+        let hash = calculate_file_hash(&test_file).await.unwrap();
+
+        // SHA-256 of "Hello, World!"
+        assert_eq!(hash, "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f");
+
+        std::fs::remove_file(test_file).ok();
+    }
+
+    #[tokio::test]
+    async fn test_verify_checksum_matching() {
+        let temp_dir = std::env::temp_dir();
+        let src_file = temp_dir.join("test_src.txt");
+        let dest_file = temp_dir.join("test_dest.txt");
+
+        // Create identical files
+        std::fs::write(&src_file, b"test content").unwrap();
+        std::fs::write(&dest_file, b"test content").unwrap();
+
+        let result = verify_checksum(&src_file, &dest_file).await.unwrap();
+        assert!(result);
+
+        std::fs::remove_file(src_file).ok();
+        std::fs::remove_file(dest_file).ok();
+    }
+
+    #[tokio::test]
+    async fn test_verify_checksum_different() {
+        let temp_dir = std::env::temp_dir();
+        let src_file = temp_dir.join("test_src2.txt");
+        let dest_file = temp_dir.join("test_dest2.txt");
+
+        // Create different files
+        std::fs::write(&src_file, b"test content 1").unwrap();
+        std::fs::write(&dest_file, b"test content 2").unwrap();
+
+        let result = verify_checksum(&src_file, &dest_file).await.unwrap();
+        assert!(!result);
+
+        std::fs::remove_file(src_file).ok();
+        std::fs::remove_file(dest_file).ok();
+    }
+
+    #[test]
+    fn test_collect_files_recursive() {
+        let temp_dir = std::env::temp_dir().join("test_collect");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        std::fs::create_dir_all(temp_dir.join("subdir")).unwrap();
+
+        // Create test files
+        std::fs::write(temp_dir.join("file1.txt"), b"test").unwrap();
+        std::fs::write(temp_dir.join("file2.txt"), b"test").unwrap();
+        std::fs::write(temp_dir.join("subdir").join("file3.txt"), b"test").unwrap();
+
+        let files = collect_files_recursive(&temp_dir).unwrap();
+        assert_eq!(files.len(), 3);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_collect_files_single_file() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("single_file.txt");
+        std::fs::write(&test_file, b"test").unwrap();
+
+        let files = collect_files_recursive(&test_file).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0], test_file);
+
+        std::fs::remove_file(test_file).ok();
+    }
+
+    #[test]
+    fn test_count_files_and_size() {
+        let temp_dir = std::env::temp_dir().join("test_count");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        std::fs::write(temp_dir.join("file1.txt"), b"12345").unwrap();
+        std::fs::write(temp_dir.join("file2.txt"), b"1234567890").unwrap();
+
+        let (count, size) = count_files_and_size(temp_dir.to_str().unwrap()).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(size, 15);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_get_home_dir() {
+        let home = get_home_dir().unwrap();
+        assert!(home.exists());
+        assert!(home.is_absolute());
+    }
+
+    #[test]
+    fn test_get_timestamp() {
+        let ts1 = get_timestamp();
+        std::thread::sleep(std::time::Duration::from_millis(1100)); // Need >1s for timestamp to change
+        let ts2 = get_timestamp();
+
+        let t1: u64 = ts1.parse().unwrap();
+        let t2: u64 = ts2.parse().unwrap();
+        assert!(t2 > t1);
+    }
+
+    #[test]
+    fn test_get_home_directory_command() {
+        let result = get_home_directory().unwrap();
+        assert!(!result.is_empty());
+        assert!(PathBuf::from(&result).exists());
+    }
+}

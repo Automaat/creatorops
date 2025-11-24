@@ -25,6 +25,7 @@ function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [projectsCount, setProjectsCount] = useState<number>(0)
   const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
+  const [projectsResetKey, setProjectsResetKey] = useState<number>(0)
 
   // Apply theme on app load
   useTheme()
@@ -129,6 +130,10 @@ function App() {
     // When navigating to Projects view via sidebar, always clear selection to show list
     if (view === 'projects') {
       setSelectedProjectId(null)
+      // If already on projects view, force remount to reset local state
+      if (currentView === 'projects') {
+        setProjectsResetKey((prev) => prev + 1)
+      }
     }
     setCurrentView(view as View)
     // Refresh count when switching to views that show projects
@@ -157,7 +162,7 @@ function App() {
         </div>
         <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
           <Projects
-            key={selectedProjectId || 'projects-list'}
+            key={`${selectedProjectId || 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
             onBackFromProject={handleBackFromProject}
           />

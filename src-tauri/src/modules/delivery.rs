@@ -449,3 +449,118 @@ pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
     queue.remove(&job_id);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_delivery_status_serialization() {
+        assert_eq!(
+            serde_json::to_string(&DeliveryStatus::Pending).unwrap(),
+            r#""pending""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DeliveryStatus::InProgress).unwrap(),
+            r#""inprogress""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DeliveryStatus::Completed).unwrap(),
+            r#""completed""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DeliveryStatus::Failed).unwrap(),
+            r#""failed""#
+        );
+    }
+
+    #[test]
+    fn test_delivery_job_serialization() {
+        let job = DeliveryJob {
+            id: "del-123".to_string(),
+            project_id: "proj-456".to_string(),
+            project_name: "Delivery Test".to_string(),
+            selected_files: vec!["/file1.jpg".to_string(), "/file2.jpg".to_string()],
+            delivery_path: "/delivery".to_string(),
+            naming_template: Some("{index}_{name}.{ext}".to_string()),
+            status: DeliveryStatus::Pending,
+            total_files: 2,
+            files_copied: 0,
+            total_bytes: 2048,
+            bytes_transferred: 0,
+            created_at: "2024-01-01".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+            manifest_path: None,
+        };
+
+        let json = serde_json::to_string(&job).unwrap();
+        assert!(json.contains("del-123"));
+        assert!(json.contains("Delivery Test"));
+        assert!(json.contains("pending"));
+    }
+
+    #[test]
+    fn test_project_file_serialization() {
+        let file = ProjectFile {
+            name: "photo.jpg".to_string(),
+            path: "/project/photo.jpg".to_string(),
+            size: 1024,
+            modified: "1640000000".to_string(),
+            file_type: "JPG".to_string(),
+            relative_path: "RAW/Photos/photo.jpg".to_string(),
+        };
+
+        let json = serde_json::to_string(&file).unwrap();
+        assert!(json.contains("photo.jpg"));
+        assert!(json.contains("1024"));
+        assert!(json.contains("JPG"));
+    }
+
+    #[test]
+    fn test_delivery_progress_serialization() {
+        let progress = DeliveryProgress {
+            job_id: "del-123".to_string(),
+            file_name: "photo.jpg".to_string(),
+            current_file: 1,
+            total_files: 5,
+            bytes_transferred: 512,
+            total_bytes: 2560,
+            speed: 100.5,
+            eta: 20,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+        assert!(json.contains("del-123"));
+        assert!(json.contains("photo.jpg"));
+    }
+
+    #[test]
+    fn test_apply_naming_template() {
+        assert_eq!(
+            apply_naming_template("{index}_{name}.{ext}", "photo.jpg", 0),
+            "001_photo.jpg"
+        );
+        assert_eq!(
+            apply_naming_template("{index}_{name}.{ext}", "photo.jpg", 9),
+            "010_photo.jpg"
+        );
+        assert_eq!(
+            apply_naming_template("{name}_final.{ext}", "document.pdf", 0),
+            "document_final.pdf"
+        );
+        assert_eq!(
+            apply_naming_template("image_{index}.{ext}", "test.png", 99),
+            "image_100.png"
+        );
+    }
+
+    #[test]
+    fn test_apply_naming_template_no_extension() {
+        assert_eq!(
+            apply_naming_template("{index}_{name}", "file", 5),
+            "006_file"
+        );
+    }
+}
