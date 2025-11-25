@@ -8,6 +8,10 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
+}))
+
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
@@ -21,7 +25,7 @@ describe('Delivery', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/Delivery/)).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Client Delivery', level: 1 })).toBeTruthy()
     })
   })
 
@@ -33,7 +37,7 @@ describe('Delivery', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Client Delivery')).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Client Delivery', level: 1 })).toBeTruthy()
     })
   })
 
@@ -45,7 +49,7 @@ describe('Delivery', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/No deliveries/)).toBeTruthy()
+      expect(screen.getByText('No deliveries yet')).toBeTruthy()
     })
   })
 })

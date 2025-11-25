@@ -29,7 +29,7 @@ describe('Import', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Import')).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Import from SD Card', level: 1 })).toBeTruthy()
     })
   })
 
@@ -41,11 +41,11 @@ describe('Import', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Import')).toBeTruthy()
+      expect(screen.getByRole('heading', { name: 'Import from SD Card', level: 1 })).toBeTruthy()
     })
   })
 
-  it('displays history section', async () => {
+  it('shows empty state when no SD cards', async () => {
     render(
       <NotificationProvider>
         <Import {...mockProps} />
@@ -53,7 +53,7 @@ describe('Import', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/Recent Imports|Import History/)).toBeTruthy()
+      expect(screen.getByText('No SD cards detected. Insert an SD card and click Refresh.')).toBeTruthy()
     })
   })
 })

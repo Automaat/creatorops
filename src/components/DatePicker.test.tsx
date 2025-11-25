@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import userEvent from '@testing-library/user-event'
 import { DatePicker } from './DatePicker'
 
 describe('DatePicker', () => {
@@ -27,7 +27,8 @@ describe('DatePicker', () => {
 
   it('shows required indicator when required prop is true', () => {
     render(<DatePicker value="" onChange={mockOnChange} label="Date" required />)
-    expect(screen.getByText('*')).toBeTruthy()
+    const label = screen.getByText(/Date/)
+    expect(label.textContent).toContain('*')
   })
 
   it('opens calendar when input clicked', async () => {

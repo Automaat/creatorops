@@ -40,8 +40,10 @@ describe('Layout', () => {
     expect(screen.getByText('Projects')).toBeTruthy()
     expect(screen.getByText('Backup Queue')).toBeTruthy()
     expect(screen.getByText('Delivery')).toBeTruthy()
-    expect(screen.getByText('History')).toBeTruthy()
-    expect(screen.getByText('Settings')).toBeTruthy()
+    // "History" appears twice: as section title and nav item
+    expect(screen.getAllByText('History').length).toBe(2)
+    // "Settings" appears twice: as section title and nav item
+    expect(screen.getAllByText('Settings').length).toBe(2)
   })
 
   it('renders children content', () => {

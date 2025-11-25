@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { userEvent } from '@testing-library/user-event'
+import userEvent from '@testing-library/user-event'
 import { Dashboard } from './Dashboard'
 import type { Project } from '../types'
 import { invoke } from '@tauri-apps/api/core'
@@ -207,8 +207,12 @@ describe('Dashboard', () => {
   })
 
   it('runs migration on first load', async () => {
-    
-    mockInvoke.mockResolvedValue(0)
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'migrate_projects_to_db') {
+        return Promise.resolve(0)
+      }
+      return Promise.resolve([])
+    })
 
     render(<Dashboard />)
 

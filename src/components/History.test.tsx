@@ -41,7 +41,7 @@ describe('History', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/No history|No items|No activities/)).toBeTruthy()
+      expect(screen.getByText('No import history yet')).toBeTruthy()
     })
   })
 })
