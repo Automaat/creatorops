@@ -14,6 +14,7 @@ export function Settings() {
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
   const [newDeliveryDestName, setNewDeliveryDestName] = useState('')
+  const [defaultImportLocation, setDefaultImportLocation] = useState('')
   const [archiveLocation, setArchiveLocation] = useState('')
   const [folderTemplate, setFolderTemplate] = useState(DEFAULT_FOLDER_TEMPLATE)
   const [fileRenameTemplate, setFileRenameTemplate] = useState(DEFAULT_FILE_TEMPLATE)
@@ -22,6 +23,7 @@ export function Settings() {
   useEffect(() => {
     loadDestinations()
     loadDeliveryDestinations()
+    loadDefaultImportLocation()
     loadArchiveLocation()
     loadTemplates()
     loadAutoEject()
@@ -93,6 +95,17 @@ export function Settings() {
     }
   }
 
+  function loadDefaultImportLocation() {
+    try {
+      const stored = localStorage.getItem('default_import_location')
+      if (stored) {
+        setDefaultImportLocation(stored)
+      }
+    } catch (err) {
+      console.error('Failed to load default import location:', err)
+    }
+  }
+
   function loadArchiveLocation() {
     try {
       const stored = localStorage.getItem('archive_location')
@@ -148,7 +161,7 @@ export function Settings() {
     saveDeliveryDestinations(deliveryDestinations.filter((d) => d.id !== id))
   }
 
-  async function selectArchiveLocation() {
+  async function selectStorageLocation(storageKey: string, setter: (value: string) => void) {
     try {
       const selected = await open({
         directory: true,
@@ -156,17 +169,20 @@ export function Settings() {
       })
 
       if (selected) {
-        localStorage.setItem('archive_location', selected)
-        setArchiveLocation(selected)
+        localStorage.setItem(storageKey, selected)
+        setter(selected)
       }
     } catch (err) {
-      console.error('Failed to select archive location:', err)
+      console.error(`Failed to select ${storageKey}:`, err)
     }
   }
 
-  function clearArchiveLocation() {
-    localStorage.removeItem('archive_location')
-    setArchiveLocation('')
+  async function selectDefaultImportLocation() {
+    await selectStorageLocation('default_import_location', setDefaultImportLocation)
+  }
+
+  async function selectArchiveLocation() {
+    await selectStorageLocation('archive_location', setArchiveLocation)
   }
 
   function loadTemplates() {
@@ -362,23 +378,33 @@ export function Settings() {
               <div className="flex flex-col">
                 <div className="card-section">
                   <h4 className="card-section-label">Default Import Location</h4>
-                  <p className="text-secondary text-sm">~/CreatorOps/Projects</p>
+                  <div className="flex gap-md align-center">
+                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                      {defaultImportLocation || '~/CreatorOps/Projects'}
+                    </p>
+                    <button
+                      onClick={selectDefaultImportLocation}
+                      className="btn btn-primary"
+                      style={{ marginLeft: 'auto' }}
+                    >
+                      {defaultImportLocation ? 'Change Location' : 'Select Location'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="card-section">
                   <h4 className="card-section-label">Archive Location</h4>
-                  <div className="flex flex-col gap-md">
-                    <p className="text-secondary text-sm">{archiveLocation || 'Not configured'}</p>
-                    <div className="flex gap-sm align-center justify-end">
-                      <button onClick={selectArchiveLocation} className="btn btn-primary">
-                        {archiveLocation ? 'Change Location' : 'Select Location'}
-                      </button>
-                      {archiveLocation && (
-                        <button onClick={clearArchiveLocation} className="btn btn-secondary">
-                          Clear
-                        </button>
-                      )}
-                    </div>
+                  <div className="flex gap-md align-center">
+                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                      {archiveLocation || 'Not configured'}
+                    </p>
+                    <button
+                      onClick={selectArchiveLocation}
+                      className="btn btn-primary"
+                      style={{ marginLeft: 'auto' }}
+                    >
+                      {archiveLocation ? 'Change Location' : 'Select Location'}
+                    </button>
                   </div>
                 </div>
               </div>

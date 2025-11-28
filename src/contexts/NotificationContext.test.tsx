@@ -14,10 +14,9 @@ describe('NotificationContext', () => {
   })
 
   it('provides notification context', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     expect(result.current).toBeDefined()
     expect(result.current?.notifications).toEqual([])
@@ -26,10 +25,9 @@ describe('NotificationContext', () => {
   })
 
   it('adds notification with success helper', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('Test success')
@@ -41,10 +39,9 @@ describe('NotificationContext', () => {
   })
 
   it('adds notification with error helper', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.error('Test error')
@@ -56,10 +53,9 @@ describe('NotificationContext', () => {
   })
 
   it('adds notification with warning helper', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.warning('Test warning')
@@ -71,10 +67,9 @@ describe('NotificationContext', () => {
   })
 
   it('adds notification with info helper', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.info('Test info')
@@ -86,10 +81,9 @@ describe('NotificationContext', () => {
   })
 
   it('removes notification manually', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('Test')
@@ -105,10 +99,9 @@ describe('NotificationContext', () => {
   })
 
   it('auto-removes notification after duration', async () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('Test', 1000)
@@ -125,10 +118,9 @@ describe('NotificationContext', () => {
   })
 
   it('supports custom duration', async () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('Test', 2000)
@@ -149,10 +141,9 @@ describe('NotificationContext', () => {
   })
 
   it('handles multiple notifications', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('First')
@@ -167,10 +158,9 @@ describe('NotificationContext', () => {
   })
 
   it('generates unique IDs for notifications', () => {
-    const { result } = renderHook(
-      () => useContext(NotificationContext),
-      { wrapper: NotificationProvider }
-    )
+    const { result } = renderHook(() => useContext(NotificationContext), {
+      wrapper: NotificationProvider,
+    })
 
     act(() => {
       result.current?.success('First')

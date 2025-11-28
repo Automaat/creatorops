@@ -41,7 +41,7 @@ describe('CreateProject', () => {
     expect(screen.queryByText('Cancel')).toBeNull()
   })
 
-  it('initializes date field with today\'s date', () => {
+  it("initializes date field with today's date", () => {
     render(<CreateProject />)
 
     const dateInput = screen.getByLabelText(/Shoot Date/)
@@ -78,7 +78,6 @@ describe('CreateProject', () => {
       updated_at: '2025-11-20',
     }
 
-    
     mockInvoke.mockResolvedValue(mockProject)
 
     const onProjectCreated = vi.fn()
@@ -113,7 +112,6 @@ describe('CreateProject', () => {
   })
 
   it('shows loading state while submitting', async () => {
-    
     let resolveInvoke: (value: Project) => void
     mockInvoke.mockReturnValue(
       new Promise((resolve) => {
@@ -149,7 +147,6 @@ describe('CreateProject', () => {
   })
 
   it('disables buttons while submitting', async () => {
-    
     mockInvoke.mockReturnValue(new Promise(() => {}))
 
     const onCancel = vi.fn()
@@ -173,7 +170,6 @@ describe('CreateProject', () => {
   })
 
   it('displays error message on submit failure', async () => {
-    
     mockInvoke.mockRejectedValue(new Error('Database error'))
 
     const user = userEvent.setup()
@@ -194,7 +190,6 @@ describe('CreateProject', () => {
   })
 
   it('clears error on new submit attempt', async () => {
-    
     mockInvoke.mockRejectedValueOnce(new Error('First error'))
     mockInvoke.mockResolvedValueOnce({
       id: '1',
@@ -244,7 +239,6 @@ describe('CreateProject', () => {
   })
 
   it('prevents form submission when required fields are empty', async () => {
-    
     const user = userEvent.setup()
 
     render(<CreateProject />)

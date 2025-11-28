@@ -159,7 +159,7 @@ describe('DatePicker', () => {
     expect(selectedDay?.textContent).toBe('20')
   })
 
-  it('highlights today\'s date', async () => {
+  it("highlights today's date", async () => {
     const user = userEvent.setup()
     const today = new Date()
     const year = today.getFullYear()

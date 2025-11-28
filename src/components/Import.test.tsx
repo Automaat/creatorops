@@ -53,7 +53,9 @@ describe('Import', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('No SD cards detected. Insert an SD card and click Refresh.')).toBeTruthy()
+      expect(
+        screen.getByText('No SD cards detected. Insert an SD card and click Refresh.')
+      ).toBeTruthy()
     })
   })
 })

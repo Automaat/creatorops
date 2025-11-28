@@ -10,13 +10,20 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
-
 const mockInvoke = vi.mocked(invoke)
 // Mock CreateProject component
 vi.mock('./CreateProject', () => ({
-  CreateProject: ({ onProjectCreated, onCancel }: { onProjectCreated?: (project: Partial<Project>) => void; onCancel?: () => void }) => (
+  CreateProject: ({
+    onProjectCreated,
+    onCancel,
+  }: {
+    onProjectCreated?: (project: Partial<Project>) => void
+    onCancel?: () => void
+  }) => (
     <div data-testid="create-project-form">
-      <button onClick={() => onProjectCreated?.({ id: 'new-id', name: 'New Project', status: 'Editing' })}>
+      <button
+        onClick={() => onProjectCreated?.({ id: 'new-id', name: 'New Project', status: 'Editing' })}
+      >
         Create
       </button>
       <button onClick={onCancel}>Cancel</button>
@@ -59,7 +66,6 @@ describe('Dashboard', () => {
   ]
 
   it('shows loading state initially', () => {
-    
     invoke.mockReturnValue(new Promise(() => {}))
 
     render(<Dashboard />)
@@ -67,7 +73,6 @@ describe('Dashboard', () => {
   })
 
   it('loads and displays projects', async () => {
-    
     mockInvoke.mockResolvedValue(mockProjects)
     localStorage.setItem('db_migrated', 'true')
 
@@ -80,7 +85,6 @@ describe('Dashboard', () => {
   })
 
   it('displays project status badges', async () => {
-    
     mockInvoke.mockResolvedValue(mockProjects)
     localStorage.setItem('db_migrated', 'true')
 
@@ -93,7 +97,6 @@ describe('Dashboard', () => {
   })
 
   it('displays empty state when no projects', async () => {
-    
     mockInvoke.mockResolvedValue([])
     localStorage.setItem('db_migrated', 'true')
 
@@ -119,7 +122,6 @@ describe('Dashboard', () => {
       },
     ]
 
-    
     mockInvoke.mockResolvedValue(projectsWithArchived)
     localStorage.setItem('db_migrated', 'true')
 
@@ -132,7 +134,6 @@ describe('Dashboard', () => {
   })
 
   it('displays correct total and active project counts', async () => {
-    
     mockInvoke.mockResolvedValue(mockProjects)
     localStorage.setItem('db_migrated', 'true')
 
@@ -145,7 +146,6 @@ describe('Dashboard', () => {
   })
 
   it('calls onProjectClick when project is clicked', async () => {
-    
     mockInvoke.mockResolvedValue(mockProjects)
     localStorage.setItem('db_migrated', 'true')
 
@@ -165,7 +165,6 @@ describe('Dashboard', () => {
   })
 
   it('opens create project dialog when New Project clicked', async () => {
-    
     mockInvoke.mockResolvedValue([])
     localStorage.setItem('db_migrated', 'true')
 
@@ -185,7 +184,6 @@ describe('Dashboard', () => {
   })
 
   it('closes create project dialog on cancel', async () => {
-    
     mockInvoke.mockResolvedValue([])
     localStorage.setItem('db_migrated', 'true')
 
@@ -224,7 +222,6 @@ describe('Dashboard', () => {
   })
 
   it('skips migration if already migrated', async () => {
-    
     mockInvoke.mockResolvedValue([])
     localStorage.setItem('db_migrated', 'true')
 
@@ -241,14 +238,16 @@ describe('Dashboard', () => {
     const consoleError = console.error
     console.error = vi.fn()
 
-    
     mockInvoke.mockRejectedValue(new Error('Load failed'))
     localStorage.setItem('db_migrated', 'true')
 
     render(<Dashboard />)
 
     await waitFor(() => {
-      expect(console.error).toHaveBeenCalledWith('Failed to load dashboard data:', expect.any(Error))
+      expect(console.error).toHaveBeenCalledWith(
+        'Failed to load dashboard data:',
+        expect.any(Error)
+      )
     })
 
     console.error = consoleError
@@ -260,7 +259,6 @@ describe('Dashboard', () => {
       { ...mockProjects[1], deadline: '2025-12-01' },
     ]
 
-    
     mockInvoke.mockResolvedValue(projectsWithDeadlines)
     localStorage.setItem('db_migrated', 'true')
 
