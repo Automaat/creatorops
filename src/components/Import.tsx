@@ -48,7 +48,7 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
       </div>
       <div className="content-body">
         {sdCards.length === 0 ? (
-          <div className="card">
+          <div className="card card-empty-state">
             <p className="text-secondary">
               {isScanning
                 ? 'Scanning for SD cards...'

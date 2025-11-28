@@ -277,6 +277,16 @@ input[type='checkbox'] + label {
   box-shadow: var(--shadow-card-hover);
 }
 
+.card-empty-state {
+  display: flex;
+  align-items: center;
+  min-height: 120px;
+}
+
+.card-empty-state p {
+  margin: 0;
+}
+
 .card-section {
   margin-top: var(--space-lg);
   padding-top: var(--space-lg);
