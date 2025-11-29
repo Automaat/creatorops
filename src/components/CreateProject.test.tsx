@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { CreateProject } from './CreateProject'
 import type { Project } from '../types'
+import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
@@ -71,11 +72,13 @@ describe('CreateProject', () => {
     const mockProject: Project = {
       id: '123',
       name: 'Test Project',
-      client_name: 'Test Client',
-      shoot_date: '2025-11-20',
-      status: 'Editing',
-      created_at: '2025-11-20',
-      updated_at: '2025-11-20',
+      clientName: 'Test Client',
+      date: '2025-11-20',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      folderPath: '/test/path',
+      createdAt: '2025-11-20',
+      updatedAt: '2025-11-20',
     }
 
     mockInvoke.mockResolvedValue(mockProject)
@@ -138,11 +141,13 @@ describe('CreateProject', () => {
     resolveInvoke!({
       id: '1',
       name: 'Test',
-      client_name: 'Test',
-      shoot_date: '2025-11-20',
-      status: 'Editing',
-      created_at: '2025-11-20',
-      updated_at: '2025-11-20',
+      clientName: 'Test',
+      date: '2025-11-20',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      folderPath: '/test/path',
+      createdAt: '2025-11-20',
+      updatedAt: '2025-11-20',
     })
   })
 
@@ -194,11 +199,13 @@ describe('CreateProject', () => {
     mockInvoke.mockResolvedValueOnce({
       id: '1',
       name: 'Test',
-      client_name: 'Test',
-      shoot_date: '2025-11-20',
-      status: 'Editing',
-      created_at: '2025-11-20',
-      updated_at: '2025-11-20',
+      clientName: 'Test',
+      date: '2025-11-20',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      folderPath: '/test/path',
+      createdAt: '2025-11-20',
+      updatedAt: '2025-11-20',
     })
 
     const user = userEvent.setup()

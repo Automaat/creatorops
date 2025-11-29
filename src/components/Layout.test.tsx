@@ -18,7 +18,9 @@ describe('Layout', () => {
   it('renders without crashing', () => {
     render(
       <NotificationProvider>
-        <Layout />
+        <Layout currentView="dashboard" onNavigate={vi.fn()}>
+          <div />
+        </Layout>
       </NotificationProvider>
     )
 
@@ -31,7 +33,9 @@ describe('Layout', () => {
   it('displays all navigation items', () => {
     render(
       <NotificationProvider>
-        <Layout />
+        <Layout currentView="dashboard" onNavigate={vi.fn()}>
+          <div />
+        </Layout>
       </NotificationProvider>
     )
 
@@ -49,7 +53,7 @@ describe('Layout', () => {
   it('renders children content', () => {
     render(
       <NotificationProvider>
-        <Layout>
+        <Layout currentView="dashboard" onNavigate={vi.fn()}>
           <div>Test Content</div>
         </Layout>
       </NotificationProvider>
