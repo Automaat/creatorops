@@ -11,6 +11,18 @@ export function formatProjectInfo(project: Project): string {
 }
 
 /**
+ * Check if a project deadline is overdue
+ */
+export function isOverdue(deadline?: string): boolean {
+  if (!deadline) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineDate = new Date(deadline)
+  deadlineDate.setHours(0, 0, 0, 0)
+  return deadlineDate < today
+}
+
+/**
  * Get sort order for project status (lower is higher priority)
  */
 function getStatusOrder(status: ProjectStatus): number {
@@ -40,6 +52,36 @@ export function sortProjectsByStatus(projects: Project[]): Project[] {
     if (statusDiff !== 0) {
       return statusDiff
     }
+    return a.name.localeCompare(b.name)
+  })
+}
+
+const STATUS_ORDER_FOR_ACTIVE: Record<string, number> = {
+  Importing: 0,
+  Editing: 1,
+  Delivered: 2,
+}
+
+/**
+ * Sort projects by deadline (earliest first), then status, then name.
+ * Used in Dashboard and Projects views for active project ordering.
+ */
+export function sortProjects(projects: Project[]): Project[] {
+  return [...projects].sort((a, b) => {
+    // 1. Sort by deadline (earliest first)
+    if (a.deadline && b.deadline) {
+      const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      if (deadlineDiff) return deadlineDiff
+    }
+    if (a.deadline) return -1
+    if (b.deadline) return 1
+
+    // 2. Sort by status
+    const statusA = STATUS_ORDER_FOR_ACTIVE[a.status] ?? 999
+    const statusB = STATUS_ORDER_FOR_ACTIVE[b.status] ?? 999
+    if (statusA !== statusB) return statusA - statusB
+
+    // 3. Sort alphabetically by name
     return a.name.localeCompare(b.name)
   })
 }

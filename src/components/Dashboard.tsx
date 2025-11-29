@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
-import { formatProjectInfo } from '../utils/project'
+import { formatProjectInfo, sortProjects } from '../utils/project'
 import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
@@ -44,31 +44,10 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
     }
   }
 
-  const statusOrder: Record<string, number> = {
-    Importing: 0,
-    Editing: 1,
-    Delivered: 2,
-  }
-
-  const activeProjects = projects
-    .filter((p) => p.status !== 'Archived')
-    .sort((a, b) => {
-      // 1. Sort by deadline (earliest first)
-      if (a.deadline && b.deadline) {
-        const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-        if (deadlineDiff) return deadlineDiff
-      }
-      if (a.deadline) return -1
-      if (b.deadline) return 1
-
-      // 2. Sort by status
-      const statusA = statusOrder[a.status] ?? 999
-      const statusB = statusOrder[b.status] ?? 999
-      if (statusA !== statusB) return statusA - statusB
-
-      // 3. Sort alphabetically by name
-      return a.name.localeCompare(b.name)
-    })
+  const activeProjects = useMemo(
+    () => sortProjects(projects.filter((p) => p.status !== 'Archived')),
+    [projects]
+  )
 
   const handleProjectCreated = (project: Project) => {
     setShowCreateProject(false)

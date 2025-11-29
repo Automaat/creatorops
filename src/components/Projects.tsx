@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type {
   Project,
@@ -13,6 +13,7 @@ import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { DatePicker } from './DatePicker'
 import { formatDisplayDate } from '../utils/formatting'
+import { sortProjects } from '../utils/project'
 import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
@@ -455,6 +456,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
+  const sortedProjects = useMemo(() => sortProjects(projects), [projects])
+
   if (loading) {
     return <div className="loading">Loading projects...</div>
   }
@@ -856,7 +859,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           </div>
         ) : (
           <div className="projects-list">
-            {projects.map((project) => (
+            {sortedProjects.map((project) => (
               <div
                 key={project.id}
                 className="project-card"
