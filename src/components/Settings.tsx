@@ -403,7 +403,7 @@ export function Settings() {
                       className="btn btn-primary"
                       style={{ marginLeft: 'auto' }}
                     >
-                      {archiveLocation ? 'Change Location' : 'Select Location'}
+                      Select Location
                     </button>
                   </div>
                 </div>

@@ -8,7 +8,7 @@
 
 .sidebar {
   width: 300px;
-  background-color: #fcfaf7;
+  background-color: var(--color-bg-sidebar);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -70,7 +70,7 @@
 }
 
 .nav-item.active {
-  background-color: var(--color-cream-highlight);
+  background-color: var(--color-nav-active);
   color: var(--color-accent-primary);
   font-weight: var(--font-weight-semibold);
 }
