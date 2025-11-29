@@ -13,7 +13,7 @@ import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { DatePicker } from './DatePicker'
 import { formatDisplayDate } from '../utils/formatting'
-import { sortProjects } from '../utils/project'
+import { sortProjects, isOverdue } from '../utils/project'
 import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
@@ -510,7 +510,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               />
             ) : (
               <span
-                className="metadata-value metadata-value-link"
+                className={`metadata-value metadata-value-link${isOverdue(selectedProject.deadline) ? ' text-overdue' : ''}`}
                 onClick={() => setIsEditingDeadline(true)}
                 title="Click to edit deadline"
               >
@@ -890,6 +890,19 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <span className="info-label">Date:</span>
                     <span>{project.date}</span>
                   </div>
+                  {project.deadline &&
+                    (() => {
+                      const overdueFlag = isOverdue(project.deadline)
+                      return (
+                        <div className="info-item">
+                          <span className="info-label">Deadline:</span>
+                          <span className={overdueFlag ? 'text-overdue' : ''}>
+                            {formatDisplayDate(project.deadline)}
+                            {overdueFlag && <span className="overdue-badge-inline">Overdue</span>}
+                          </span>
+                        </div>
+                      )
+                    })()}
                 </div>
               </div>
             ))}

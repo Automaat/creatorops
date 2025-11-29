@@ -236,4 +236,63 @@ describe('Dashboard', () => {
       expect(projectItems[1].textContent).toBe('Wedding Photos') // 2025-12-25
     })
   })
+
+  it('displays deadline in red when overdue', async () => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const overdueProjects: Project[] = [
+      {
+        ...mockProjects[0],
+        deadline: yesterday.toISOString().split('T')[0],
+      },
+    ]
+
+    mockInvoke.mockResolvedValue(overdueProjects)
+
+    render(<Dashboard />)
+
+    await waitFor(() => {
+      const overdueElements = document.querySelectorAll('.text-overdue')
+      expect(overdueElements.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('does not display deadline in red when not overdue', async () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const futureProjects: Project[] = [
+      {
+        ...mockProjects[0],
+        deadline: tomorrow.toISOString().split('T')[0],
+      },
+    ]
+
+    mockInvoke.mockResolvedValue(futureProjects)
+
+    render(<Dashboard />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Wedding Photos')).toBeTruthy()
+    })
+
+    const overdueElements = document.querySelectorAll('.text-overdue')
+    expect(overdueElements.length).toBe(0)
+  })
+
+  it('displays deadline date for projects with deadlines', async () => {
+    const projectWithDeadline: Project[] = [
+      {
+        ...mockProjects[0],
+        deadline: '2025-12-15',
+      },
+    ]
+
+    mockInvoke.mockResolvedValue(projectWithDeadline)
+
+    render(<Dashboard />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Due/)).toBeTruthy()
+    })
+  })
 })

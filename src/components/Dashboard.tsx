@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
-import { formatProjectInfo, sortProjects } from '../utils/project'
+import { sortProjects, isOverdue } from '../utils/project'
+import { formatDisplayDate } from '../utils/formatting'
 import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
@@ -88,7 +89,17 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
                     <div className="project-list-content">
                       <div>
                         <h3>{project.name}</h3>
-                        <p className="text-secondary text-sm">{formatProjectInfo(project)}</p>
+                        <p className="text-secondary text-sm">
+                          {project.date}
+                          {project.deadline && (
+                            <>
+                              {' · '}
+                              <span className={isOverdue(project.deadline) ? 'text-overdue' : ''}>
+                                Due {formatDisplayDate(project.deadline)}
+                              </span>
+                            </>
+                          )}
+                        </p>
                       </div>
                       <span className={`project-status ${getStatusColor(project.status)}`}>
                         {project.status}
