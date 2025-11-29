@@ -148,6 +148,21 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedProject, handleBackToList])
 
+  // Cmd+N to create new project in list view
+  useEffect(() => {
+    if (selectedProject) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault()
+        setShowCreateProject(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedProject])
+
   async function loadDestinations() {
     try {
       const stored = localStorage.getItem('backup_destinations')
