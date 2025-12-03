@@ -212,6 +212,7 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_sd_card_serialization() {
@@ -267,5 +268,151 @@ mod tests {
     fn test_get_device_info_returns_tuple() {
         let (device_type, _) = get_device_info("TestVolume");
         assert!(!device_type.is_empty());
+    }
+
+    #[test]
+    fn test_count_files_with_subdirectories() {
+        let temp_dir = TempDir::new().unwrap();
+        let subdir = temp_dir.path().join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+
+        std::fs::write(temp_dir.path().join("file1.txt"), b"test").unwrap();
+        std::fs::write(subdir.join("file2.txt"), b"test").unwrap();
+        std::fs::write(subdir.join("file3.txt"), b"test").unwrap();
+
+        let count = count_files(temp_dir.path());
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_count_files_empty_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let count = count_files(temp_dir.path());
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("photo1.jpg"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("photo2.png"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("video1.mp4"), b"video").unwrap();
+        std::fs::write(temp_dir.path().join("ignored.txt"), b"text").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|f| f.contains("photo1.jpg")));
+        assert!(files.iter().any(|f| f.contains("photo2.png")));
+        assert!(files.iter().any(|f| f.contains("video1.mp4")));
+        assert!(!files.iter().any(|f| f.contains("ignored.txt")));
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_with_raw_formats() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("raw1.cr2"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw2.nef"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw3.arw"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw4.dng"), b"raw").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_nonexistent_path() {
+        let result = list_sd_card_files("/nonexistent/path".to_string()).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "SD card path does not exist");
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_nested_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let dcim = temp_dir.path().join("DCIM");
+        let folder1 = dcim.join("100CANON");
+        std::fs::create_dir_all(&folder1).unwrap();
+
+        std::fs::write(folder1.join("IMG_0001.jpg"), b"photo").unwrap();
+        std::fs::write(folder1.join("IMG_0002.cr3"), b"raw").unwrap();
+        std::fs::write(folder1.join("VID_0001.mov"), b"video").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_case_insensitive_extensions() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("photo.JPG"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("photo.jpeg"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("video.MOV"), b"video").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_disk_usage() {
+        let temp_dir = TempDir::new().unwrap();
+        let (size, free_space) = get_disk_usage(temp_dir.path());
+        assert!(size > 0);
+        assert!(free_space > 0);
+        assert!(free_space <= size);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn test_get_disk_usage_fallback() {
+        let temp_dir = TempDir::new().unwrap();
+        let (size, free_space) = get_disk_usage(temp_dir.path());
+        assert_eq!(size, 0);
+        assert_eq!(free_space, 0);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
+    async fn test_eject_sd_card_not_supported() {
+        let result = eject_sd_card("/test/path".to_string()).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "SD card ejection is only supported on macOS"
+        );
+    }
+
+    #[test]
+    fn test_sd_card_complete_struct() {
+        let card = SDCard {
+            name: "TestCard".to_string(),
+            path: "/Volumes/TestCard".to_string(),
+            size: 64000000000,
+            free_space: 32000000000,
+            file_count: 250,
+            device_type: "SD Card".to_string(),
+            is_removable: true,
+        };
+
+        assert_eq!(card.name, "TestCard");
+        assert_eq!(card.size, 64000000000);
+        assert_eq!(card.free_space, 32000000000);
+        assert_eq!(card.file_count, 250);
+        assert!(card.is_removable);
     }
 }

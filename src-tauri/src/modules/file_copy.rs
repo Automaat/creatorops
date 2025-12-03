@@ -252,6 +252,8 @@ pub async fn cancel_import(import_id: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use tempfile::TempDir;
 
     #[test]
     fn test_get_file_type_photos() {
@@ -327,5 +329,134 @@ mod tests {
         assert!(VIDEO_EXTENSIONS.contains(&"mp4"));
         assert!(VIDEO_EXTENSIONS.contains(&"mov"));
         assert!(VIDEO_EXTENSIONS.contains(&"avi"));
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.jpg");
+        let dest = temp_dir.path().join("dest.jpg");
+
+        let mut file = std::fs::File::create(&src).unwrap();
+        file.write_all(b"test photo data").unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 15);
+        assert!(dest.exists());
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_cancelled() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.mp4");
+        let dest = temp_dir.path().join("dest.mp4");
+
+        let mut file = std::fs::File::create(&src).unwrap();
+        file.write_all(b"test video").unwrap();
+
+        let cancel_token = CancellationToken::new();
+        cancel_token.cancel();
+
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Import cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_missing_source() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("nonexistent.jpg");
+        let dest = temp_dir.path().join("dest.jpg");
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_import() {
+        let import_id = "test-import-123".to_string();
+        let cancel_token = CancellationToken::new();
+
+        {
+            let mut tokens = IMPORT_TOKENS.lock().await;
+            tokens.insert(import_id.clone(), cancel_token.clone());
+        }
+
+        let result = cancel_import(import_id.clone()).await;
+        assert!(result.is_ok());
+        assert!(cancel_token.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_import_not_found() {
+        let result = cancel_import("nonexistent-import".to_string()).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Import not found or already completed"
+        );
+    }
+
+    #[test]
+    fn test_copy_result_with_errors() {
+        let result = CopyResult {
+            success: false,
+            error: Some("3 file(s) skipped due to errors".to_string()),
+            files_copied: 5,
+            files_skipped: 3,
+            skipped_files: vec![
+                "file1.jpg".to_string(),
+                "file2.mp4".to_string(),
+                "file3.png".to_string(),
+            ],
+            total_bytes: 2048,
+            photos_copied: 4,
+            videos_copied: 1,
+        };
+
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert_eq!(result.files_skipped, 3);
+        assert_eq!(result.skipped_files.len(), 3);
+    }
+
+    #[test]
+    fn test_copy_result_cancelled() {
+        let result = CopyResult {
+            success: false,
+            error: Some("Import cancelled (10 files copied)".to_string()),
+            files_copied: 10,
+            files_skipped: 0,
+            skipped_files: vec![],
+            total_bytes: 5120,
+            photos_copied: 8,
+            videos_copied: 2,
+        };
+
+        assert!(!result.success);
+        assert!(result.error.as_ref().unwrap().contains("cancelled"));
+        assert_eq!(result.files_copied, 10);
+    }
+
+    #[test]
+    fn test_all_photo_extensions() {
+        for ext in PHOTO_EXTENSIONS.iter() {
+            let path = format!("test.{}", ext);
+            assert_eq!(get_file_type(Path::new(&path)), Some("photo"));
+        }
+    }
+
+    #[test]
+    fn test_all_video_extensions() {
+        for ext in VIDEO_EXTENSIONS.iter() {
+            let path = format!("test.{}", ext);
+            assert_eq!(get_file_type(Path::new(&path)), Some("video"));
+        }
     }
 }

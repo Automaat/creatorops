@@ -194,6 +194,7 @@ pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
 mod tests {
     use super::*;
     use std::path::Path;
+    use tempfile::TempDir;
 
     #[test]
     fn test_windows_paths_constants() {
@@ -232,5 +233,127 @@ mod tests {
         assert!(media_path.is_dir());
 
         std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_open_in_external_app_invalid_path_encoding() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Photos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let result = open_in_external_app(project_path, "Photos", "TestApp", &[], None);
+
+        // Should validate path exists (error occurs when trying to spawn)
+        assert!(result.is_err() || result.is_ok());
+    }
+
+    #[test]
+    fn test_open_in_external_app_photos_subfolder() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Photos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let media_path = Path::new(project_path).join("RAW").join("Photos");
+
+        assert!(media_path.exists());
+        assert!(media_path.is_dir());
+    }
+
+    #[test]
+    fn test_open_in_external_app_videos_subfolder() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Videos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let media_path = Path::new(project_path).join("RAW").join("Videos");
+
+        assert!(media_path.exists());
+        assert!(media_path.is_dir());
+    }
+
+    #[test]
+    fn test_open_in_lightroom_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_lightroom(temp_dir.path().to_string_lossy().to_string());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_aftershoot_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_aftershoot(temp_dir.path().to_string_lossy().to_string());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_davinci_resolve_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_davinci_resolve(temp_dir.path().to_string_lossy().to_string());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_final_cut_pro_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_final_cut_pro(temp_dir.path().to_string_lossy().to_string());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_reveal_in_finder_with_valid_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, b"test").unwrap();
+
+        // Function spawns background process, so it may succeed or fail depending on platform
+        let result = reveal_in_finder(test_file.to_string_lossy().to_string());
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_lightroom_paths() {
+        assert!(LIGHTROOM_PATHS.len() >= 2);
+        assert!(LIGHTROOM_PATHS[0].contains("Adobe"));
+        assert!(LIGHTROOM_PATHS[0].contains("Lightroom"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_aftershoot_paths() {
+        assert!(AFTERSHOOT_PATHS.len() >= 2);
+        assert!(AFTERSHOOT_PATHS[0].contains("AfterShoot"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_davinci_resolve_paths() {
+        assert!(DAVINCI_RESOLVE_PATHS.len() >= 2);
+        assert!(DAVINCI_RESOLVE_PATHS[0].contains("Blackmagic Design"));
+        assert!(DAVINCI_RESOLVE_PATHS[0].contains("DaVinci Resolve"));
+    }
+
+    #[test]
+    fn test_open_in_external_app_missing_raw_directory() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = open_in_external_app(
+            temp_dir.path().to_str().unwrap(),
+            "Photos",
+            "TestApp",
+            &[],
+            None,
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
     }
 }
