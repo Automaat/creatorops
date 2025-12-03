@@ -596,4 +596,215 @@ mod tests {
         assert!(json.contains("failed"));
         assert!(json.contains("Disk full"));
     }
+
+    #[tokio::test]
+    async fn test_queue_backup() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file1.txt"), "test data").unwrap();
+
+        let result = queue_backup(
+            "proj-123".to_string(),
+            "Backup Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-456".to_string(),
+            "External Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+        assert_eq!(job.project_id, "proj-123");
+        assert_eq!(job.status, BackupStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+
+        // Clean up
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_backup_queue() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-789".to_string(),
+            "Queue Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-123".to_string(),
+            "Test Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let queue = get_backup_queue().await.unwrap();
+        assert!(queue.iter().any(|j| j.id == job.id));
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_backup() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-cancel".to_string(),
+            "Cancel Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-456".to_string(),
+            "Cancel Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let result = cancel_backup(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify cancelled
+        let queue = get_backup_queue().await.unwrap();
+        let cancelled_job = queue.iter().find(|j| j.id == job.id).unwrap();
+        assert_eq!(cancelled_job.status, BackupStatus::Cancelled);
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_backup_not_pending() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-not-pending".to_string(),
+            "Not Pending Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-789".to_string(),
+            "Test Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        // Cancel once (should succeed)
+        let _ = cancel_backup(job.id.clone()).await;
+
+        // Try to cancel again (should fail)
+        let result = cancel_backup(job.id.clone()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Can only cancel pending"));
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_backup_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-remove".to_string(),
+            "Remove Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-remove".to_string(),
+            "Remove Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let result = remove_backup_job(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let queue = get_backup_queue().await.unwrap();
+        assert!(!queue.iter().any(|j| j.id == job.id));
+    }
+
+    #[tokio::test]
+    async fn test_get_backup_history_empty() {
+        let result = get_backup_history().await;
+        assert!(result.is_ok());
+        // Should return empty vec if no history file
+    }
+
+    #[tokio::test]
+    async fn test_get_project_backup_history() {
+        let _all_history = get_backup_history().await.unwrap();
+        let result = get_project_backup_history("nonexistent-project".to_string()).await;
+        assert!(result.is_ok());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_backup_queue_sorted_by_created_at() {
+        use tempfile::TempDir;
+        use tokio::time::{sleep, Duration};
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job1 = queue_backup(
+            "proj-first".to_string(),
+            "First".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-1".to_string(),
+            "Drive 1".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        let job2 = queue_backup(
+            "proj-second".to_string(),
+            "Second".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-2".to_string(),
+            "Drive 2".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let queue = get_backup_queue().await.unwrap();
+
+        // Verify both jobs are in queue
+        assert!(queue.iter().any(|j| j.id == job1.id));
+        assert!(queue.iter().any(|j| j.id == job2.id));
+
+        // Verify job2 has a later created_at timestamp
+        let job1_entry = queue.iter().find(|j| j.id == job1.id).unwrap();
+        let job2_entry = queue.iter().find(|j| j.id == job2.id).unwrap();
+        assert!(job2_entry.created_at >= job1_entry.created_at);
+
+        let _ = remove_backup_job(job1.id).await;
+        let _ = remove_backup_job(job2.id).await;
+    }
 }

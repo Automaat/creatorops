@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Projects } from './Projects'
 import { NotificationProvider } from '../contexts/NotificationContext'
-import type { Project } from '../types'
+import type { Project, BackupDestination, ImportHistory } from '../types'
 import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -17,6 +18,13 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   open: vi.fn(),
+}))
+
+vi.mock('../hooks/useSDCardScanner', () => ({
+  useSDCardScanner: () => ({
+    sdCards: [],
+    isScanning: false,
+  }),
 }))
 
 const mockInvoke = vi.mocked(invoke)
@@ -35,106 +43,1046 @@ const createMockProject = (overrides?: Partial<Project>): Project => ({
   ...overrides,
 })
 
+const createMockBackupDestination = (
+  overrides?: Partial<BackupDestination>
+): BackupDestination => ({
+  id: 'dest-1',
+  name: 'External Drive',
+  path: '/Volumes/Backup',
+  enabled: true,
+  ...overrides,
+})
+
 describe('Projects', () => {
   beforeEach(() => {
     mockInvoke.mockResolvedValue([])
+    localStorage.clear()
+    vi.clearAllMocks()
   })
 
-  it('renders without crashing', async () => {
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+  afterEach(() => {
+    localStorage.clear()
+  })
 
-    await waitFor(() => {
-      expect(screen.getByText('Projects')).toBeTruthy()
+  describe('List View', () => {
+    it('renders without crashing', async () => {
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeTruthy()
+      })
+    })
+
+    it('displays projects list view by default', async () => {
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeTruthy()
+      })
+    })
+
+    it('shows empty state when no projects', async () => {
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText(/No projects/)).toBeTruthy()
+      })
+    })
+
+    it('renders multiple projects in list', async () => {
+      const projects = [
+        createMockProject({ id: '1', name: 'Project Alpha' }),
+        createMockProject({ id: '2', name: 'Project Beta' }),
+        createMockProject({ id: '3', name: 'Project Gamma' }),
+      ]
+
+      mockInvoke.mockResolvedValue(projects)
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Project Alpha')).toBeTruthy()
+        expect(screen.getByText('Project Beta')).toBeTruthy()
+        expect(screen.getByText('Project Gamma')).toBeTruthy()
+      })
+    })
+
+    it('displays project metadata in cards', async () => {
+      const project = createMockProject({
+        name: 'Wedding Shoot',
+        clientName: 'John Doe',
+        shootType: 'Wedding',
+        date: '2024-01-15',
+      })
+
+      mockInvoke.mockResolvedValue([project])
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Wedding Shoot')).toBeTruthy()
+        expect(screen.getByText('John Doe')).toBeTruthy()
+        expect(screen.getByText('Wedding')).toBeTruthy()
+        expect(screen.getByText('2024-01-15')).toBeTruthy()
+      })
+    })
+
+    it('displays overdue badge when project deadline is past', async () => {
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const overdueProject = createMockProject({
+        deadline: yesterday.toISOString().split('T')[0],
+      })
+
+      mockInvoke.mockResolvedValue([overdueProject])
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Overdue')).toBeTruthy()
+      })
+    })
+
+    it('does not display overdue badge when deadline is in future', async () => {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const futureProject = createMockProject({
+        deadline: tomorrow.toISOString().split('T')[0],
+      })
+
+      mockInvoke.mockResolvedValue([futureProject])
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Project')).toBeTruthy()
+      })
+
+      expect(screen.queryByText('Overdue')).toBeNull()
+    })
+
+    it('displays project status alongside overdue indicator', async () => {
+      const overdueProject = createMockProject({
+        deadline: '2020-01-01',
+        status: ProjectStatus.Editing,
+      })
+
+      mockInvoke.mockResolvedValue([overdueProject])
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Editing')).toBeTruthy()
+        expect(screen.getByText('Overdue')).toBeTruthy()
+      })
+    })
+
+    it('shows Create Project button', async () => {
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Project')).toBeTruthy()
+      })
+    })
+
+    it('opens create project dialog when button clicked', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Project')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Create Project'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Project')).toBeTruthy()
+      })
     })
   })
 
-  it('displays projects list view by default', async () => {
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+  describe('Project Selection and Detail View', () => {
+    it('shows project detail when card is clicked', async () => {
+      const project = createMockProject({ name: 'Test Project' })
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'list_projects') return Promise.resolve([project])
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText('Projects')).toBeTruthy()
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Project')).toBeTruthy()
+      })
+
+      const projectCard = screen.getByText('Test Project').closest('.project-card')
+      expect(projectCard).toBeTruthy()
+
+      await user.click(projectCard!)
+
+      await waitFor(() => {
+        expect(screen.getByText('← Back')).toBeTruthy()
+        expect(screen.getByText('Actions')).toBeTruthy()
+      })
+    })
+
+    it('returns to list view when back button clicked', async () => {
+      const project = createMockProject({ name: 'Test Project' })
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'list_projects') return Promise.resolve([project])
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Project')).toBeTruthy()
+      })
+
+      const projectCard = screen.getByText('Test Project').closest('.project-card')
+      await user.click(projectCard!)
+
+      await waitFor(() => {
+        expect(screen.getByText('← Back')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('← Back'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeTruthy()
+        expect(screen.queryByText('Actions')).toBeNull()
+      })
+    })
+
+    it('loads project from initialSelectedProjectId prop', async () => {
+      const project = createMockProject({ id: 'proj-123', name: 'Initial Project' })
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="proj-123" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('get_project', { projectId: 'proj-123' })
+        expect(screen.getByText('Initial Project')).toBeTruthy()
+        expect(screen.getByText('← Back')).toBeTruthy()
+      })
+    })
+
+    it('calls onBackFromProject when back button clicked from external selection', async () => {
+      const project = createMockProject({ id: 'proj-123', name: 'External Project' })
+      const onBackFromProject = vi.fn()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="proj-123" onBackFromProject={onBackFromProject} />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('← Back')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('← Back'))
+
+      expect(onBackFromProject).toHaveBeenCalledTimes(1)
     })
   })
 
-  it('shows empty state when no projects', async () => {
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+  describe('Project Detail View', () => {
+    it('displays project metadata in detail view', async () => {
+      const project = createMockProject({
+        name: 'Wedding Shoot',
+        clientName: 'John Doe',
+        shootType: 'Wedding',
+        date: '2024-01-15',
+        status: ProjectStatus.Editing,
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText(/No projects/)).toBeTruthy()
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Wedding Shoot')).toBeTruthy()
+        expect(screen.getByText('John Doe')).toBeTruthy()
+        expect(screen.getByText('Wedding')).toBeTruthy()
+        expect(screen.getByText('2024-01-15')).toBeTruthy()
+        expect(screen.getByText('Editing')).toBeTruthy()
+      })
+    })
+
+    it('displays project folder path', async () => {
+      const project = createMockProject({ folderPath: '/Users/test/projects/test-project' })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('~/projects/test-project')).toBeTruthy()
+      })
+    })
+
+    it('opens reveal in finder when folder path clicked', async () => {
+      const project = createMockProject({ folderPath: '/path/to/project' })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Click to show in Finder')).toBeTruthy()
+      })
+
+      await user.click(screen.getByTitle('Click to show in Finder'))
+
+      expect(mockInvoke).toHaveBeenCalledWith('reveal_in_finder', { path: '/path/to/project' })
+    })
+
+    it('shows Import button in detail view', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Import')).toBeTruthy()
+      })
     })
   })
 
-  it('displays overdue badge when project deadline is past', async () => {
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const overdueProject = createMockProject({
-      deadline: yesterday.toISOString().split('T')[0],
+  describe('Archive Functionality', () => {
+    it('shows archive button when project not archived', async () => {
+      const project = createMockProject({ status: ProjectStatus.Editing })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Archive')).toBeTruthy()
+      })
     })
 
-    mockInvoke.mockResolvedValue([overdueProject])
+    it('disables archive button when project already archived', async () => {
+      const project = createMockProject({ status: ProjectStatus.Archived })
 
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText('Overdue')).toBeTruthy()
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const button = screen.getByText('Already Archived')
+        expect(button).toBeTruthy()
+        expect((button as HTMLButtonElement).disabled).toBe(true)
+      })
+    })
+
+    it('opens archive dialog when archive button clicked', async () => {
+      const project = createMockProject({ status: ProjectStatus.Editing })
+      localStorage.setItem('archive_location', '/path/to/archives')
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Archive')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Archive'))
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Archive Project').length).toBeGreaterThan(0)
+        expect(screen.getByText(/Archive Location:/)).toBeTruthy()
+        expect(screen.getByText('Confirm Archive')).toBeTruthy()
+      })
+    })
+
+    it('closes archive dialog when cancel clicked', async () => {
+      const project = createMockProject({ status: ProjectStatus.Editing })
+      localStorage.setItem('archive_location', '/path/to/archives')
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Archive')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Archive'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Confirm Archive')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Cancel'))
+
+      await waitFor(() => {
+        expect(screen.queryByText('Confirm Archive')).toBeNull()
+      })
     })
   })
 
-  it('does not display overdue badge when deadline is in future', async () => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const futureProject = createMockProject({
-      deadline: tomorrow.toISOString().split('T')[0],
+  describe('Delete Functionality', () => {
+    it('shows delete button in detail view', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const buttons = screen.getAllByText('Delete Project')
+        expect(buttons.length).toBeGreaterThan(0)
+      })
     })
 
-    mockInvoke.mockResolvedValue([futureProject])
+    it('opens delete confirmation dialog when delete clicked', async () => {
+      const project = createMockProject({ name: 'Test Project' })
 
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText('Test Project')).toBeTruthy()
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const buttons = screen.getAllByText('Delete Project')
+        expect(buttons.length).toBeGreaterThan(0)
+      })
+
+      const deleteButtons = screen.getAllByText('Delete Project')
+      const deleteButton = deleteButtons.find((btn) => btn.classList.contains('btn-danger'))
+      await user.click(deleteButton!)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Are you sure you want to delete/)).toBeTruthy()
+        expect(screen.getByText(/This action cannot be undone/)).toBeTruthy()
+      })
     })
 
-    expect(screen.queryByText('Overdue')).toBeNull()
+    it('closes delete dialog when cancel clicked', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const buttons = screen.getAllByText('Delete Project')
+        expect(buttons.length).toBeGreaterThan(0)
+      })
+
+      const deleteButtons = screen.getAllByText('Delete Project')
+      const deleteButton = deleteButtons.find((btn) => btn.classList.contains('btn-danger'))
+      await user.click(deleteButton!)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Are you sure/)).toBeTruthy()
+      })
+
+      const cancelButtons = screen.getAllByText('Cancel')
+      await user.click(cancelButtons[cancelButtons.length - 1])
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Are you sure/)).toBeNull()
+      })
+    })
+
+    it('deletes project when confirmed', async () => {
+      const project = createMockProject({ id: 'proj-123', name: 'Test Project' })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        if (cmd === 'delete_project') return Promise.resolve()
+        if (cmd === 'list_projects') return Promise.resolve([])
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="proj-123" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const buttons = screen.getAllByText('Delete Project')
+        expect(buttons.length).toBeGreaterThan(0)
+      })
+
+      const initialDeleteButtons = screen.getAllByText('Delete Project')
+      const deleteButton = initialDeleteButtons.find((btn) => btn.classList.contains('btn-danger'))
+      await user.click(deleteButton!)
+
+      await waitFor(() => {
+        expect(screen.getByText(/Are you sure/)).toBeTruthy()
+      })
+
+      const deleteButtons = screen.getAllByText('Delete Project')
+      await user.click(deleteButtons[deleteButtons.length - 1])
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('delete_project', { projectId: 'proj-123' })
+      })
+    })
   })
 
-  it('displays project status alongside overdue indicator', async () => {
-    const overdueProject = createMockProject({
-      deadline: '2020-01-01',
-      status: ProjectStatus.Editing,
+  describe('Open in App Functionality', () => {
+    it('shows editing app buttons', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightroom Classic')).toBeTruthy()
+        expect(screen.getByText('AfterShoot')).toBeTruthy()
+        expect(screen.getByText('DaVinci Resolve')).toBeTruthy()
+        expect(screen.getByText('Final Cut Pro')).toBeTruthy()
+      })
     })
 
-    mockInvoke.mockResolvedValue([overdueProject])
+    it('calls open_in_lightroom when Lightroom Classic clicked', async () => {
+      const project = createMockProject({ folderPath: '/path/to/project' })
 
-    render(
-      <NotificationProvider>
-        <Projects />
-      </NotificationProvider>
-    )
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        if (cmd === 'open_in_lightroom') return Promise.resolve()
+        return Promise.resolve([])
+      })
 
-    await waitFor(() => {
-      expect(screen.getByText('Editing')).toBeTruthy()
-      expect(screen.getByText('Overdue')).toBeTruthy()
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightroom Classic')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Lightroom Classic'))
+
+      expect(mockInvoke).toHaveBeenCalledWith('open_in_lightroom', { path: '/path/to/project' })
+    })
+
+    it('updates project status to Editing when opening app from New status', async () => {
+      const project = createMockProject({ status: ProjectStatus.New })
+      const updatedProject = { ...project, status: ProjectStatus.Editing }
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        if (cmd === 'open_in_lightroom') return Promise.resolve()
+        if (cmd === 'update_project_status') return Promise.resolve(updatedProject)
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Lightroom Classic')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Lightroom Classic'))
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('update_project_status', {
+          projectId: '1',
+          newStatus: ProjectStatus.Editing,
+        })
+      })
+    })
+  })
+
+  describe('Backup Functionality', () => {
+    it('shows backup destinations when configured', async () => {
+      const project = createMockProject()
+      const destinations = [
+        createMockBackupDestination({ name: 'External Drive', path: '/Volumes/Backup' }),
+        createMockBackupDestination({ id: 'dest-2', name: 'NAS Drive', path: '/Volumes/NAS' }),
+      ]
+
+      localStorage.setItem('backup_destinations', JSON.stringify(destinations))
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('External Drive')).toBeTruthy()
+        expect(screen.getByText('NAS Drive')).toBeTruthy()
+      })
+    })
+
+    it('shows empty state when no backup destinations', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText(/No backup destinations configured/)).toBeTruthy()
+      })
+    })
+
+    it('queues backup when destination clicked', async () => {
+      const project = createMockProject({ id: 'proj-1', name: 'Test Project' })
+      const destination = createMockBackupDestination()
+
+      localStorage.setItem('backup_destinations', JSON.stringify([destination]))
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        if (cmd === 'queue_backup') return Promise.resolve()
+        return Promise.resolve([])
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="proj-1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('External Drive')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('External Drive'))
+
+      expect(mockInvoke).toHaveBeenCalledWith('queue_backup', {
+        projectId: 'proj-1',
+        projectName: 'Test Project',
+        sourcePath: '/path/to/project',
+        destinationId: 'dest-1',
+        destinationName: 'External Drive',
+        destinationPath: '/Volumes/Backup',
+      })
+    })
+
+    it('filters out disabled backup destinations', async () => {
+      const project = createMockProject()
+      const destinations = [
+        createMockBackupDestination({ name: 'Enabled Drive', enabled: true }),
+        createMockBackupDestination({
+          id: 'dest-2',
+          name: 'Disabled Drive',
+          enabled: false,
+        }),
+      ]
+
+      localStorage.setItem('backup_destinations', JSON.stringify(destinations))
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Enabled Drive')).toBeTruthy()
+        expect(screen.queryByText('Disabled Drive')).toBeNull()
+      })
+    })
+  })
+
+  describe('Deadline Editing', () => {
+    it('shows deadline in detail view', async () => {
+      const project = createMockProject({ deadline: '2024-12-25' })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Dec 25, 2024')).toBeTruthy()
+      })
+    })
+
+    it('shows Not set when no deadline', async () => {
+      const project = createMockProject({ deadline: undefined })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Not set')).toBeTruthy()
+      })
+    })
+
+    it('shows overdue text for past deadlines in detail view', async () => {
+      const project = createMockProject({ deadline: '2020-01-01' })
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        const elements = screen.getAllByText('Jan 1, 2020')
+        expect(elements.length).toBeGreaterThan(0)
+        const deadlineElement = elements[0]
+        expect(deadlineElement.className).toContain('text-overdue')
+      })
+    })
+  })
+
+  describe('Import History', () => {
+    it('displays import history when available', async () => {
+      const project = createMockProject()
+      const history: ImportHistory[] = [
+        {
+          id: 'import-1',
+          projectId: '1',
+          projectName: 'Test Project',
+          sourcePath: '/Volumes/SD1',
+          destinationPath: '/path/to/project/RAW',
+          filesCopied: 100,
+          filesSkipped: 5,
+          totalBytes: 1073741824,
+          photosCopied: 80,
+          videosCopied: 20,
+          startedAt: '2024-01-15T10:00:00Z',
+          completedAt: '2024-01-15T10:30:00Z',
+          status: 'success',
+          errorMessage: null,
+        },
+      ]
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve(history)
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText(/Photos Imported:/)).toBeTruthy()
+        expect(screen.getByText('80')).toBeTruthy()
+        expect(screen.getByText(/Videos Imported:/)).toBeTruthy()
+        expect(screen.getByText('20')).toBeTruthy()
+      })
+    })
+  })
+
+  describe('Keyboard Shortcuts', () => {
+    it('closes detail view when Escape key pressed', async () => {
+      const project = createMockProject()
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_project') return Promise.resolve(project)
+        if (cmd === 'get_project_import_history') return Promise.resolve([])
+        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+        return Promise.resolve([])
+      })
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('← Back')).toBeTruthy()
+      })
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+
+      await waitFor(() => {
+        expect(screen.queryByText('← Back')).toBeNull()
+      })
+    })
+
+    it('opens create project dialog when Cmd+N pressed in list view', async () => {
+      mockInvoke.mockResolvedValue([])
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Projects')).toBeTruthy()
+      })
+
+      fireEvent.keyDown(window, { key: 'n', metaKey: true })
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Project')).toBeTruthy()
+      })
     })
   })
 })

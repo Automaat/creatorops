@@ -352,4 +352,189 @@ mod tests {
         assert!(json.contains("document.pdf"));
         assert!(json.contains("25"));
     }
+
+    #[tokio::test]
+    async fn test_create_archive() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file1.txt"), "test data").unwrap();
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let result = create_archive(
+            "proj-123".to_string(),
+            "Archive Test".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            false,
+            None,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+        assert_eq!(job.project_id, "proj-123");
+        assert_eq!(job.project_name, "Archive Test");
+        assert_eq!(job.status, ArchiveStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+        assert!(!job.compress);
+
+        // Clean up
+        let _ = remove_archive_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_create_archive_with_compression() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file1.txt"), "test data").unwrap();
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let result = create_archive(
+            "proj-456".to_string(),
+            "Compressed Archive".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            true,
+            Some("zip".to_string()),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+        assert!(job.compress);
+        assert_eq!(job.compression_format, Some("zip".to_string()));
+
+        let _ = remove_archive_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_archive_queue() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let job = create_archive(
+            "proj-789".to_string(),
+            "Queue Test".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let queue = get_archive_queue().await.unwrap();
+        assert!(queue.iter().any(|j| j.id == job.id));
+
+        let _ = remove_archive_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_archive_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let job = create_archive(
+            "proj-remove".to_string(),
+            "Remove Test".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let result = remove_archive_job(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let queue = get_archive_queue().await.unwrap();
+        assert!(!queue.iter().any(|j| j.id == job.id));
+    }
+
+    #[tokio::test]
+    async fn test_archive_job_calculates_total_bytes() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+
+        let file1 = source.join("large.dat");
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(&vec![0u8; 2048]).unwrap(); // 2KB file
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let job = create_archive(
+            "proj-size".to_string(),
+            "Size Test".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.total_bytes, 2048);
+        let _ = remove_archive_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_archive_counts_multiple_files() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file1.txt"), "data1").unwrap();
+        std::fs::write(source.join("file2.txt"), "data2").unwrap();
+        std::fs::write(source.join("file3.txt"), "data3").unwrap();
+
+        let archive_location = temp_dir.path().join("archives");
+        std::fs::create_dir(&archive_location).unwrap();
+
+        let job = create_archive(
+            "proj-multi".to_string(),
+            "Multi File Test".to_string(),
+            source.to_string_lossy().to_string(),
+            archive_location.to_string_lossy().to_string(),
+            false,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.total_files, 3);
+        let _ = remove_archive_job(job.id).await;
+    }
 }
