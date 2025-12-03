@@ -67,6 +67,7 @@ pub struct ImportProgress {
 }
 
 /// Copy files from source to destination with parallel processing
+#[allow(clippy::too_many_lines)] // Complex import logic requires detailed handling
 #[tauri::command]
 pub async fn copy_files(
     app: AppHandle,
@@ -136,6 +137,8 @@ pub async fn copy_files(
             match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
                 Ok(size) => {
                     let copied = files_copied_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                    // Safe cast: file sizes fit in usize on target platform
+                    #[allow(clippy::cast_possible_truncation)]
                     total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
 
                     // Track photo/video counts
@@ -165,7 +168,7 @@ pub async fn copy_files(
                     if cancel_token_clone.is_cancelled() {
                         return Err("Import cancelled".to_owned());
                     }
-                    eprintln!("Failed to copy {file_name} after retries: {e}");
+                    // Copy failed after retries - track as skipped
                     files_skipped_clone.fetch_add(1, Ordering::SeqCst);
                     skipped_files_clone.lock().await.push(file_name);
                     Err(e)
@@ -179,8 +182,9 @@ pub async fn copy_files(
     // Wait for all tasks and handle errors
     let mut cancelled = false;
     for result in futures::future::join_all(tasks).await {
+        #[allow(clippy::match_same_arms)] // Different semantics: success vs failure
         match result {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {} // Success
             Ok(Err(e)) if e == "Import cancelled" => {
                 cancelled = true;
             }
@@ -244,12 +248,13 @@ async fn copy_file_with_retry(
 #[tauri::command]
 pub async fn cancel_import(import_id: String) -> Result<(), String> {
     let tokens = IMPORT_TOKENS.lock().await;
-    if let Some(token) = tokens.get(&import_id) {
-        token.cancel();
-        Ok(())
-    } else {
-        Err("Import not found or already completed".to_owned())
-    }
+    tokens.get(&import_id).map_or_else(
+        || Err("Import not found or already completed".to_owned()),
+        |token| {
+            token.cancel();
+            Ok(())
+        },
+    )
 }
 
 #[allow(clippy::wildcard_imports)]
@@ -776,8 +781,10 @@ mod tests {
             current_file: "photo_50.jpg".to_owned(),
         };
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let percent = (progress.files_copied as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(percent, 50.0);
+        assert!((percent - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]

@@ -7,6 +7,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use uuid::Uuid;
+use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,12 +118,14 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
 
         job.status = ArchiveStatus::InProgress;
         job.started_at = Some(get_timestamp());
-        job.clone()
+        let job_clone = job.clone();
+        drop(queue);
+        job_clone
     };
 
     // Spawn background task
     tokio::spawn(async move {
-        let result = process_archive(job.clone(), app_handle.clone()).await;
+        let result = process_archive(job.clone(), &app_handle);
 
         // Update job status
         if let Ok(mut queue) = ARCHIVE_QUEUE.lock() {
@@ -145,7 +148,7 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
     Ok(())
 }
 
-async fn process_archive(mut job: ArchiveJob, app_handle: tauri::AppHandle) -> Result<(), String> {
+fn process_archive(mut job: ArchiveJob, app_handle: &tauri::AppHandle) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
     let source_path = Path::new(&source_path_str);
@@ -157,12 +160,12 @@ async fn process_archive(mut job: ArchiveJob, app_handle: tauri::AppHandle) -> R
         return Err("Compression not yet implemented".to_owned());
     }
     // Move entire directory to archive location
-    move_directory_recursive(source_path, archive_path, &mut job, &app_handle).await?;
+    move_directory_recursive(source_path, archive_path, &mut job, app_handle)?;
 
     Ok(())
 }
 
-async fn move_directory_recursive(
+fn move_directory_recursive(
     source: &Path,
     dest: &Path,
     job: &mut ArchiveJob,
@@ -172,8 +175,6 @@ async fn move_directory_recursive(
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
 
     // Copy all files and subdirectories using walkdir to avoid recursion
-    use walkdir::WalkDir;
-
     for entry in WalkDir::new(source) {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
@@ -238,8 +239,10 @@ pub async fn get_archive_queue() -> Result<Vec<ArchiveJob>, String> {
 /// Remove an archive job from queue
 #[tauri::command]
 pub async fn remove_archive_job(job_id: String) -> Result<(), String> {
-    let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
-    queue.remove(&job_id);
+    {
+        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+        queue.remove(&job_id);
+    }
     Ok(())
 }
 
@@ -611,12 +614,15 @@ mod tests {
             total_bytes: 1_024_000,
         };
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(progress_percent, 50.0);
+        assert!((progress_percent - 50.0).abs() < f64::EPSILON);
 
+        #[allow(clippy::cast_precision_loss)]
         let bytes_percent =
             (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
-        assert_eq!(bytes_percent, 50.0);
+        assert!((bytes_percent - 50.0).abs() < f64::EPSILON);
     }
 
     #[tokio::test]

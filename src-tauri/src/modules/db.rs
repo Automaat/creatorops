@@ -1,5 +1,5 @@
 use rusqlite::{Connection, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// Database wrapper for dependency injection
@@ -11,18 +11,18 @@ impl Database {
     /// Create new database instance with default path
     pub fn new() -> Result<Self> {
         let db_path = Self::get_default_path()?;
-        Self::new_with_path(db_path)
+        Self::new_with_path(&db_path)
     }
 
     /// Create new database instance with custom path (for testing)
-    pub fn new_with_path(db_path: PathBuf) -> Result<Self> {
+    pub fn new_with_path(db_path: &Path) -> Result<Self> {
         // Create parent directory if it doesn't exist
         if let Some(parent) = db_path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
         }
 
-        let conn = Connection::open(&db_path)?;
+        let conn = Connection::open(db_path)?;
 
         // Initialize schema
         Self::init_schema(&conn)?;
@@ -114,7 +114,7 @@ mod tests {
         // Parent doesn't exist yet
         assert!(!db_path.parent().unwrap().exists());
 
-        let db = Database::new_with_path(db_path.clone()).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         // Parent was created
         assert!(db_path.parent().unwrap().exists());
@@ -138,7 +138,7 @@ mod tests {
     fn test_schema_initialization_creates_all_indexes() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let indexes = db
             .execute(|conn| {
@@ -162,7 +162,7 @@ mod tests {
     fn test_execute_with_callback() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         // Test successful query
         let result = db.execute(|conn| {
@@ -192,7 +192,7 @@ mod tests {
     fn test_execute_query_returns_value() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let count: usize = db
             .execute(|conn| {
@@ -218,7 +218,7 @@ mod tests {
     fn test_multiple_connections() {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         // Multiple operations should work
         db.execute(|conn| {

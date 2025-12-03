@@ -59,8 +59,8 @@ pub async fn save_import_history(
     };
 
     let history = ImportHistory {
-        id: id.clone(),
-        project_id: project_id.clone(),
+        id,
+        project_id,
         project_name,
         source_path,
         destination_path,
@@ -77,7 +77,7 @@ pub async fn save_import_history(
 
     // Save to history file
     let history_path = get_history_file_path()?;
-    let mut histories = load_all_histories().await.unwrap_or_default();
+    let mut histories = load_all_histories().unwrap_or_default();
     histories.insert(0, history.clone());
 
     // Keep only last 100 imports
@@ -93,21 +93,21 @@ pub async fn save_import_history(
 
 #[tauri::command]
 pub async fn get_import_history(limit: Option<usize>) -> Result<Vec<ImportHistory>, String> {
-    let histories = load_all_histories().await?;
+    let histories = load_all_histories()?;
     let limit = limit.unwrap_or(50);
     Ok(histories.into_iter().take(limit).collect())
 }
 
 #[tauri::command]
 pub async fn get_project_import_history(project_id: String) -> Result<Vec<ImportHistory>, String> {
-    let histories = load_all_histories().await?;
+    let histories = load_all_histories()?;
     Ok(histories
         .into_iter()
         .filter(|h| h.project_id == project_id)
         .collect())
 }
 
-async fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
+fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
     let history_path = get_history_file_path()?;
 
     if !history_path.exists() {
@@ -220,10 +220,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_success() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
@@ -252,10 +252,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_partial() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
@@ -283,10 +283,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_failed() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
@@ -340,16 +340,16 @@ mod tests {
     #[tokio::test]
     async fn test_load_all_histories_empty() {
         // Test loading when file doesn't exist
-        let result = load_all_histories().await;
+        let result = load_all_histories();
         assert!(result.is_ok() || result.is_err()); // May succeed with empty vec or fail
     }
 
     #[tokio::test]
     async fn test_status_determination_logic() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         // Test Failed status (0 files copied)
@@ -414,10 +414,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_import_history_empty() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = get_import_history(None).await;
@@ -428,9 +428,9 @@ mod tests {
 
     #[test]
     fn test_get_history_file_path() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = get_history_file_path();
         assert!(result.is_ok());

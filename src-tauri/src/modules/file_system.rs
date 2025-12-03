@@ -108,12 +108,12 @@ fn open_in_external_app(
 }
 
 #[tauri::command]
-pub fn reveal_in_finder(path: String) -> Result<(), String> {
+pub fn reveal_in_finder(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         Command::new("open")
             .arg("-R")
-            .arg(&path)
+            .arg(path)
             .spawn()
             .map_err(|e| format!("Failed to reveal in Finder: {e}"))?;
     }
@@ -144,34 +144,34 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_in_lightroom(path: String) -> Result<(), String> {
+pub fn open_in_lightroom(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = LIGHTROOM_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
-    open_in_external_app(&path, "Photos", "Adobe Lightroom Classic", paths, None)
+    open_in_external_app(path, "Photos", "Adobe Lightroom Classic", paths, None)
 }
 
 #[tauri::command]
-pub fn open_in_aftershoot(path: String) -> Result<(), String> {
+pub fn open_in_aftershoot(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = AFTERSHOOT_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
-    open_in_external_app(&path, "Photos", "AfterShoot", paths, None)
+    open_in_external_app(path, "Photos", "AfterShoot", paths, None)
 }
 
 #[tauri::command]
-pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
+pub fn open_in_davinci_resolve(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = DAVINCI_RESOLVE_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
     open_in_external_app(
-        &path,
+        path,
         "Videos",
         "DaVinci Resolve",
         paths,
@@ -180,9 +180,9 @@ pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
+pub fn open_in_final_cut_pro(path: &str) -> Result<(), String> {
     open_in_external_app(
-        &path,
+        path,
         "Videos",
         "Final Cut Pro",
         &[],
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_open_in_lightroom_validates_path() {
         let temp_dir = TempDir::new().unwrap();
-        let result = open_in_lightroom(temp_dir.path().to_string_lossy().to_string());
+        let result = open_in_lightroom(&temp_dir.path().to_string_lossy());
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     fn test_open_in_aftershoot_validates_path() {
         let temp_dir = TempDir::new().unwrap();
-        let result = open_in_aftershoot(temp_dir.path().to_string_lossy().to_string());
+        let result = open_in_aftershoot(&temp_dir.path().to_string_lossy());
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn test_open_in_davinci_resolve_validates_path() {
         let temp_dir = TempDir::new().unwrap();
-        let result = open_in_davinci_resolve(temp_dir.path().to_string_lossy().to_string());
+        let result = open_in_davinci_resolve(&temp_dir.path().to_string_lossy());
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_open_in_final_cut_pro_validates_path() {
         let temp_dir = TempDir::new().unwrap();
-        let result = open_in_final_cut_pro(temp_dir.path().to_string_lossy().to_string());
+        let result = open_in_final_cut_pro(&temp_dir.path().to_string_lossy());
 
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));
@@ -315,7 +315,7 @@ mod tests {
         std::fs::write(&test_file, b"test").unwrap();
 
         // Function spawns background process, so it may succeed or fail depending on platform
-        let result = reveal_in_finder(test_file.to_string_lossy().to_string());
+        let result = reveal_in_finder(&test_file.to_string_lossy());
         assert!(result.is_ok() || result.is_err());
     }
 

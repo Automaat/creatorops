@@ -295,7 +295,7 @@ mod tests {
     fn setup_test_db() -> (TempDir, Database) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
         (temp_dir, db)
     }
 
@@ -750,7 +750,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let project_base = temp_dir.path().join("CreatorOps").join("Projects");
 
@@ -841,7 +841,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let project_folder = temp_dir.path().join("test_project");
         std::fs::create_dir_all(&project_folder).unwrap();
@@ -973,7 +973,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         // Insert project with invalid status
         db.execute(|conn| {

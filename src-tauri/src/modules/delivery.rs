@@ -226,7 +226,9 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
 
         job.status = DeliveryStatus::InProgress;
         job.started_at = Some(get_timestamp());
-        job.clone()
+        let job_clone = job.clone();
+        drop(queue);
+        job_clone
     };
 
     // Spawn background task
@@ -274,11 +276,10 @@ async fn process_delivery(
             .to_string();
 
         // Apply naming template if provided
-        let dest_name = if let Some(template) = &job.naming_template {
-            apply_naming_template(template, &file_name, index)
-        } else {
-            file_name.clone()
-        };
+        let dest_name = job.naming_template.as_ref().map_or_else(
+            || file_name.clone(),
+            |template| apply_naming_template(template, &file_name, index),
+        );
 
         let dest_path = delivery_path.join(&dest_name);
 
@@ -390,6 +391,8 @@ async fn copy_file_with_progress(
 
         // Calculate speed and ETA
         let elapsed = start_time.elapsed().as_secs_f64();
+        // Safe cast: bytes_transferred used for progress display, precision loss acceptable
+        #[allow(clippy::cast_precision_loss)]
         let speed = if elapsed > 0.0 {
             *bytes_transferred as f64 / elapsed
         } else {
@@ -397,7 +400,9 @@ async fn copy_file_with_progress(
         };
 
         let remaining_bytes = total_bytes.saturating_sub(*bytes_transferred);
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let eta = if speed > 0.0 {
+            // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64
         } else {
             0
@@ -429,11 +434,15 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
     let path = Path::new(original_name);
     let name_without_ext = path.file_stem().unwrap_or_default().to_string_lossy();
     let ext = path.extension().unwrap_or_default().to_string_lossy();
+    let index_str = format!("{:03}", index + 1);
 
-    template
-        .replace("{index}", &format!("{:03}", index + 1))
-        .replace("{name}", &name_without_ext)
-        .replace("{ext}", &ext)
+    #[allow(clippy::literal_string_with_formatting_args)] // Template placeholders, not format args
+    {
+        template
+            .replace("{index}", &index_str)
+            .replace("{name}", &name_without_ext)
+            .replace("{ext}", &ext)
+    }
 }
 
 /// Get delivery queue
@@ -446,8 +455,10 @@ pub async fn get_delivery_queue() -> Result<Vec<DeliveryJob>, String> {
 /// Remove a delivery job from queue
 #[tauri::command]
 pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
-    let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
-    queue.remove(&job_id);
+    {
+        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        queue.remove(&job_id);
+    }
     Ok(())
 }
 
@@ -783,14 +794,16 @@ mod tests {
             file_name: "image.jpg".to_owned(),
             current_file: 30,
             total_files: 100,
-            bytes_transferred: 307200,
-            total_bytes: 1024000,
-            speed: 102400.0,
+            bytes_transferred: 307_200,
+            total_bytes: 1_024_000,
+            speed: 102_400.0,
             eta: 7,
         };
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(progress_percent, 30.0);
+        assert!((progress_percent - 30.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -840,14 +853,14 @@ mod tests {
         let file = ProjectFile {
             name: "photo.jpg".to_owned(),
             path: "/path/to/photo.jpg".to_owned(),
-            size: 2048000,
+            size: 2_048_000,
             modified: "2024-01-01T10:00:00Z".to_owned(),
             file_type: "image/jpeg".to_owned(),
             relative_path: "Selects/photo.jpg".to_owned(),
         };
 
         assert_eq!(file.name, "photo.jpg");
-        assert_eq!(file.size, 2048000);
+        assert_eq!(file.size, 2_048_000);
         assert_eq!(file.file_type, "image/jpeg");
     }
 

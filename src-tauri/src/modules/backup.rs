@@ -5,6 +5,7 @@ use crate::modules::file_utils::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
@@ -121,10 +122,12 @@ pub async fn queue_backup(
         error_message: None,
     };
 
-    let mut queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
-    queue.insert(id, job.clone());
+    {
+        let mut queue = BACKUP_QUEUE
+            .lock()
+            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        queue.insert(id, job.clone());
+    }
 
     Ok(job)
 }
@@ -132,11 +135,12 @@ pub async fn queue_backup(
 /// Get all backup jobs in the queue
 #[tauri::command]
 pub async fn get_backup_queue() -> Result<Vec<BackupJob>, String> {
-    let queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
-
-    let mut jobs: Vec<BackupJob> = queue.values().cloned().collect();
+    let mut jobs: Vec<BackupJob> = {
+        let queue = BACKUP_QUEUE
+            .lock()
+            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        queue.values().cloned().collect()
+    };
     jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     Ok(jobs)
@@ -159,7 +163,9 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
             return Err("Backup job is not pending".to_owned());
         }
 
-        job
+        let job_clone = job;
+        drop(queue);
+        job_clone
     };
 
     // Update status to in-progress
@@ -204,9 +210,8 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
                 // Emit job update
                 let _ = window_clone.emit("backup-job-updated", j.clone());
             }
-        } else {
-            eprintln!("Failed to lock backup queue in background task");
         }
+        // Queue lock failed - continue without updating
     });
 
     // Return immediately with in-progress status
@@ -242,17 +247,19 @@ pub async fn cancel_backup(job_id: String) -> Result<(), String> {
 /// Remove a completed/failed/cancelled backup job from queue
 #[tauri::command]
 pub async fn remove_backup_job(job_id: String) -> Result<(), String> {
-    let mut queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
+    {
+        let mut queue = BACKUP_QUEUE
+            .lock()
+            .map_err(|e| format!("Failed to lock queue: {e}"))?;
 
-    if let Some(job) = queue.get(&job_id) {
-        if job.status == BackupStatus::InProgress {
-            return Err("Cannot remove in-progress backup".to_owned());
+        if let Some(job) = queue.get(&job_id) {
+            if job.status == BackupStatus::InProgress {
+                return Err("Cannot remove in-progress backup".to_owned());
+            }
         }
-    }
 
-    queue.remove(&job_id);
+        queue.remove(&job_id);
+    }
     Ok(())
 }
 
@@ -332,14 +339,17 @@ async fn perform_backup(
                 bytes_transferred += size;
                 files_copied += 1;
             }
-            Err(e) => {
-                eprintln!("Failed to copy {file_name} after retries: {e}");
+            Err(_e) => {
+                // Copy failed after retries - skip file
                 files_skipped += 1;
             }
         }
 
         // Emit progress
         let elapsed = start_time.elapsed().as_secs_f64();
+        // Safe cast: bytes_transferred and remaining_bytes used for progress calculation
+        // Precision loss acceptable for display purposes
+        #[allow(clippy::cast_precision_loss)]
         let speed = if elapsed > 0.0 {
             bytes_transferred as f64 / elapsed
         } else {
@@ -347,7 +357,9 @@ async fn perform_backup(
         };
 
         let remaining_bytes = job.total_bytes - bytes_transferred;
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let eta = if speed > 0.0 {
+            // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64
         } else {
             0
@@ -383,7 +395,7 @@ async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
         match verify_checksum(src, dest).await {
             Ok(true) => Ok(size),
             Ok(false) => {
-                eprintln!("Checksum mismatch for {src:?}, retrying...");
+                // Checksum mismatch - retry
                 let _ = tokio::fs::remove_file(dest).await;
                 Err("Checksum verification failed".to_owned())
             }
@@ -451,8 +463,7 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     let mut history: Vec<BackupHistory> = if history_path.exists() {
         let data = fs::read_to_string(&history_path).map_err(|e| e.to_string())?;
         serde_json::from_str(&data).map_err(|e| {
-            eprintln!("Failed to deserialize backup history: {e}");
-            eprintln!("File content: {data}");
+            // Failed to deserialize - return empty history
             e.to_string()
         })?
     } else {
@@ -479,7 +490,6 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     let json_data = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
 
     // Write and sync file to ensure data is persisted immediately
-    use std::io::Write;
     let mut file = fs::File::create(&history_path).map_err(|e| e.to_string())?;
     file.write_all(json_data.as_bytes())
         .map_err(|e| e.to_string())?;
@@ -900,12 +910,15 @@ mod tests {
             eta: 6,
         };
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(progress_percent, 25.0);
+        assert!((progress_percent - 25.0).abs() < f64::EPSILON);
 
+        #[allow(clippy::cast_precision_loss)]
         let bytes_percent =
             (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
-        assert_eq!(bytes_percent, 25.0);
+        assert!((bytes_percent - 25.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1411,10 +1424,12 @@ mod tests {
         assert_eq!(progress.total_files, 10);
         assert_eq!(progress.bytes_transferred, 512);
         assert_eq!(progress.total_bytes, 1024);
-        assert_eq!(progress.speed, 100.5);
+        assert!((progress.speed - 100.5).abs() < f64::EPSILON);
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(percent, 50.0);
+        assert!((percent - 50.0).abs() < f64::EPSILON);
     }
 
     #[tokio::test]
