@@ -404,9 +404,8 @@ async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let file_size = src_file.metadata().await.map_err(|e| e.to_string())?.len();
-
     let mut buffer = vec![0u8; CHUNK_SIZE];
+    let mut total_bytes = 0u64;
 
     loop {
         let bytes_read = src_file
@@ -422,9 +421,14 @@ async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
             .write_all(&buffer[..bytes_read])
             .await
             .map_err(|e| e.to_string())?;
+
+        total_bytes += bytes_read as u64;
     }
 
-    Ok(file_size)
+    // Ensure all data is written to disk
+    dest_file.sync_all().await.map_err(|e| e.to_string())?;
+
+    Ok(total_bytes)
 }
 
 // Global mutex for backup history file access
@@ -445,7 +449,11 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 
     let mut history: Vec<BackupHistory> = if history_path.exists() {
         let data = fs::read_to_string(&history_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&data).unwrap_or_default()
+        serde_json::from_str(&data).map_err(|e| {
+            eprintln!("Failed to deserialize backup history: {}", e);
+            eprintln!("File content: {}", data);
+            e.to_string()
+        })?
     } else {
         Vec::new()
     };
@@ -468,7 +476,13 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     history.push(entry);
 
     let json_data = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
-    fs::write(&history_path, json_data).map_err(|e| e.to_string())?;
+
+    // Write and sync file to ensure data is persisted immediately
+    use std::io::Write;
+    let mut file = fs::File::create(&history_path).map_err(|e| e.to_string())?;
+    file.write_all(json_data.as_bytes())
+        .map_err(|e| e.to_string())?;
+    file.sync_all().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -476,6 +490,11 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Global mutex to serialize tests that manipulate HOME environment variable
+    lazy_static::lazy_static! {
+        static ref HOME_TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+    }
 
     #[test]
     fn test_backup_status_serialization() {
@@ -595,5 +614,862 @@ mod tests {
         let json = serde_json::to_string(&job).unwrap();
         assert!(json.contains("failed"));
         assert!(json.contains("Disk full"));
+    }
+
+    #[tokio::test]
+    async fn test_queue_backup() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file1.txt"), "test data").unwrap();
+
+        let result = queue_backup(
+            "proj-123".to_string(),
+            "Backup Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-456".to_string(),
+            "External Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+        assert_eq!(job.project_id, "proj-123");
+        assert_eq!(job.status, BackupStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+
+        // Clean up
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_backup_queue() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-789".to_string(),
+            "Queue Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-123".to_string(),
+            "Test Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let queue = get_backup_queue().await.unwrap();
+        assert!(queue.iter().any(|j| j.id == job.id));
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_backup() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-cancel".to_string(),
+            "Cancel Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-456".to_string(),
+            "Cancel Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let result = cancel_backup(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify cancelled
+        let queue = get_backup_queue().await.unwrap();
+        let cancelled_job = queue.iter().find(|j| j.id == job.id).unwrap();
+        assert_eq!(cancelled_job.status, BackupStatus::Cancelled);
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_backup_not_pending() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-not-pending".to_string(),
+            "Not Pending Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-789".to_string(),
+            "Test Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        // Cancel once (should succeed)
+        let _ = cancel_backup(job.id.clone()).await;
+
+        // Try to cancel again (should fail)
+        let result = cancel_backup(job.id.clone()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Can only cancel pending"));
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_backup_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-remove".to_string(),
+            "Remove Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-remove".to_string(),
+            "Remove Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let result = remove_backup_job(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let queue = get_backup_queue().await.unwrap();
+        assert!(!queue.iter().any(|j| j.id == job.id));
+    }
+
+    #[tokio::test]
+    async fn test_get_backup_history_empty() {
+        let result = get_backup_history().await;
+        assert!(result.is_ok());
+        // Should return empty vec if no history file
+    }
+
+    #[tokio::test]
+    async fn test_get_project_backup_history() {
+        let _all_history = get_backup_history().await.unwrap();
+        let result = get_project_backup_history("nonexistent-project".to_string()).await;
+        assert!(result.is_ok());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_backup_queue_sorted_by_created_at() {
+        use tempfile::TempDir;
+        use tokio::time::{sleep, Duration};
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job1 = queue_backup(
+            "proj-first".to_string(),
+            "First".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-1".to_string(),
+            "Drive 1".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        sleep(Duration::from_millis(100)).await;
+
+        let job2 = queue_backup(
+            "proj-second".to_string(),
+            "Second".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-2".to_string(),
+            "Drive 2".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        let queue = get_backup_queue().await.unwrap();
+
+        // Verify both jobs are in queue
+        assert!(queue.iter().any(|j| j.id == job1.id));
+        assert!(queue.iter().any(|j| j.id == job2.id));
+
+        // Verify job2 has a later created_at timestamp
+        let job1_entry = queue.iter().find(|j| j.id == job1.id).unwrap();
+        let job2_entry = queue.iter().find(|j| j.id == job2.id).unwrap();
+        assert!(job2_entry.created_at >= job1_entry.created_at);
+
+        let _ = remove_backup_job(job1.id).await;
+        let _ = remove_backup_job(job2.id).await;
+    }
+
+    #[test]
+    fn test_backup_status_all_variants() {
+        let statuses = vec![
+            BackupStatus::Pending,
+            BackupStatus::InProgress,
+            BackupStatus::Completed,
+            BackupStatus::Failed,
+            BackupStatus::Cancelled,
+        ];
+
+        for status in statuses {
+            let job = BackupJob {
+                id: "test".to_string(),
+                project_id: "proj".to_string(),
+                project_name: "Test".to_string(),
+                source_path: "/src".to_string(),
+                destination_id: "dest".to_string(),
+                destination_name: "Dest".to_string(),
+                destination_path: "/dst".to_string(),
+                status: status.clone(),
+                total_files: 0,
+                files_copied: 0,
+                files_skipped: 0,
+                total_bytes: 0,
+                bytes_transferred: 0,
+                created_at: "2024-01-01".to_string(),
+                started_at: None,
+                completed_at: None,
+                error_message: None,
+            };
+            assert_eq!(job.status, status);
+        }
+    }
+
+    #[test]
+    fn test_backup_status_deserialization() {
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""pending""#).unwrap(),
+            BackupStatus::Pending
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""inprogress""#).unwrap(),
+            BackupStatus::InProgress
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""completed""#).unwrap(),
+            BackupStatus::Completed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""failed""#).unwrap(),
+            BackupStatus::Failed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""cancelled""#).unwrap(),
+            BackupStatus::Cancelled
+        ));
+    }
+
+    #[test]
+    fn test_backup_progress_calculation() {
+        let progress = BackupProgress {
+            job_id: "backup-123".to_string(),
+            file_name: "photo.jpg".to_string(),
+            current_file: 25,
+            total_files: 100,
+            bytes_transferred: 256000,
+            total_bytes: 1024000,
+            speed: 128000.0,
+            eta: 6,
+        };
+
+        let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(progress_percent, 25.0);
+
+        let bytes_percent =
+            (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
+        assert_eq!(bytes_percent, 25.0);
+    }
+
+    #[test]
+    fn test_backup_constants() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+        assert_eq!(MAX_RETRY_ATTEMPTS, 3);
+    }
+
+    #[tokio::test]
+    async fn test_queue_backup_creates_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-create".to_string(),
+            "Create Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-create".to_string(),
+            "Create Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.status, BackupStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+        assert_eq!(job.files_copied, 0);
+        assert_eq!(job.bytes_transferred, 0);
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_backup_job() {
+        // remove_backup_job returns Ok even for nonexistent jobs
+        let result = remove_backup_job("nonexistent-id".to_string()).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_backup_job_with_skipped_files() {
+        let job = BackupJob {
+            id: "backup-skip".to_string(),
+            project_id: "proj-123".to_string(),
+            project_name: "Partial Backup".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-123".to_string(),
+            destination_name: "Backup Drive".to_string(),
+            destination_path: "/backup".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 10,
+            files_copied: 8,
+            files_skipped: 2,
+            total_bytes: 1024,
+            bytes_transferred: 820,
+            created_at: "2024-01-01".to_string(),
+            started_at: Some("2024-01-01T10:00:00Z".to_string()),
+            completed_at: Some("2024-01-01T10:10:00Z".to_string()),
+            error_message: Some("2 files skipped".to_string()),
+        };
+
+        assert_eq!(job.files_copied + job.files_skipped, job.total_files);
+        assert!(job.error_message.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_nonexistent_backup() {
+        let result = cancel_backup("nonexistent-id".to_string()).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Backup job not found");
+    }
+
+    #[tokio::test]
+    async fn test_backup_job_fields() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "test data").unwrap();
+
+        let job = queue_backup(
+            "test-fields".to_string(),
+            "Test Fields".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-1".to_string(),
+            "Destination".to_string(),
+            "/backup/path".to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.project_id, "test-fields");
+        assert_eq!(job.project_name, "Test Fields");
+        assert_eq!(job.destination_id, "dest-1");
+        assert_eq!(job.destination_name, "Destination");
+        assert_eq!(job.destination_path, "/backup/path");
+        assert!(matches!(job.status, BackupStatus::Pending));
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+        assert_eq!(job.bytes_transferred, 0);
+        assert_eq!(job.files_copied, 0);
+        assert!(job.error_message.is_none());
+    }
+
+    #[test]
+    fn test_backup_job_id_generation() {
+        let job1 = BackupJob {
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id: "proj-1".to_string(),
+            project_name: "Project 1".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-1".to_string(),
+            destination_name: "Dest 1".to_string(),
+            destination_path: "/dest".to_string(),
+            status: BackupStatus::Pending,
+            total_files: 0,
+            total_bytes: 0,
+            files_copied: 0,
+            files_skipped: 0,
+            bytes_transferred: 0,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+        };
+
+        let job2 = BackupJob {
+            id: uuid::Uuid::new_v4().to_string(),
+            project_id: "proj-2".to_string(),
+            project_name: "Project 2".to_string(),
+            source_path: "/source2".to_string(),
+            destination_id: "dest-2".to_string(),
+            destination_name: "Dest 2".to_string(),
+            destination_path: "/dest2".to_string(),
+            status: BackupStatus::Pending,
+            total_files: 0,
+            total_bytes: 0,
+            files_copied: 0,
+            files_skipped: 0,
+            bytes_transferred: 0,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            started_at: None,
+            completed_at: None,
+            error_message: None,
+        };
+
+        // IDs should be unique
+        assert_ne!(job1.id, job2.id);
+    }
+
+    // Integration tests for main execution paths
+    #[tokio::test]
+    async fn test_copy_file_creates_destination() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.txt");
+        let dest = temp_dir.path().join("dest.txt");
+
+        let test_data = b"test data for copy";
+        std::fs::write(&src, test_data).unwrap();
+
+        let result = copy_file(&src, &dest).await;
+        assert!(result.is_ok());
+        assert!(dest.exists());
+
+        let content = std::fs::read(&dest).unwrap();
+        assert_eq!(content, test_data);
+        assert_eq!(result.unwrap(), test_data.len() as u64);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_large_file() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("large.bin");
+        let dest = temp_dir.path().join("large_dest.bin");
+
+        // Create 5MB file (larger than one chunk)
+        let data = vec![0xAB; 5 * 1024 * 1024];
+        std::fs::write(&src, &data).unwrap();
+
+        let result = copy_file(&src, &dest).await;
+        assert!(result.is_ok());
+        let expected_size = data.len() as u64;
+        assert_eq!(result.unwrap(), expected_size);
+
+        let dest_size = std::fs::metadata(&dest).unwrap().len();
+        assert_eq!(dest_size, expected_size);
+
+        // Verify content integrity
+        let dest_data = std::fs::read(&dest).unwrap();
+        assert_eq!(dest_data.len(), data.len());
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_success() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.jpg");
+        let dest = temp_dir.path().join("dest.jpg");
+
+        std::fs::write(&src, b"photo data").unwrap();
+
+        let result = copy_file_with_retry(&src, &dest).await;
+        assert!(result.is_ok());
+        assert!(dest.exists());
+
+        let src_content = std::fs::read(&src).unwrap();
+        let dest_content = std::fs::read(&dest).unwrap();
+        assert_eq!(src_content, dest_content);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_checksum_verification() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.bin");
+        let dest = temp_dir.path().join("dest.bin");
+
+        // Create file with specific content
+        let content = b"checksum test data 12345";
+        std::fs::write(&src, content).unwrap();
+
+        let result = copy_file_with_retry(&src, &dest).await;
+        assert!(result.is_ok());
+
+        // Verify checksum matches
+        let src_data = std::fs::read(&src).unwrap();
+        let dest_data = std::fs::read(&dest).unwrap();
+        assert_eq!(src_data, dest_data);
+    }
+
+    #[tokio::test]
+    async fn test_save_backup_to_history() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Acquire lock to prevent parallel tests from interfering with HOME
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+
+        // Save and set HOME to temp dir
+        let original_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", temp_dir.path());
+
+        let job = BackupJob {
+            id: "hist-test-1".to_string(),
+            project_id: "proj-hist".to_string(),
+            project_name: "History Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-hist".to_string(),
+            destination_name: "History Dest".to_string(),
+            destination_path: "/dest".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 5,
+            files_copied: 5,
+            files_skipped: 0,
+            total_bytes: 1024,
+            bytes_transferred: 1024,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            started_at: Some("2024-01-01T00:01:00Z".to_string()),
+            completed_at: Some("2024-01-01T00:02:00Z".to_string()),
+            error_message: None,
+        };
+
+        let result = save_backup_to_history(&job);
+        assert!(result.is_ok());
+
+        // Verify history file was created
+        let history_path = temp_dir
+            .path()
+            .join("CreatorOps")
+            .join("backup_history.json");
+        assert!(history_path.exists());
+
+        // Verify content
+        let content = std::fs::read_to_string(&history_path).unwrap();
+        assert!(content.contains("hist-test-1"));
+        assert!(content.contains("History Project"));
+
+        // Restore HOME
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_save_backup_to_history_multiple_entries() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Hold lock during setup and save operations to prevent other tests from interfering
+        let original_home = {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            let original_home = std::env::var_os("HOME");
+            std::env::set_var("HOME", temp_dir.path());
+
+            // Save first backup
+            let job1 = BackupJob {
+                id: "hist-1".to_string(),
+                project_id: "proj-1".to_string(),
+                project_name: "Project 1".to_string(),
+                source_path: "/src1".to_string(),
+                destination_id: "dest-1".to_string(),
+                destination_name: "Dest 1".to_string(),
+                destination_path: "/dest1".to_string(),
+                status: BackupStatus::Completed,
+                total_files: 3,
+                files_copied: 3,
+                files_skipped: 0,
+                total_bytes: 512,
+                bytes_transferred: 512,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                started_at: Some("2024-01-01T00:01:00Z".to_string()),
+                completed_at: Some("2024-01-01T00:02:00Z".to_string()),
+                error_message: None,
+            };
+
+            save_backup_to_history(&job1).unwrap();
+
+            // Save second backup
+            let job2 = BackupJob {
+                id: "hist-2".to_string(),
+                project_id: "proj-2".to_string(),
+                project_name: "Project 2".to_string(),
+                source_path: "/src2".to_string(),
+                destination_id: "dest-2".to_string(),
+                destination_name: "Dest 2".to_string(),
+                destination_path: "/dest2".to_string(),
+                status: BackupStatus::Completed,
+                total_files: 5,
+                files_copied: 5,
+                files_skipped: 0,
+                total_bytes: 1024,
+                bytes_transferred: 1024,
+                created_at: "2024-01-02T00:00:00Z".to_string(),
+                started_at: Some("2024-01-02T00:01:00Z".to_string()),
+                completed_at: Some("2024-01-02T00:02:00Z".to_string()),
+                error_message: None,
+            };
+
+            save_backup_to_history(&job2).unwrap();
+
+            original_home
+        }; // Lock dropped here before await
+
+        // Verify both entries exist (no lock held during await)
+        let history = get_backup_history().await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert!(history.iter().any(|h| h.id == "hist-1"));
+        assert!(history.iter().any(|h| h.id == "hist-2"));
+
+        // Restore HOME at the end
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            if let Some(home) = original_home {
+                std::env::set_var("HOME", home);
+            } else {
+                std::env::remove_var("HOME");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_backup_history_with_entries() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Setup HOME in locked scope, then drop lock but keep HOME set
+        let (source, original_home) = {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            let original_home = std::env::var_os("HOME");
+            std::env::set_var("HOME", temp_dir.path());
+
+            let source = temp_dir.path().join("project");
+            std::fs::create_dir(&source).unwrap();
+            std::fs::write(source.join("file.txt"), "data").unwrap();
+
+            (source, original_home)
+        }; // Lock dropped here, but HOME still set
+
+        // Queue and complete a backup (no lock held during await)
+        let _job = queue_backup(
+            "proj-hist".to_string(),
+            "History Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-hist".to_string(),
+            "Dest History".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        // Note: Without actually running start_backup, history will be empty
+        // This tests the history retrieval mechanism
+        let _history = get_backup_history().await.unwrap();
+
+        // Restore HOME at the end
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            if let Some(home) = original_home {
+                std::env::set_var("HOME", home);
+            } else {
+                std::env::remove_var("HOME");
+            }
+        }
+    }
+
+    #[test]
+    fn test_backup_history_struct() {
+        let history = BackupHistory {
+            id: "hist-1".to_string(),
+            project_id: "proj-1".to_string(),
+            project_name: "Project 1".to_string(),
+            destination_name: "Destination".to_string(),
+            destination_path: "/backup/dest".to_string(),
+            files_copied: 10,
+            files_skipped: 2,
+            total_bytes: 1024,
+            started_at: "2024-01-01T00:00:00Z".to_string(),
+            completed_at: "2024-01-01T00:01:00Z".to_string(),
+            status: BackupStatus::Completed,
+            error_message: None,
+        };
+
+        assert_eq!(history.id, "hist-1");
+        assert_eq!(history.files_copied, 10);
+        assert_eq!(history.files_skipped, 2);
+        assert_eq!(history.total_bytes, 1024);
+        assert!(!history.started_at.is_empty());
+        assert!(!history.completed_at.is_empty());
+        assert!(matches!(history.status, BackupStatus::Completed));
+        assert!(history.error_message.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_backup_job_timestamps() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "time-test".to_string(),
+            "Timestamp Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-time".to_string(),
+            "Dest Time".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert!(!job.created_at.is_empty());
+        assert!(job.started_at.is_none());
+        assert!(job.completed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_backup_empty_source() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("empty_project");
+        std::fs::create_dir(&source).unwrap();
+
+        let job = queue_backup(
+            "empty-test".to_string(),
+            "Empty Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-empty".to_string(),
+            "Dest Empty".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.total_files, 0);
+        assert_eq!(job.total_bytes, 0);
+    }
+
+    #[test]
+    fn test_backup_progress_struct() {
+        let progress = BackupProgress {
+            job_id: "job-1".to_string(),
+            file_name: "test.jpg".to_string(),
+            current_file: 5,
+            total_files: 10,
+            bytes_transferred: 512,
+            total_bytes: 1024,
+            speed: 100.5,
+            eta: 10,
+        };
+
+        assert_eq!(progress.job_id, "job-1");
+        assert_eq!(progress.current_file, 5);
+        assert_eq!(progress.total_files, 10);
+        assert_eq!(progress.bytes_transferred, 512);
+        assert_eq!(progress.total_bytes, 1024);
+        assert_eq!(progress.speed, 100.5);
+
+        let percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(percent, 50.0);
+    }
+
+    #[tokio::test]
+    async fn test_get_project_backup_history_empty() {
+        let history = get_project_backup_history("nonexistent-project".to_string())
+            .await
+            .unwrap();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn test_backup_status_ordering() {
+        let statuses = [
+            BackupStatus::Pending,
+            BackupStatus::InProgress,
+            BackupStatus::Completed,
+            BackupStatus::Failed,
+            BackupStatus::Cancelled,
+        ];
+
+        // Verify all statuses are distinct
+        for (i, status1) in statuses.iter().enumerate() {
+            for (j, status2) in statuses.iter().enumerate() {
+                if i == j {
+                    assert_eq!(status1, status2);
+                } else {
+                    assert_ne!(status1, status2);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_backup_job_deserialization() {
+        let json = r#"{
+            "id": "test-123",
+            "projectId": "proj-1",
+            "projectName": "Project 1",
+            "sourcePath": "/source",
+            "destinationId": "dest-1",
+            "destinationName": "Destination",
+            "destinationPath": "/dest",
+            "status": "pending",
+            "totalFiles": 10,
+            "totalBytes": 1024,
+            "filesCopied": 0,
+            "filesSkipped": 0,
+            "bytesTransferred": 0,
+            "createdAt": "2024-01-01T00:00:00Z",
+            "startedAt": null,
+            "completedAt": null,
+            "errorMessage": null
+        }"#;
+
+        let job: BackupJob = serde_json::from_str(json).unwrap();
+        assert_eq!(job.id, "test-123");
+        assert_eq!(job.project_id, "proj-1");
+        assert!(matches!(job.status, BackupStatus::Pending));
     }
 }

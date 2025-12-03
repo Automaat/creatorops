@@ -563,4 +563,629 @@ mod tests {
             "006_file"
         );
     }
+
+    #[tokio::test]
+    async fn test_create_delivery() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("test1.jpg");
+        let file2 = temp_dir.path().join("test2.jpg");
+
+        // Create temp files
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(b"test data 1").unwrap();
+        let mut f2 = std::fs::File::create(&file2).unwrap();
+        f2.write_all(b"test data 2").unwrap();
+
+        let result = create_delivery(
+            "proj-123".to_string(),
+            "Test Project".to_string(),
+            vec![
+                file1.to_string_lossy().to_string(),
+                file2.to_string_lossy().to_string(),
+            ],
+            "/delivery".to_string(),
+            Some("{index}_{name}.{ext}".to_string()),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+        assert_eq!(job.project_id, "proj-123");
+        assert_eq!(job.project_name, "Test Project");
+        assert_eq!(job.status, DeliveryStatus::Pending);
+        assert_eq!(job.total_files, 2);
+        assert_eq!(job.files_copied, 0);
+        assert!(job.total_bytes > 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_delivery_queue() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("test.jpg");
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(b"test").unwrap();
+
+        // Create a delivery job
+        let job = create_delivery(
+            "proj-456".to_string(),
+            "Queue Test".to_string(),
+            vec![file1.to_string_lossy().to_string()],
+            "/delivery".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Get queue
+        let queue = get_delivery_queue().await.unwrap();
+        assert!(queue.iter().any(|j| j.id == job.id));
+
+        // Clean up
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_delivery_job() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("test.jpg");
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(b"test").unwrap();
+
+        // Create and remove
+        let job = create_delivery(
+            "proj-789".to_string(),
+            "Remove Test".to_string(),
+            vec![file1.to_string_lossy().to_string()],
+            "/delivery".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let result = remove_delivery_job(job.id.clone()).await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let queue = get_delivery_queue().await.unwrap();
+        assert!(!queue.iter().any(|j| j.id == job.id));
+    }
+
+    #[tokio::test]
+    async fn test_delivery_job_calculates_total_bytes() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("large.jpg");
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(&vec![0u8; 1024]).unwrap(); // 1KB file
+
+        let job = create_delivery(
+            "proj-size".to_string(),
+            "Size Test".to_string(),
+            vec![file1.to_string_lossy().to_string()],
+            "/delivery".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.total_bytes, 1024);
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[test]
+    fn test_collect_project_files_helper() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        // Create test structure
+        std::fs::create_dir_all(base.join("subdir")).unwrap();
+        std::fs::write(base.join("file1.txt"), "test1").unwrap();
+        std::fs::write(base.join("subdir/file2.txt"), "test2").unwrap();
+
+        let mut files = Vec::new();
+        let result = collect_project_files(base, base, &mut files);
+
+        assert!(result.is_ok());
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|f| f.name == "file1.txt"));
+        assert!(files.iter().any(|f| f.name == "file2.txt"));
+    }
+
+    #[test]
+    fn test_collect_project_files_skips_project_json() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        std::fs::write(base.join("project.json"), "{}").unwrap();
+        std::fs::write(base.join("normal.txt"), "data").unwrap();
+
+        let mut files = Vec::new();
+        let result = collect_project_files(base, base, &mut files);
+
+        assert!(result.is_ok());
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "normal.txt");
+    }
+
+    #[test]
+    fn test_delivery_status_all_variants() {
+        let statuses = vec![
+            DeliveryStatus::Pending,
+            DeliveryStatus::InProgress,
+            DeliveryStatus::Completed,
+            DeliveryStatus::Failed,
+        ];
+
+        for status in statuses {
+            let job = DeliveryJob {
+                id: "test".to_string(),
+                project_id: "proj".to_string(),
+                project_name: "Test".to_string(),
+                selected_files: vec![],
+                delivery_path: "/delivery".to_string(),
+                naming_template: None,
+                status: status.clone(),
+                total_files: 0,
+                files_copied: 0,
+                total_bytes: 0,
+                bytes_transferred: 0,
+                created_at: "2024-01-01".to_string(),
+                started_at: None,
+                completed_at: None,
+                error_message: None,
+                manifest_path: None,
+            };
+            assert_eq!(job.status, status);
+        }
+    }
+
+    #[test]
+    fn test_delivery_status_deserialization() {
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""pending""#).unwrap(),
+            DeliveryStatus::Pending
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""inprogress""#).unwrap(),
+            DeliveryStatus::InProgress
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""completed""#).unwrap(),
+            DeliveryStatus::Completed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""failed""#).unwrap(),
+            DeliveryStatus::Failed
+        ));
+    }
+
+    #[test]
+    fn test_delivery_progress_calculation() {
+        let progress = DeliveryProgress {
+            job_id: "delivery-123".to_string(),
+            file_name: "image.jpg".to_string(),
+            current_file: 30,
+            total_files: 100,
+            bytes_transferred: 307200,
+            total_bytes: 1024000,
+            speed: 102400.0,
+            eta: 7,
+        };
+
+        let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(progress_percent, 30.0);
+    }
+
+    #[test]
+    fn test_delivery_constants() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+    }
+
+    #[tokio::test]
+    async fn test_create_delivery_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let project = temp_dir.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let file = project.join("photo.jpg");
+        std::fs::write(&file, "photo data").unwrap();
+
+        let delivery_path = temp_dir.path().join("delivery");
+        std::fs::create_dir(&delivery_path).unwrap();
+
+        let job = create_delivery(
+            "proj-del".to_string(),
+            "Delivery Test".to_string(),
+            vec![file.to_string_lossy().to_string()],
+            delivery_path.to_string_lossy().to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.status, DeliveryStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_delivery_job() {
+        // remove_delivery_job returns Ok even for nonexistent jobs
+        let result = remove_delivery_job("nonexistent-id".to_string()).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_project_file_complete_struct() {
+        let file = ProjectFile {
+            name: "photo.jpg".to_string(),
+            path: "/path/to/photo.jpg".to_string(),
+            size: 2048000,
+            modified: "2024-01-01T10:00:00Z".to_string(),
+            file_type: "image/jpeg".to_string(),
+            relative_path: "Selects/photo.jpg".to_string(),
+        };
+
+        assert_eq!(file.name, "photo.jpg");
+        assert_eq!(file.size, 2048000);
+        assert_eq!(file.file_type, "image/jpeg");
+    }
+
+    #[test]
+    fn test_apply_naming_template_with_index() {
+        let template = "{name}_{index}";
+        // index is 1-based and zero-padded to 3 digits: index 5 becomes "006"
+        let result = apply_naming_template(template, "photo.jpg", 5);
+        assert_eq!(result, "photo_006");
+    }
+
+    #[test]
+    fn test_apply_naming_template_with_ext() {
+        let template = "{name}.{ext}";
+        let result = apply_naming_template(template, "photo.jpg", 1);
+        assert_eq!(result, "photo.jpg");
+    }
+
+    #[tokio::test]
+    async fn test_delivery_job_with_naming_template() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let project = temp_dir.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let file = project.join("original.jpg");
+        std::fs::write(&file, "data").unwrap();
+
+        let delivery_path = temp_dir.path().join("delivery");
+        std::fs::create_dir(&delivery_path).unwrap();
+
+        let job = create_delivery(
+            "proj-template".to_string(),
+            "Template Test".to_string(),
+            vec![file.to_string_lossy().to_string()],
+            delivery_path.to_string_lossy().to_string(),
+            Some("{name}_{index}".to_string()),
+        )
+        .await
+        .unwrap();
+
+        assert!(job.naming_template.is_some());
+        assert_eq!(job.naming_template.unwrap(), "{name}_{index}");
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[test]
+    fn test_delivery_job_deserialization() {
+        let json = r#"{
+            "id": "del-123",
+            "projectId": "proj-456",
+            "projectName": "Wedding",
+            "selectedFiles": ["/file1.jpg", "/file2.jpg"],
+            "deliveryPath": "/delivery",
+            "namingTemplate": null,
+            "status": "pending",
+            "totalFiles": 2,
+            "filesCopied": 0,
+            "totalBytes": 2048,
+            "bytesTransferred": 0,
+            "createdAt": "2024-01-01",
+            "startedAt": null,
+            "completedAt": null,
+            "errorMessage": null,
+            "manifestPath": null
+        }"#;
+
+        let job: DeliveryJob = serde_json::from_str(json).unwrap();
+        assert_eq!(job.id, "del-123");
+        assert_eq!(job.project_id, "proj-456");
+        assert_eq!(job.total_files, 2);
+    }
+
+    #[test]
+    fn test_collect_project_files_with_subdirs() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        std::fs::create_dir_all(base.join("dir1/dir2")).unwrap();
+        std::fs::write(base.join("file1.txt"), "1").unwrap();
+        std::fs::write(base.join("dir1/file2.txt"), "2").unwrap();
+        std::fs::write(base.join("dir1/dir2/file3.txt"), "3").unwrap();
+
+        let mut files = Vec::new();
+        let result = collect_project_files(base, base, &mut files);
+
+        assert!(result.is_ok());
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|f| f.name == "file1.txt"));
+        assert!(files.iter().any(|f| f.name == "file2.txt"));
+        assert!(files.iter().any(|f| f.name == "file3.txt"));
+    }
+
+    // Integration tests for main execution paths
+    #[tokio::test]
+    async fn test_apply_naming_template_in_workflow() {
+        let template = "{name}_{index}.{ext}";
+
+        let result1 = apply_naming_template(template, "photo.jpg", 0);
+        assert_eq!(result1, "photo_001.jpg");
+
+        let result2 = apply_naming_template(template, "video.mp4", 9);
+        assert_eq!(result2, "video_010.mp4");
+
+        let result3 = apply_naming_template(template, "document.pdf", 99);
+        assert_eq!(result3, "document_100.pdf");
+    }
+
+    #[tokio::test]
+    async fn test_create_delivery_calculates_sizes_correctly() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("large1.bin");
+        let file2 = temp_dir.path().join("large2.bin");
+        let file3 = temp_dir.path().join("small.txt");
+
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(&vec![0u8; 1024]).unwrap();
+
+        let mut f2 = std::fs::File::create(&file2).unwrap();
+        f2.write_all(&vec![0u8; 2048]).unwrap();
+
+        let mut f3 = std::fs::File::create(&file3).unwrap();
+        f3.write_all(b"test").unwrap();
+
+        let job = create_delivery(
+            "proj-size".to_string(),
+            "Size Test".to_string(),
+            vec![
+                file1.to_string_lossy().to_string(),
+                file2.to_string_lossy().to_string(),
+                file3.to_string_lossy().to_string(),
+            ],
+            "/delivery".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.total_files, 3);
+        assert_eq!(job.total_bytes, 1024 + 2048 + 4);
+        assert_eq!(job.bytes_transferred, 0);
+        assert_eq!(job.files_copied, 0);
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_collect_project_files_calculates_metadata() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        std::fs::create_dir_all(base.join("photos")).unwrap();
+        std::fs::write(base.join("photo1.jpg"), b"photo1").unwrap();
+        std::fs::write(base.join("photos/photo2.jpg"), b"photo2data").unwrap();
+        std::fs::write(base.join("document.txt"), b"text").unwrap();
+
+        let mut files = Vec::new();
+        collect_project_files(base, base, &mut files).unwrap();
+
+        assert_eq!(files.len(), 3);
+
+        let photo1 = files.iter().find(|f| f.name == "photo1.jpg").unwrap();
+        assert_eq!(photo1.size, 6);
+        assert_eq!(photo1.file_type, "JPG");
+        assert_eq!(photo1.relative_path, "photo1.jpg");
+
+        let photo2 = files.iter().find(|f| f.name == "photo2.jpg").unwrap();
+        assert_eq!(photo2.size, 10);
+        assert_eq!(photo2.file_type, "JPG");
+        assert!(photo2.relative_path.contains("photos"));
+
+        let doc = files.iter().find(|f| f.name == "document.txt").unwrap();
+        assert_eq!(doc.size, 4);
+        assert_eq!(doc.file_type, "TXT");
+    }
+
+    #[tokio::test]
+    async fn test_delivery_status_transitions() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("test.jpg");
+        let mut f1 = std::fs::File::create(&file1).unwrap();
+        f1.write_all(b"data").unwrap();
+
+        let job = create_delivery(
+            "status-test".to_string(),
+            "Status Test".to_string(),
+            vec![file1.to_string_lossy().to_string()],
+            "/delivery".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.status, DeliveryStatus::Pending);
+        assert!(job.started_at.is_none());
+        assert!(job.completed_at.is_none());
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_delivery_queue_operations() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file1 = temp_dir.path().join("f1.jpg");
+        let file2 = temp_dir.path().join("f2.jpg");
+
+        std::fs::File::create(&file1)
+            .unwrap()
+            .write_all(b"1")
+            .unwrap();
+        std::fs::File::create(&file2)
+            .unwrap()
+            .write_all(b"2")
+            .unwrap();
+
+        // Create two jobs
+        let job1 = create_delivery(
+            "q1".to_string(),
+            "Queue1".to_string(),
+            vec![file1.to_string_lossy().to_string()],
+            "/del1".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let job2 = create_delivery(
+            "q2".to_string(),
+            "Queue2".to_string(),
+            vec![file2.to_string_lossy().to_string()],
+            "/del2".to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        let job1_id = job1.id.clone();
+        let job2_id = job2.id.clone();
+
+        // Get queue
+        let queue = get_delivery_queue().await.unwrap();
+        assert!(queue.len() >= 2);
+        assert!(queue.iter().any(|j| j.id == job1_id));
+        assert!(queue.iter().any(|j| j.id == job2_id));
+
+        // Remove jobs
+        let _ = remove_delivery_job(job1.id).await;
+        let _ = remove_delivery_job(job2.id).await;
+
+        let queue_after = get_delivery_queue().await.unwrap();
+        assert!(!queue_after.iter().any(|j| j.id == job1_id));
+        assert!(!queue_after.iter().any(|j| j.id == job2_id));
+    }
+
+    #[test]
+    fn test_apply_naming_template_edge_cases() {
+        // Empty template
+        let result = apply_naming_template("", "file.jpg", 0);
+        assert_eq!(result, "");
+
+        // No placeholders
+        let result = apply_naming_template("static_name.jpg", "original.png", 5);
+        assert_eq!(result, "static_name.jpg");
+
+        // Only index
+        let result = apply_naming_template("{index}", "file.jpg", 42);
+        assert_eq!(result, "043");
+
+        // File without extension
+        let result = apply_naming_template("{name}_{index}", "README", 10);
+        assert_eq!(result, "README_011");
+    }
+
+    #[test]
+    fn test_project_file_with_no_extension() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        std::fs::write(base.join("Makefile"), "build").unwrap();
+        std::fs::write(base.join("README"), "readme").unwrap();
+
+        let mut files = Vec::new();
+        collect_project_files(base, base, &mut files).unwrap();
+
+        assert_eq!(files.len(), 2);
+
+        let makefile = files.iter().find(|f| f.name == "Makefile").unwrap();
+        assert_eq!(makefile.file_type, "UNKNOWN");
+
+        let readme = files.iter().find(|f| f.name == "README").unwrap();
+        assert_eq!(readme.file_type, "UNKNOWN");
+    }
+
+    #[tokio::test]
+    async fn test_create_delivery_with_nonexistent_files() {
+        let result = create_delivery(
+            "nonexist".to_string(),
+            "Nonexistent".to_string(),
+            vec!["/nonexistent/file.jpg".to_string()],
+            "/delivery".to_string(),
+            None,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let job = result.unwrap();
+
+        // Should create job with 0 bytes since file doesn't exist
+        assert_eq!(job.total_bytes, 0);
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[test]
+    fn test_collect_project_files_empty_directory() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = temp_dir.path();
+
+        let mut files = Vec::new();
+        let result = collect_project_files(base, base, &mut files);
+
+        assert!(result.is_ok());
+        assert_eq!(files.len(), 0);
+    }
 }

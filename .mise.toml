@@ -2,7 +2,7 @@
 rust = "1.91.1"
 node = "24.11.1"
 "cargo:tauri-cli" = "2.9.4"
-"cargo:cargo-tarpaulin" = "0.31.2"
+"cargo:cargo-llvm-cov" = "0.6.15"
 
 [tasks.dev]
 description = "Run Tauri app in development mode"
@@ -66,7 +66,7 @@ depends = ["coverage:rust", "coverage:frontend"]
 
 [tasks."coverage:rust"]
 description = "Generate Rust coverage report"
-run = "cd src-tauri && cargo tarpaulin --out Lcov --out Html --output-dir ../coverage/rust --exclude-files 'target/*' --timeout 300"
+run = "mkdir -p coverage/rust && cd src-tauri && cargo llvm-cov --all-features --workspace --lcov --output-path ../coverage/rust/lcov.info && cargo llvm-cov --all-features --workspace --html --output-dir ../coverage/rust"
 
 [tasks."coverage:frontend"]
 description = "Generate frontend coverage report"

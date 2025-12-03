@@ -602,6 +602,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
  "tauri-plugin-opener",
+ "tempfile",
  "tokio",
  "tokio-retry",
  "tokio-util",
