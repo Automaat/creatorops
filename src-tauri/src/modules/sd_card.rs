@@ -77,12 +77,13 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
 fn count_files(path: &Path) -> usize {
     WalkDir::new(path)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.file_type().is_file())
         .count()
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+#[allow(unsafe_code, clippy::unwrap_used)]
 fn get_disk_usage(path: &Path) -> (u64, u64) {
     #[cfg(target_os = "macos")]
     {
@@ -94,7 +95,7 @@ fn get_disk_usage(path: &Path) -> (u64, u64) {
             let mut stats: libc::statfs = mem::zeroed();
 
             if libc::statfs(path_cstr.as_ptr(), &mut stats) == 0 {
-                let block_size = stats.f_bsize as u64;
+                let block_size = u64::from(stats.f_bsize);
                 let total_blocks = stats.f_blocks;
                 let free_blocks = stats.f_bfree;
 
@@ -116,7 +117,7 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
     let path = Path::new(&card_path);
 
     if !path.exists() {
-        return Err("SD card path does not exist".to_string());
+        return Err("SD card path does not exist".to_owned());
     }
 
     let mut file_paths = Vec::new();
@@ -127,7 +128,7 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
 
     for entry in WalkDir::new(path)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.file_type().is_file())
     {
         let file_path = entry.path();
@@ -151,19 +152,19 @@ pub async fn eject_sd_card(volume_path: String) -> Result<(), String> {
         let output = Command::new("diskutil")
             .args(["eject", &volume_path])
             .output()
-            .map_err(|e| format!("Failed to execute diskutil: {}", e))?;
+            .map_err(|e| format!("Failed to execute diskutil: {e}"))?;
 
         if output.status.success() {
             Ok(())
         } else {
             let error = String::from_utf8_lossy(&output.stderr);
-            Err(format!("Failed to eject SD card: {}", error))
+            Err(format!("Failed to eject SD card: {error}"))
         }
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        Err("SD card ejection is only supported on macOS".to_string())
+        Err("SD card ejection is only supported on macOS".to_owned())
     }
 }
 
@@ -182,17 +183,17 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
 
             // Parse device type
             let device_type = if info.contains("SD Card") || info.contains("SD_Card") {
-                "SD Card".to_string()
+                "SD Card".to_owned()
             } else if info.contains("USB") {
-                "USB Drive".to_string()
+                "USB Drive".to_owned()
             } else if info.contains("Disk Image") {
-                "Disk Image".to_string()
+                "Disk Image".to_owned()
             } else if info.contains("External") {
-                "External Drive".to_string()
+                "External Drive".to_owned()
             } else if info.contains("Internal") {
-                "Internal Drive".to_string()
+                "Internal Drive".to_owned()
             } else {
-                "Unknown".to_string()
+                "Unknown".to_owned()
             };
 
             // Check if removable
@@ -206,7 +207,7 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
     }
 
     // Fallback for non-macOS or if diskutil fails
-    ("Unknown".to_string(), true)
+    ("Unknown".to_owned(), true)
 }
 
 #[cfg(test)]
@@ -217,18 +218,18 @@ mod tests {
     #[test]
     fn test_sd_card_serialization() {
         let card = SDCard {
-            name: "SD_CARD".to_string(),
-            path: "/Volumes/SD_CARD".to_string(),
-            size: 32000000000,
-            free_space: 16000000000,
+            name: "SD_CARD".to_owned(),
+            path: "/Volumes/SD_CARD".to_owned(),
+            size: 32_000_000_000,
+            free_space: 16_000_000_000,
             file_count: 150,
-            device_type: "SD Card".to_string(),
+            device_type: "SD Card".to_owned(),
             is_removable: true,
         };
 
         let json = serde_json::to_string(&card).unwrap();
         assert!(json.contains("SD_CARD"));
-        assert!(json.contains("32000000000"));
+        assert!(json.contains("32_000_000_000"));
         assert!(json.contains("true"));
     }
 
@@ -237,8 +238,8 @@ mod tests {
         let json = r#"{
             "name": "USB_DRIVE",
             "path": "/Volumes/USB_DRIVE",
-            "size": 64000000000,
-            "freeSpace": 32000000000,
+            "size": 64_000_000_000,
+            "freeSpace": 32_000_000_000,
             "fileCount": 200,
             "deviceType": "USB Drive",
             "isRemovable": true
@@ -246,7 +247,7 @@ mod tests {
 
         let card: SDCard = serde_json::from_str(json).unwrap();
         assert_eq!(card.name, "USB_DRIVE");
-        assert_eq!(card.size, 64000000000);
+        assert_eq!(card.size, 64_000_000_000);
         assert!(card.is_removable);
     }
 
@@ -329,7 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_sd_card_files_nonexistent_path() {
-        let result = list_sd_card_files("/nonexistent/path".to_string()).await;
+        let result = list_sd_card_files("/nonexistent/path".to_owned()).await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "SD card path does not exist");
     }
@@ -389,7 +390,7 @@ mod tests {
     #[cfg(not(target_os = "macos"))]
     #[tokio::test]
     async fn test_eject_sd_card_not_supported() {
-        let result = eject_sd_card("/test/path".to_string()).await;
+        let result = eject_sd_card("/test/path".to_owned()).await;
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -400,18 +401,18 @@ mod tests {
     #[test]
     fn test_sd_card_complete_struct() {
         let card = SDCard {
-            name: "TestCard".to_string(),
-            path: "/Volumes/TestCard".to_string(),
-            size: 64000000000,
-            free_space: 32000000000,
+            name: "TestCard".to_owned(),
+            path: "/Volumes/TestCard".to_owned(),
+            size: 64_000_000_000,
+            free_space: 32_000_000_000,
             file_count: 250,
-            device_type: "SD Card".to_string(),
+            device_type: "SD Card".to_owned(),
             is_removable: true,
         };
 
         assert_eq!(card.name, "TestCard");
-        assert_eq!(card.size, 64000000000);
-        assert_eq!(card.free_space, 32000000000);
+        assert_eq!(card.size, 64_000_000_000);
+        assert_eq!(card.free_space, 32_000_000_000);
         assert_eq!(card.file_count, 250);
         assert!(card.is_removable);
     }

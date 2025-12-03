@@ -21,7 +21,7 @@ const DAVINCI_RESOLVE_PATHS: &[&str] = &[
 
 /// Opens a project's media folder in an external editing application.
 ///
-/// This function assumes the standard CreatorOps project structure:
+/// This function assumes the standard `CreatorOps` project structure:
 /// ```text
 /// ProjectFolder/
 ///   RAW/
@@ -44,14 +44,13 @@ fn open_in_external_app(
 
     if !media_path.exists() {
         return Err(format!(
-            "{} directory not found. Expected RAW/{} subdirectory.",
-            subfolder, subfolder
+            "{subfolder} directory not found. Expected RAW/{subfolder} subdirectory."
         ));
     }
 
     let media_path_str = media_path
         .to_str()
-        .ok_or_else(|| "Invalid path encoding".to_string())?;
+        .ok_or_else(|| "Invalid path encoding".to_owned())?;
 
     #[cfg(target_os = "macos")]
     {
@@ -60,7 +59,7 @@ fn open_in_external_app(
             .arg(app_name)
             .arg(media_path_str)
             .spawn()
-            .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+            .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -115,7 +114,7 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
             .arg("-R")
             .arg(&path)
             .spawn()
-            .map_err(|e| format!("Failed to reveal in Finder: {}", e))?;
+            .map_err(|e| format!("Failed to reveal in Finder: {e}"))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -136,7 +135,7 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
                 .spawn()
                 .map_err(|e| format!("Failed to open file manager: {}", e))?;
         } else {
-            return Err("Failed to get parent directory".to_string());
+            return Err("Failed to get parent directory".to_owned());
         }
     }
 

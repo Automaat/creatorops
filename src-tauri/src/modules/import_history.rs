@@ -170,18 +170,18 @@ mod tests {
     #[test]
     fn test_import_history_serialization() {
         let history = ImportHistory {
-            id: "test-id".to_string(),
-            project_id: "proj-123".to_string(),
-            project_name: "Test Project".to_string(),
-            source_path: "/source".to_string(),
-            destination_path: "/dest".to_string(),
+            id: "test-id".to_owned(),
+            project_id: "proj-123".to_owned(),
+            project_name: "Test Project".to_owned(),
+            source_path: "/source".to_owned(),
+            destination_path: "/dest".to_owned(),
             files_copied: 10,
             files_skipped: 2,
             total_bytes: 1024,
             photos_copied: 8,
             videos_copied: 2,
-            started_at: "2024-01-01".to_string(),
-            completed_at: "2024-01-01".to_string(),
+            started_at: "2024-01-01".to_owned(),
+            completed_at: "2024-01-01".to_owned(),
             status: ImportStatus::Success,
             error_message: None,
         };
@@ -195,20 +195,20 @@ mod tests {
     #[test]
     fn test_import_history_with_error() {
         let history = ImportHistory {
-            id: "test-id".to_string(),
-            project_id: "proj-123".to_string(),
-            project_name: "Test Project".to_string(),
-            source_path: "/source".to_string(),
-            destination_path: "/dest".to_string(),
+            id: "test-id".to_owned(),
+            project_id: "proj-123".to_owned(),
+            project_name: "Test Project".to_owned(),
+            source_path: "/source".to_owned(),
+            destination_path: "/dest".to_owned(),
             files_copied: 5,
             files_skipped: 5,
             total_bytes: 512,
             photos_copied: 5,
             videos_copied: 0,
-            started_at: "2024-01-01".to_string(),
-            completed_at: "2024-01-01".to_string(),
+            started_at: "2024-01-01".to_owned(),
+            completed_at: "2024-01-01".to_owned(),
             status: ImportStatus::Partial,
-            error_message: Some("Some files failed".to_string()),
+            error_message: Some("Some files failed".to_owned()),
         };
 
         let json = serde_json::to_string(&history).unwrap();
@@ -225,16 +225,16 @@ mod tests {
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-123".to_string(),
-            "Test Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-123".to_owned(),
+            "Test Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await;
@@ -257,17 +257,17 @@ mod tests {
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-456".to_string(),
-            "Partial Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-456".to_owned(),
+            "Partial Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             5,
             3,
             512,
             4,
             1,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("3 files failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("3 files failed".to_owned()),
         )
         .await;
 
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(history.files_copied, 5);
         assert_eq!(history.files_skipped, 3);
         assert!(matches!(history.status, ImportStatus::Partial));
-        assert_eq!(history.error_message, Some("3 files failed".to_string()));
+        assert_eq!(history.error_message, Some("3 files failed".to_owned()));
     }
 
     #[tokio::test]
@@ -288,17 +288,17 @@ mod tests {
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-789".to_string(),
-            "Failed Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-789".to_owned(),
+            "Failed Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             0,
             10,
             0,
             0,
             0,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("All files failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("All files failed".to_owned()),
         )
         .await;
 
@@ -310,23 +310,23 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Skip due to parallel test HOME env var conflicts
+    #[ignore = "Skip due to parallel test HOME env var conflicts"]
     async fn test_save_and_retrieve_import_history() {
         let temp_dir = TempDir::new().unwrap();
         let home_path = temp_dir.path().to_string_lossy().to_string();
         std::env::set_var("HOME", &home_path);
 
         let history1 = save_import_history(
-            "proj-1".to_string(),
-            "Project 1".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-1".to_owned(),
+            "Project 1".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await;
@@ -352,17 +352,17 @@ mod tests {
 
         // Test Failed status (0 files copied)
         let failed = save_import_history(
-            "proj-fail".to_string(),
-            "Failed".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-fail".to_owned(),
+            "Failed".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             0,
             10,
             0,
             0,
             0,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("All failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("All failed".to_owned()),
         )
         .await
         .unwrap();
@@ -371,16 +371,16 @@ mod tests {
 
         // Test Partial status (some files copied, some skipped)
         let partial = save_import_history(
-            "proj-partial".to_string(),
-            "Partial".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-partial".to_owned(),
+            "Partial".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             5,
             3,
             512,
             4,
             1,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await
@@ -390,16 +390,16 @@ mod tests {
 
         // Test Success status (all files copied, none skipped)
         let success = save_import_history(
-            "proj-success".to_string(),
-            "Success".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-success".to_owned(),
+            "Success".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await

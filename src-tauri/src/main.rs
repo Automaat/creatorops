@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    creatorops_lib::run()
+    creatorops_lib::run();
 }

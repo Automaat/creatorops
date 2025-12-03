@@ -151,10 +151,10 @@ mod tests {
             })
             .unwrap();
 
-        assert!(indexes.contains(&"idx_projects_status".to_string()));
-        assert!(indexes.contains(&"idx_projects_updated_at".to_string()));
-        assert!(indexes.contains(&"idx_projects_date".to_string()));
-        assert!(indexes.contains(&"idx_projects_client_name".to_string()));
+        assert!(indexes.contains(&"idx_projects_status".to_owned()));
+        assert!(indexes.contains(&"idx_projects_updated_at".to_owned()));
+        assert!(indexes.contains(&"idx_projects_date".to_owned()));
+        assert!(indexes.contains(&"idx_projects_client_name".to_owned()));
     }
 
     #[test]

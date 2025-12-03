@@ -12,7 +12,7 @@ pub async fn calculate_file_hash(path: &Path) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
 
     let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; CHUNK_SIZE];
+    let mut buffer = vec![0_u8; CHUNK_SIZE];
 
     loop {
         let bytes_read = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
@@ -60,7 +60,7 @@ pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
 /// Count files and calculate total size
 pub fn count_files_and_size(path: &str) -> Result<(usize, u64), String> {
     let files = collect_files_recursive(Path::new(path))?;
-    let mut total_size = 0u64;
+    let mut total_size = 0_u64;
 
     for file in &files {
         if let Ok(metadata) = fs::metadata(file) {
@@ -78,7 +78,7 @@ pub fn get_home_dir() -> Result<PathBuf, String> {
         std::env::var_os("HOME")
             .and_then(|h| if h.is_empty() { None } else { Some(h) })
             .map(PathBuf::from)
-            .ok_or_else(|| "Failed to get home directory".to_string())
+            .ok_or_else(|| "Failed to get home directory".to_owned())
     }
 
     #[cfg(windows)]
@@ -96,12 +96,12 @@ pub fn get_home_dir() -> Result<PathBuf, String> {
             })
             .and_then(|h| if h.is_empty() { None } else { Some(h) })
             .map(PathBuf::from)
-            .ok_or_else(|| "Failed to get home directory".to_string())
+            .ok_or_else(|| "Failed to get home directory".to_owned())
     }
 
     #[cfg(not(any(unix, windows)))]
     {
-        Err("Unsupported platform for home directory detection".to_string())
+        Err("Unsupported platform for home directory detection".to_owned())
     }
 }
 
@@ -119,7 +119,7 @@ pub fn get_home_directory() -> Result<String, String> {
     get_home_dir()?
         .to_str()
         .map(ToString::to_string)
-        .ok_or_else(|| "Failed to convert path to string".to_string())
+        .ok_or_else(|| "Failed to convert path to string".to_owned())
 }
 
 #[cfg(test)]
@@ -142,7 +142,7 @@ mod tests {
         // SHA-256 of "Hello, World!"
         assert_eq!(
             hash,
-            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a428688a362182986f"
         );
 
         std::fs::remove_file(test_file).ok();
@@ -232,12 +232,12 @@ mod tests {
         let home = get_home_dir().unwrap();
         assert!(home.is_absolute());
         // In CI environments, HOME might not exist, so create it for testing
-        if !home.exists() {
+        if home.exists() {
+            assert!(home.exists());
+        } else {
             std::fs::create_dir_all(&home).unwrap();
             assert!(home.exists());
             std::fs::remove_dir_all(&home).ok();
-        } else {
-            assert!(home.exists());
         }
     }
 
@@ -259,12 +259,12 @@ mod tests {
         let home_path = PathBuf::from(&result);
         assert!(home_path.is_absolute());
         // In CI environments, HOME might not exist, so create it for testing
-        if !home_path.exists() {
+        if home_path.exists() {
+            assert!(home_path.exists());
+        } else {
             std::fs::create_dir_all(&home_path).unwrap();
             assert!(home_path.exists());
             std::fs::remove_dir_all(&home_path).ok();
-        } else {
-            assert!(home_path.exists());
         }
     }
 
@@ -274,7 +274,7 @@ mod tests {
         let test_file = temp_dir.join("large_file.dat");
 
         // Create file larger than CHUNK_SIZE (>4MB)
-        let data = vec![0u8; 5 * 1024 * 1024]; // 5MB
+        let data = vec![0_u8; 5 * 1024 * 1024]; // 5MB
         std::fs::write(&test_file, data).unwrap();
 
         let hash = calculate_file_hash(&test_file).await.unwrap();

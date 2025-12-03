@@ -32,7 +32,7 @@ pub struct DeliveryJob {
     pub manifest_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DeliveryStatus {
     Pending,
@@ -144,16 +144,13 @@ fn collect_project_files(
             let modified = metadata
                 .modified()
                 .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs().to_string())
-                .unwrap_or_else(|| "0".to_string());
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or_else(|| "0".to_owned(), |d| d.as_secs().to_string());
 
             files.push(ProjectFile {
                 name: path
                     .file_name()
                     .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
+                    .unwrap_or("unknown").to_owned(),
                 path: path.to_string_lossy().to_string(),
                 size: metadata.len(),
                 modified,
@@ -179,7 +176,7 @@ pub async fn create_delivery(
     let now = get_timestamp();
 
     // Calculate total size
-    let mut total_bytes = 0u64;
+    let mut total_bytes = 0_u64;
     for file_path in &selected_files {
         if let Ok(metadata) = fs::metadata(file_path) {
             total_bytes += metadata.len();
@@ -207,8 +204,8 @@ pub async fn create_delivery(
 
     // Add to queue
     {
-        let mut queue = DELIVERY_QUEUE.lock().unwrap();
-        queue.insert(id.clone(), job.clone());
+        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        queue.insert(id, job.clone());
     }
 
     Ok(job)
@@ -219,11 +216,11 @@ pub async fn create_delivery(
 pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
     // Get job from queue
     let job = {
-        let mut queue = DELIVERY_QUEUE.lock().unwrap();
+        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
         let job = queue.get_mut(&job_id).ok_or("Job not found")?;
 
         if job.status != DeliveryStatus::Pending {
-            return Err("Job is not in pending status".to_string());
+            return Err("Job is not in pending status".to_owned());
         }
 
         job.status = DeliveryStatus::InProgress;
@@ -236,17 +233,18 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
         let result = process_delivery(job.clone(), app_handle.clone()).await;
 
         // Update job status
-        let mut queue = DELIVERY_QUEUE.lock().unwrap();
-        if let Some(job) = queue.get_mut(&job_id) {
-            match result {
-                Ok(_) => {
-                    job.status = DeliveryStatus::Completed;
-                    job.completed_at = Some(get_timestamp());
-                }
-                Err(e) => {
-                    job.status = DeliveryStatus::Failed;
-                    job.error_message = Some(e);
-                    job.completed_at = Some(get_timestamp());
+        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
+            if let Some(job) = queue.get_mut(&job_id) {
+                match result {
+                    Ok(()) => {
+                        job.status = DeliveryStatus::Completed;
+                        job.completed_at = Some(get_timestamp());
+                    }
+                    Err(e) => {
+                        job.status = DeliveryStatus::Failed;
+                        job.error_message = Some(e);
+                        job.completed_at = Some(get_timestamp());
+                    }
                 }
             }
         }
@@ -301,14 +299,15 @@ async fn process_delivery(
         job.files_copied += 1;
 
         // Add to manifest
-        manifest_entries.push(format!("{} -> {} ({})", file_name, dest_name, file_size));
+        manifest_entries.push(format!("{file_name} -> {dest_name} ({file_size})"));
 
         // Update queue
         {
-            let mut queue = DELIVERY_QUEUE.lock().unwrap();
-            if let Some(q_job) = queue.get_mut(&job.id) {
-                q_job.files_copied = job.files_copied;
-                q_job.bytes_transferred = job.bytes_transferred;
+            if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
+                if let Some(q_job) = queue.get_mut(&job.id) {
+                    q_job.files_copied = job.files_copied;
+                    q_job.bytes_transferred = job.bytes_transferred;
+                }
             }
         }
     }
@@ -334,9 +333,10 @@ async fn process_delivery(
 
     // Update job with manifest path
     {
-        let mut queue = DELIVERY_QUEUE.lock().unwrap();
-        if let Some(q_job) = queue.get_mut(&job.id) {
-            q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
+        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
+            if let Some(q_job) = queue.get_mut(&job.id) {
+                q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
+            }
         }
     }
 
@@ -363,7 +363,7 @@ async fn copy_file_with_progress(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut buffer = vec![0u8; CHUNK_SIZE];
+    let mut buffer = vec![0_u8; CHUNK_SIZE];
     let file_name = source
         .file_name()
         .unwrap_or_default()
@@ -404,7 +404,7 @@ async fn copy_file_with_progress(
 
         // Emit progress event
         let progress = DeliveryProgress {
-            job_id: job_id.to_string(),
+            job_id: job_id.to_owned(),
             file_name: file_name.clone(),
             current_file,
             total_files,
@@ -438,14 +438,14 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
 /// Get delivery queue
 #[tauri::command]
 pub async fn get_delivery_queue() -> Result<Vec<DeliveryJob>, String> {
-    let queue = DELIVERY_QUEUE.lock().unwrap();
+    let queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
     Ok(queue.values().cloned().collect())
 }
 
 /// Remove a delivery job from queue
 #[tauri::command]
 pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
-    let mut queue = DELIVERY_QUEUE.lock().unwrap();
+    let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
     queue.remove(&job_id);
     Ok(())
 }
@@ -477,18 +477,18 @@ mod tests {
     #[test]
     fn test_delivery_job_serialization() {
         let job = DeliveryJob {
-            id: "del-123".to_string(),
-            project_id: "proj-456".to_string(),
-            project_name: "Delivery Test".to_string(),
-            selected_files: vec!["/file1.jpg".to_string(), "/file2.jpg".to_string()],
-            delivery_path: "/delivery".to_string(),
-            naming_template: Some("{index}_{name}.{ext}".to_string()),
+            id: "del-123".to_owned(),
+            project_id: "proj-456".to_owned(),
+            project_name: "Delivery Test".to_owned(),
+            selected_files: vec!["/file1.jpg".to_owned(), "/file2.jpg".to_owned()],
+            delivery_path: "/delivery".to_owned(),
+            naming_template: Some("{index}_{name}.{ext}".to_owned()),
             status: DeliveryStatus::Pending,
             total_files: 2,
             files_copied: 0,
             total_bytes: 2048,
             bytes_transferred: 0,
-            created_at: "2024-01-01".to_string(),
+            created_at: "2024-01-01".to_owned(),
             started_at: None,
             completed_at: None,
             error_message: None,
@@ -504,12 +504,12 @@ mod tests {
     #[test]
     fn test_project_file_serialization() {
         let file = ProjectFile {
-            name: "photo.jpg".to_string(),
-            path: "/project/photo.jpg".to_string(),
+            name: "photo.jpg".to_owned(),
+            path: "/project/photo.jpg".to_owned(),
             size: 1024,
-            modified: "1640000000".to_string(),
-            file_type: "JPG".to_string(),
-            relative_path: "RAW/Photos/photo.jpg".to_string(),
+            modified: "1640000000".to_owned(),
+            file_type: "JPG".to_owned(),
+            relative_path: "RAW/Photos/photo.jpg".to_owned(),
         };
 
         let json = serde_json::to_string(&file).unwrap();
@@ -521,8 +521,8 @@ mod tests {
     #[test]
     fn test_delivery_progress_serialization() {
         let progress = DeliveryProgress {
-            job_id: "del-123".to_string(),
-            file_name: "photo.jpg".to_string(),
+            job_id: "del-123".to_owned(),
+            file_name: "photo.jpg".to_owned(),
             current_file: 1,
             total_files: 5,
             bytes_transferred: 512,
@@ -580,14 +580,14 @@ mod tests {
         f2.write_all(b"test data 2").unwrap();
 
         let result = create_delivery(
-            "proj-123".to_string(),
-            "Test Project".to_string(),
+            "proj-123".to_owned(),
+            "Test Project".to_owned(),
             vec![
                 file1.to_string_lossy().to_string(),
                 file2.to_string_lossy().to_string(),
             ],
-            "/delivery".to_string(),
-            Some("{index}_{name}.{ext}".to_string()),
+            "/delivery".to_owned(),
+            Some("{index}_{name}.{ext}".to_owned()),
         )
         .await;
 
@@ -613,10 +613,10 @@ mod tests {
 
         // Create a delivery job
         let job = create_delivery(
-            "proj-456".to_string(),
-            "Queue Test".to_string(),
+            "proj-456".to_owned(),
+            "Queue Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
-            "/delivery".to_string(),
+            "/delivery".to_owned(),
             None,
         )
         .await
@@ -642,10 +642,10 @@ mod tests {
 
         // Create and remove
         let job = create_delivery(
-            "proj-789".to_string(),
-            "Remove Test".to_string(),
+            "proj-789".to_owned(),
+            "Remove Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
-            "/delivery".to_string(),
+            "/delivery".to_owned(),
             None,
         )
         .await
@@ -667,13 +667,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("large.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
-        f1.write_all(&vec![0u8; 1024]).unwrap(); // 1KB file
+        f1.write_all(&vec![0_u8; 1024]).unwrap(); // 1KB file
 
         let job = create_delivery(
-            "proj-size".to_string(),
-            "Size Test".to_string(),
+            "proj-size".to_owned(),
+            "Size Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
-            "/delivery".to_string(),
+            "/delivery".to_owned(),
             None,
         )
         .await
@@ -733,18 +733,18 @@ mod tests {
 
         for status in statuses {
             let job = DeliveryJob {
-                id: "test".to_string(),
-                project_id: "proj".to_string(),
-                project_name: "Test".to_string(),
+                id: "test".to_owned(),
+                project_id: "proj".to_owned(),
+                project_name: "Test".to_owned(),
                 selected_files: vec![],
-                delivery_path: "/delivery".to_string(),
+                delivery_path: "/delivery".to_owned(),
                 naming_template: None,
                 status: status.clone(),
                 total_files: 0,
                 files_copied: 0,
                 total_bytes: 0,
                 bytes_transferred: 0,
-                created_at: "2024-01-01".to_string(),
+                created_at: "2024-01-01".to_owned(),
                 started_at: None,
                 completed_at: None,
                 error_message: None,
@@ -777,8 +777,8 @@ mod tests {
     #[test]
     fn test_delivery_progress_calculation() {
         let progress = DeliveryProgress {
-            job_id: "delivery-123".to_string(),
-            file_name: "image.jpg".to_string(),
+            job_id: "delivery-123".to_owned(),
+            file_name: "image.jpg".to_owned(),
             current_file: 30,
             total_files: 100,
             bytes_transferred: 307200,
@@ -810,8 +810,8 @@ mod tests {
         std::fs::create_dir(&delivery_path).unwrap();
 
         let job = create_delivery(
-            "proj-del".to_string(),
-            "Delivery Test".to_string(),
+            "proj-del".to_owned(),
+            "Delivery Test".to_owned(),
             vec![file.to_string_lossy().to_string()],
             delivery_path.to_string_lossy().to_string(),
             None,
@@ -829,19 +829,19 @@ mod tests {
     #[tokio::test]
     async fn test_remove_nonexistent_delivery_job() {
         // remove_delivery_job returns Ok even for nonexistent jobs
-        let result = remove_delivery_job("nonexistent-id".to_string()).await;
+        let result = remove_delivery_job("nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_project_file_complete_struct() {
         let file = ProjectFile {
-            name: "photo.jpg".to_string(),
-            path: "/path/to/photo.jpg".to_string(),
+            name: "photo.jpg".to_owned(),
+            path: "/path/to/photo.jpg".to_owned(),
             size: 2048000,
-            modified: "2024-01-01T10:00:00Z".to_string(),
-            file_type: "image/jpeg".to_string(),
-            relative_path: "Selects/photo.jpg".to_string(),
+            modified: "2024-01-01T10:00:00Z".to_owned(),
+            file_type: "image/jpeg".to_owned(),
+            relative_path: "Selects/photo.jpg".to_owned(),
         };
 
         assert_eq!(file.name, "photo.jpg");
@@ -878,11 +878,11 @@ mod tests {
         std::fs::create_dir(&delivery_path).unwrap();
 
         let job = create_delivery(
-            "proj-template".to_string(),
-            "Template Test".to_string(),
+            "proj-template".to_owned(),
+            "Template Test".to_owned(),
             vec![file.to_string_lossy().to_string()],
             delivery_path.to_string_lossy().to_string(),
-            Some("{name}_{index}".to_string()),
+            Some("{name}_{index}".to_owned()),
         )
         .await
         .unwrap();
@@ -968,23 +968,23 @@ mod tests {
         let file3 = temp_dir.path().join("small.txt");
 
         let mut f1 = std::fs::File::create(&file1).unwrap();
-        f1.write_all(&vec![0u8; 1024]).unwrap();
+        f1.write_all(&vec![0_u8; 1024]).unwrap();
 
         let mut f2 = std::fs::File::create(&file2).unwrap();
-        f2.write_all(&vec![0u8; 2048]).unwrap();
+        f2.write_all(&vec![0_u8; 2048]).unwrap();
 
         let mut f3 = std::fs::File::create(&file3).unwrap();
         f3.write_all(b"test").unwrap();
 
         let job = create_delivery(
-            "proj-size".to_string(),
-            "Size Test".to_string(),
+            "proj-size".to_owned(),
+            "Size Test".to_owned(),
             vec![
                 file1.to_string_lossy().to_string(),
                 file2.to_string_lossy().to_string(),
                 file3.to_string_lossy().to_string(),
             ],
-            "/delivery".to_string(),
+            "/delivery".to_owned(),
             None,
         )
         .await
@@ -1041,10 +1041,10 @@ mod tests {
         f1.write_all(b"data").unwrap();
 
         let job = create_delivery(
-            "status-test".to_string(),
-            "Status Test".to_string(),
+            "status-test".to_owned(),
+            "Status Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
-            "/delivery".to_string(),
+            "/delivery".to_owned(),
             None,
         )
         .await
@@ -1077,20 +1077,20 @@ mod tests {
 
         // Create two jobs
         let job1 = create_delivery(
-            "q1".to_string(),
-            "Queue1".to_string(),
+            "q1".to_owned(),
+            "Queue1".to_owned(),
             vec![file1.to_string_lossy().to_string()],
-            "/del1".to_string(),
+            "/del1".to_owned(),
             None,
         )
         .await
         .unwrap();
 
         let job2 = create_delivery(
-            "q2".to_string(),
-            "Queue2".to_string(),
+            "q2".to_owned(),
+            "Queue2".to_owned(),
             vec![file2.to_string_lossy().to_string()],
-            "/del2".to_string(),
+            "/del2".to_owned(),
             None,
         )
         .await
@@ -1158,10 +1158,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_delivery_with_nonexistent_files() {
         let result = create_delivery(
-            "nonexist".to_string(),
-            "Nonexistent".to_string(),
-            vec!["/nonexistent/file.jpg".to_string()],
-            "/delivery".to_string(),
+            "nonexist".to_owned(),
+            "Nonexistent".to_owned(),
+            vec!["/nonexistent/file.jpg".to_owned()],
+            "/delivery".to_owned(),
             None,
         )
         .await;
