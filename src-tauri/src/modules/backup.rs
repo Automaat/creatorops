@@ -1040,6 +1040,206 @@ mod tests {
         assert_ne!(job1.id, job2.id);
     }
 
+    // Integration tests for main execution paths
+    #[tokio::test]
+    async fn test_copy_file_creates_destination() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.txt");
+        let dest = temp_dir.path().join("dest.txt");
+
+        let test_data = b"test data for copy";
+        std::fs::write(&src, test_data).unwrap();
+
+        let result = copy_file(&src, &dest).await;
+        assert!(result.is_ok());
+        assert!(dest.exists());
+
+        let content = std::fs::read(&dest).unwrap();
+        assert_eq!(content, test_data);
+        assert_eq!(result.unwrap(), test_data.len() as u64);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_large_file() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("large.bin");
+        let dest = temp_dir.path().join("large_dest.bin");
+
+        // Create 5MB file (larger than one chunk)
+        let data = vec![0xAB; 5 * 1024 * 1024];
+        std::fs::write(&src, &data).unwrap();
+
+        let result = copy_file(&src, &dest).await;
+        assert!(result.is_ok());
+        let expected_size = data.len() as u64;
+        assert_eq!(result.unwrap(), expected_size);
+
+        let dest_size = std::fs::metadata(&dest).unwrap().len();
+        assert_eq!(dest_size, expected_size);
+
+        // Verify content integrity
+        let dest_data = std::fs::read(&dest).unwrap();
+        assert_eq!(dest_data.len(), data.len());
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_success() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.jpg");
+        let dest = temp_dir.path().join("dest.jpg");
+
+        std::fs::write(&src, b"photo data").unwrap();
+
+        let result = copy_file_with_retry(&src, &dest).await;
+        assert!(result.is_ok());
+        assert!(dest.exists());
+
+        let src_content = std::fs::read(&src).unwrap();
+        let dest_content = std::fs::read(&dest).unwrap();
+        assert_eq!(src_content, dest_content);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_checksum_verification() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.bin");
+        let dest = temp_dir.path().join("dest.bin");
+
+        // Create file with specific content
+        let content = b"checksum test data 12345";
+        std::fs::write(&src, content).unwrap();
+
+        let result = copy_file_with_retry(&src, &dest).await;
+        assert!(result.is_ok());
+
+        // Verify checksum matches
+        let src_data = std::fs::read(&src).unwrap();
+        let dest_data = std::fs::read(&dest).unwrap();
+        assert_eq!(src_data, dest_data);
+    }
+
+    #[tokio::test]
+    async fn test_save_backup_to_history() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Save and set HOME to temp dir
+        let original_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", temp_dir.path());
+
+        let job = BackupJob {
+            id: "hist-test-1".to_string(),
+            project_id: "proj-hist".to_string(),
+            project_name: "History Project".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-hist".to_string(),
+            destination_name: "History Dest".to_string(),
+            destination_path: "/dest".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 5,
+            files_copied: 5,
+            files_skipped: 0,
+            total_bytes: 1024,
+            bytes_transferred: 1024,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            started_at: Some("2024-01-01T00:01:00Z".to_string()),
+            completed_at: Some("2024-01-01T00:02:00Z".to_string()),
+            error_message: None,
+        };
+
+        let result = save_backup_to_history(&job);
+        assert!(result.is_ok());
+
+        // Verify history file was created
+        let history_path = temp_dir.path().join("CreatorOps").join("backup_history.json");
+        assert!(history_path.exists());
+
+        // Verify content
+        let content = std::fs::read_to_string(&history_path).unwrap();
+        assert!(content.contains("hist-test-1"));
+        assert!(content.contains("History Project"));
+
+        // Restore HOME
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_save_backup_to_history_multiple_entries() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Save and set HOME
+        let original_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", temp_dir.path());
+
+        // Save first backup
+        let job1 = BackupJob {
+            id: "hist-1".to_string(),
+            project_id: "proj-1".to_string(),
+            project_name: "Project 1".to_string(),
+            source_path: "/src1".to_string(),
+            destination_id: "dest-1".to_string(),
+            destination_name: "Dest 1".to_string(),
+            destination_path: "/dest1".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 3,
+            files_copied: 3,
+            files_skipped: 0,
+            total_bytes: 512,
+            bytes_transferred: 512,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            started_at: Some("2024-01-01T00:01:00Z".to_string()),
+            completed_at: Some("2024-01-01T00:02:00Z".to_string()),
+            error_message: None,
+        };
+
+        save_backup_to_history(&job1).unwrap();
+
+        // Save second backup
+        let job2 = BackupJob {
+            id: "hist-2".to_string(),
+            project_id: "proj-2".to_string(),
+            project_name: "Project 2".to_string(),
+            source_path: "/src2".to_string(),
+            destination_id: "dest-2".to_string(),
+            destination_name: "Dest 2".to_string(),
+            destination_path: "/dest2".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 5,
+            files_copied: 5,
+            files_skipped: 0,
+            total_bytes: 1024,
+            bytes_transferred: 1024,
+            created_at: "2024-01-02T00:00:00Z".to_string(),
+            started_at: Some("2024-01-02T00:01:00Z".to_string()),
+            completed_at: Some("2024-01-02T00:02:00Z".to_string()),
+            error_message: None,
+        };
+
+        save_backup_to_history(&job2).unwrap();
+
+        // Verify both entries exist
+        let history = get_backup_history().await.unwrap();
+        assert_eq!(history.len(), 2);
+        assert!(history.iter().any(|h| h.id == "hist-1"));
+        assert!(history.iter().any(|h| h.id == "hist-2"));
+
+        // Restore HOME
+        if let Some(home) = original_home {
+            std::env::set_var("HOME", home);
+        } else {
+            std::env::remove_var("HOME");
+        }
+    }
+
     #[tokio::test]
     async fn test_get_backup_history_with_entries() {
         use tempfile::TempDir;

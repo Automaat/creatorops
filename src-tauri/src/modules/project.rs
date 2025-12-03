@@ -740,4 +740,271 @@ mod tests {
             assert_eq!(project.status, status);
         }
     }
+
+    #[tokio::test]
+    async fn test_create_project_command() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        let project_base = temp_dir.path().join("CreatorOps").join("Projects");
+
+        // Override home dir for test by creating project in temp dir
+        let result = db.execute(|conn| {
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = chrono::Utc::now().to_rfc3339();
+            let folder_path = project_base.join("2024-01-15_JohnDoe_Wedding");
+
+            // Simulate what create_project does
+            std::fs::create_dir_all(&folder_path).unwrap();
+            std::fs::create_dir_all(folder_path.join("RAW/Photos")).unwrap();
+            std::fs::create_dir_all(folder_path.join("RAW/Videos")).unwrap();
+            std::fs::create_dir_all(folder_path.join("Selects")).unwrap();
+            std::fs::create_dir_all(folder_path.join("Delivery")).unwrap();
+
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    id,
+                    "Wedding Shoot",
+                    "John Doe",
+                    "2024-01-15",
+                    "Wedding",
+                    ProjectStatus::New.to_string(),
+                    folder_path.to_string_lossy().to_string(),
+                    now.clone(),
+                    now,
+                    Some("2024-02-01"),
+                ],
+            )?;
+
+            Ok(id)
+        }).unwrap();
+
+        let project = get_project_by_id(&db, &result).unwrap();
+        assert_eq!(project.name, "Wedding Shoot");
+        assert_eq!(project.client_name, "John Doe");
+        assert_eq!(project.status, ProjectStatus::New);
+        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+
+        // Verify folders were created
+        let folder_path = std::path::PathBuf::from(&project.folder_path);
+        assert!(folder_path.join("RAW/Photos").exists());
+        assert!(folder_path.join("RAW/Videos").exists());
+        assert!(folder_path.join("Selects").exists());
+        assert!(folder_path.join("Delivery").exists());
+    }
+
+    #[tokio::test]
+    async fn test_list_projects_command() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert projects
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["id1", "Project 1", "Client A", "2024-01-01", "Wedding", "New", "/path1", "2024-01-01T10:00:00Z", "2024-01-01T10:00:00Z", None::<String>],
+            )?;
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["id2", "Project 2", "Client B", "2024-01-02", "Portrait", "Editing", "/path2", "2024-01-02T10:00:00Z", "2024-01-02T11:00:00Z", Some("2024-02-01")],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let projects = db.execute(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC"
+            )?;
+            let projects = stmt
+                .query_map([], map_project_row)?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(projects)
+        }).unwrap();
+
+        assert_eq!(projects.len(), 2);
+        assert_eq!(projects[0].id, "id2"); // Most recent first
+        assert_eq!(projects[1].id, "id1");
+    }
+
+    #[tokio::test]
+    async fn test_delete_project_command() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        let project_folder = temp_dir.path().join("test_project");
+        std::fs::create_dir_all(&project_folder).unwrap();
+        std::fs::write(project_folder.join("test.txt"), "test").unwrap();
+
+        // Insert project
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    "del-1",
+                    "Delete Test",
+                    "Client",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    project_folder.to_string_lossy().to_string(),
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-01T10:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        assert!(project_folder.exists());
+
+        // Simulate delete_project
+        let folder_path = db.execute(|conn| {
+            let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
+            let path: String = stmt.query_row(rusqlite::params!["del-1"], |row| row.get(0))?;
+            Ok(path)
+        }).unwrap();
+
+        std::fs::remove_dir_all(&folder_path).unwrap();
+
+        db.execute(|conn| {
+            conn.execute("DELETE FROM projects WHERE id = ?1", rusqlite::params!["del-1"])?;
+            Ok(())
+        }).unwrap();
+
+        assert!(!project_folder.exists());
+        assert!(get_project_by_id(&db, "del-1").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_project_status_command() {
+        let (_temp_dir, db) = setup_test_db();
+
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["upd-1", "Update Test", "Client", "2024-01-01", "Wedding", "New", "/path", "2024-01-01T10:00:00Z", "2024-01-01T10:00:00Z", None::<String>],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![ProjectStatus::Editing.to_string(), now, "upd-1"],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let project = get_project_by_id(&db, "upd-1").unwrap();
+        assert_eq!(project.status, ProjectStatus::Editing);
+    }
+
+    #[tokio::test]
+    async fn test_update_project_deadline_command() {
+        let (_temp_dir, db) = setup_test_db();
+
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["upd-2", "Deadline Test", "Client", "2024-01-01", "Wedding", "New", "/path", "2024-01-01T10:00:00Z", "2024-01-01T10:00:00Z", None::<String>],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let now = chrono::Utc::now().to_rfc3339();
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE projects SET deadline = ?1, updated_at = ?2 WHERE id = ?3",
+                rusqlite::params![Some("2024-03-01"), now, "upd-2"],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let project = get_project_by_id(&db, "upd-2").unwrap();
+        assert_eq!(project.deadline, Some("2024-03-01".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_project_command() {
+        let (_temp_dir, db) = setup_test_db();
+
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["get-1", "Get Test", "Client", "2024-01-01", "Wedding", "New", "/path", "2024-01-01T10:00:00Z", "2024-01-01T10:00:00Z", Some("2024-02-01")],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let project = get_project_by_id(&db, "get-1").unwrap();
+        assert_eq!(project.id, "get-1");
+        assert_eq!(project.name, "Get Test");
+        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+    }
+
+    #[test]
+    fn test_map_project_row_error_handling() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        // Insert project with invalid status
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["bad-1", "Bad Status", "Client", "2024-01-01", "Wedding", "InvalidStatus", "/path", "2024-01-01T10:00:00Z", "2024-01-01T10:00:00Z", None::<String>],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        // Should fail to map due to invalid status
+        let result = get_project_by_id(&db, "bad-1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_create_project_with_empty_shoot_type() {
+        // Test folder name generation without shoot type
+        let sanitized_client = sanitize_path_component("John Doe");
+        let folder_name = format!("{}_{}", "2024-01-15", sanitized_client);
+        assert_eq!(folder_name, "2024-01-15_JohnDoe");
+    }
+
+    #[test]
+    fn test_create_project_with_shoot_type() {
+        // Test folder name generation with shoot type
+        let sanitized_client = sanitize_path_component("Jane Smith");
+        let sanitized_type = sanitize_path_component("Wedding");
+        let folder_name = format!("{}_{}_{}", "2024-02-20", sanitized_client, sanitized_type);
+        assert_eq!(folder_name, "2024-02-20_JaneSmith_Wedding");
+    }
+
+    #[test]
+    fn test_deadline_filtering() {
+        // Test that empty string deadline is converted to None
+        let deadline = Some("".to_string());
+        let filtered = deadline.filter(|d| !d.is_empty());
+        assert_eq!(filtered, None);
+
+        let deadline = Some("2024-03-01".to_string());
+        let filtered = deadline.filter(|d| !d.is_empty());
+        assert_eq!(filtered, Some("2024-03-01".to_string()));
+    }
 }

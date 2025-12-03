@@ -99,3 +99,139 @@ impl Database {
         f(&conn)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_new_with_path_creates_parent_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("subdir").join("test.db");
+
+        // Parent doesn't exist yet
+        assert!(!db_path.parent().unwrap().exists());
+
+        let db = Database::new_with_path(db_path.clone()).unwrap();
+
+        // Parent was created
+        assert!(db_path.parent().unwrap().exists());
+        assert!(db_path.exists());
+
+        // Verify schema was initialized
+        let result = db.execute(|conn| {
+            let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'")?;
+            let exists = stmt.exists([])?;
+            Ok(exists)
+        }).unwrap();
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_schema_initialization_creates_all_indexes() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        let indexes = db.execute(|conn| {
+            let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='projects'")?;
+            let index_names: Vec<String> = stmt
+                .query_map([], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(index_names)
+        }).unwrap();
+
+        assert!(indexes.contains(&"idx_projects_status".to_string()));
+        assert!(indexes.contains(&"idx_projects_updated_at".to_string()));
+        assert!(indexes.contains(&"idx_projects_date".to_string()));
+        assert!(indexes.contains(&"idx_projects_client_name".to_string()));
+    }
+
+    #[test]
+    fn test_execute_with_callback() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        // Test successful query
+        let result = db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params![
+                    "test-id",
+                    "Test",
+                    "Client",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    "/path",
+                    "2024-01-01T00:00:00Z",
+                    "2024-01-01T00:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            Ok(())
+        });
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_execute_query_returns_value() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        let count: usize = db.execute(|conn| {
+            let count: usize = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+            Ok(count)
+        }).unwrap();
+
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_get_default_path_structure() {
+        let path = Database::get_default_path().unwrap();
+        let path_str = path.to_string_lossy();
+
+        assert!(path_str.contains("CreatorOps"));
+        assert!(path_str.ends_with("creatorops.db"));
+    }
+
+    #[test]
+    fn test_multiple_connections() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+
+        // Multiple operations should work
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["id1", "Name1", "Client1", "2024-01-01", "Type1", "New", "/path1", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z", None::<String>],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["id2", "Name2", "Client2", "2024-01-02", "Type2", "Editing", "/path2", "2024-01-02T00:00:00Z", "2024-01-02T00:00:00Z", None::<String>],
+            )?;
+            Ok(())
+        }).unwrap();
+
+        let count: usize = db.execute(|conn| {
+            let count: usize = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+            Ok(count)
+        }).unwrap();
+
+        assert_eq!(count, 2);
+    }
+}

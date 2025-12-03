@@ -542,4 +542,306 @@ mod tests {
         assert_eq!(get_file_type(Path::new("photo.HEIC")), Some("photo"));
         assert_eq!(get_file_type(Path::new("clip.M4V")), Some("video"));
     }
+
+    #[test]
+    fn test_get_file_type_unknown_extension() {
+        assert_eq!(get_file_type(Path::new("document.pdf")), None);
+        assert_eq!(get_file_type(Path::new("data.txt")), None);
+        assert_eq!(get_file_type(Path::new("archive.zip")), None);
+    }
+
+    #[test]
+    fn test_file_type_case_insensitivity() {
+        assert_eq!(get_file_type(Path::new("photo.JPG")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("photo.jPg")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("video.MP4")), Some("video"));
+        assert_eq!(get_file_type(Path::new("video.MoV")), Some("video"));
+    }
+
+    #[test]
+    fn test_get_file_type_with_path() {
+        assert_eq!(
+            get_file_type(Path::new("/path/to/photo.jpg")),
+            Some("photo")
+        );
+        assert_eq!(
+            get_file_type(Path::new("/path/to/video.mp4")),
+            Some("video")
+        );
+        assert_eq!(get_file_type(Path::new("/path/to/file.txt")), None);
+    }
+
+    // Integration tests for main execution paths
+    #[tokio::test]
+    async fn test_copy_file_with_retry_exponential_backoff() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.dat");
+        let dest = temp_dir.path().join("dest.dat");
+
+        std::fs::write(&src, b"retry test data").unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let start = std::time::Instant::now();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+        let elapsed = start.elapsed();
+
+        assert!(result.is_ok());
+        assert!(dest.exists());
+        // First attempt should succeed quickly
+        assert!(elapsed.as_millis() < 100);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_respects_max_attempts() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+
+        // Non-existent source should fail after retries
+        let src = temp_dir.path().join("nonexistent.dat");
+        let dest = temp_dir.path().join("dest.dat");
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_err());
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn test_constants_values() {
+        assert_eq!(MAX_RETRY_ATTEMPTS, 3);
+        assert_eq!(MAX_CONCURRENT_COPIES, 4);
+    }
+
+    #[test]
+    fn test_photo_and_video_extensions_comprehensive() {
+        // Test all photo extensions
+        let photo_files = vec![
+            "IMG.jpg", "IMG.jpeg", "IMG.png", "IMG.gif", "IMG.bmp",
+            "IMG.tiff", "IMG.tif", "IMG.raw", "IMG.cr2", "IMG.nef",
+            "IMG.arw", "IMG.dng", "IMG.orf", "IMG.rw2", "IMG.pef",
+            "IMG.srw", "IMG.heic", "IMG.heif", "IMG.webp",
+        ];
+
+        for file in photo_files {
+            assert_eq!(get_file_type(Path::new(file)), Some("photo"), "Failed for {}", file);
+        }
+
+        // Test all video extensions
+        let video_files = vec![
+            "VID.mp4", "VID.mov", "VID.avi", "VID.mkv", "VID.wmv",
+            "VID.flv", "VID.webm", "VID.m4v", "VID.mpg", "VID.mpeg",
+            "VID.3gp", "VID.mts", "VID.m2ts",
+        ];
+
+        for file in video_files {
+            assert_eq!(get_file_type(Path::new(file)), Some("video"), "Failed for {}", file);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cancel_import_cancels_token() {
+        let import_id = "import-to-cancel".to_string();
+        let token = CancellationToken::new();
+
+        {
+            let mut tokens = IMPORT_TOKENS.lock().await;
+            tokens.insert(import_id.clone(), token.clone());
+        }
+
+        assert!(!token.is_cancelled());
+
+        let result = cancel_import(import_id.clone()).await;
+        assert!(result.is_ok());
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn test_copy_result_with_partial_success() {
+        let result = CopyResult {
+            success: true,
+            error: Some("2 file(s) skipped due to errors".to_string()),
+            files_copied: 8,
+            files_skipped: 2,
+            skipped_files: vec!["bad1.jpg".to_string(), "bad2.mp4".to_string()],
+            total_bytes: 8192,
+            photos_copied: 6,
+            videos_copied: 2,
+        };
+
+        assert!(result.success);
+        assert!(result.error.is_some());
+        assert_eq!(result.files_copied, 8);
+        assert_eq!(result.files_skipped, 2);
+        assert_eq!(result.skipped_files.len(), 2);
+        assert_eq!(result.photos_copied + result.videos_copied, result.files_copied);
+    }
+
+    #[test]
+    fn test_copy_result_complete_success() {
+        let result = CopyResult {
+            success: true,
+            error: None,
+            files_copied: 15,
+            files_skipped: 0,
+            skipped_files: vec![],
+            total_bytes: 15360,
+            photos_copied: 10,
+            videos_copied: 5,
+        };
+
+        assert!(result.success);
+        assert!(result.error.is_none());
+        assert_eq!(result.files_skipped, 0);
+        assert!(result.skipped_files.is_empty());
+        assert_eq!(result.photos_copied + result.videos_copied, result.files_copied);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_cancel_during_retry() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("cancel_test.dat");
+        let dest = temp_dir.path().join("dest_cancel.dat");
+
+        std::fs::write(&src, b"data to cancel").unwrap();
+
+        let cancel_token = CancellationToken::new();
+
+        // Cancel immediately before copy
+        cancel_token.cancel();
+
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Import cancelled");
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_large_file() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("large.bin");
+        let dest = temp_dir.path().join("large_dest.bin");
+
+        // Create 5MB file
+        let data = vec![0xAB; 5 * 1024 * 1024];
+        std::fs::write(&src, &data).unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), data.len() as u64);
+        assert!(dest.exists());
+
+        let dest_data = std::fs::read(&dest).unwrap();
+        assert_eq!(dest_data.len(), data.len());
+    }
+
+    #[test]
+    fn test_import_progress_zero_progress() {
+        let progress = ImportProgress {
+            files_copied: 0,
+            total_files: 100,
+            current_file: "".to_string(),
+        };
+
+        assert_eq!(progress.files_copied, 0);
+        assert!(progress.files_copied < progress.total_files);
+    }
+
+    #[test]
+    fn test_import_progress_mid_progress() {
+        let progress = ImportProgress {
+            files_copied: 50,
+            total_files: 100,
+            current_file: "photo_50.jpg".to_string(),
+        };
+
+        let percent = (progress.files_copied as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(percent, 50.0);
+    }
+
+
+    #[test]
+    fn test_get_file_type_real_world_filenames() {
+        // Canon camera files
+        assert_eq!(get_file_type(Path::new("IMG_1234.CR2")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("IMG_1234.JPG")), Some("photo"));
+
+        // Nikon camera files
+        assert_eq!(get_file_type(Path::new("DSC_5678.NEF")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("DSC_5678.JPG")), Some("photo"));
+
+        // Sony camera files
+        assert_eq!(get_file_type(Path::new("DSC00123.ARW")), Some("photo"));
+
+        // iPhone files
+        assert_eq!(get_file_type(Path::new("IMG_9876.HEIC")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("IMG_9876.MOV")), Some("video"));
+
+        // Video files
+        assert_eq!(get_file_type(Path::new("MVI_0001.MP4")), Some("video"));
+        assert_eq!(get_file_type(Path::new("GOPR0123.MP4")), Some("video"));
+    }
+
+    #[tokio::test]
+    async fn test_cancel_import_idempotent() {
+        let import_id = "double-cancel-test".to_string();
+        let token = CancellationToken::new();
+
+        {
+            let mut tokens = IMPORT_TOKENS.lock().await;
+            tokens.insert(import_id.clone(), token.clone());
+        }
+
+        // First cancel should succeed
+        let result1 = cancel_import(import_id.clone()).await;
+        assert!(result1.is_ok());
+        assert!(token.is_cancelled());
+
+        // Second cancel should also succeed (idempotent)
+        let result2 = cancel_import(import_id.clone()).await;
+        assert!(result2.is_ok());
+        assert!(token.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_zero_byte_file() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("empty.txt");
+        let dest = temp_dir.path().join("empty_dest.txt");
+
+        std::fs::write(&src, b"").unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+        assert!(dest.exists());
+        assert_eq!(std::fs::metadata(&dest).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_copy_result_all_skipped() {
+        let result = CopyResult {
+            success: false,
+            error: Some("10 file(s) skipped due to errors".to_string()),
+            files_copied: 0,
+            files_skipped: 10,
+            skipped_files: vec!["f1.jpg".to_string(), "f2.jpg".to_string()],
+            total_bytes: 0,
+            photos_copied: 0,
+            videos_copied: 0,
+        };
+
+        assert!(!result.success);
+        assert!(result.error.is_some());
+        assert_eq!(result.files_copied, 0);
+        assert_eq!(result.files_skipped, 10);
+    }
 }

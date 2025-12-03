@@ -251,4 +251,50 @@ mod tests {
         assert!(!result.is_empty());
         assert!(PathBuf::from(&result).exists());
     }
+
+    #[tokio::test]
+    async fn test_calculate_hash_large_file() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("large_file.dat");
+
+        // Create file larger than CHUNK_SIZE (>4MB)
+        let data = vec![0u8; 5 * 1024 * 1024]; // 5MB
+        std::fs::write(&test_file, data).unwrap();
+
+        let hash = calculate_file_hash(&test_file).await.unwrap();
+        assert!(!hash.is_empty());
+        assert_eq!(hash.len(), 64); // SHA-256 produces 64 hex characters
+
+        std::fs::remove_file(test_file).ok();
+    }
+
+    #[tokio::test]
+    async fn test_calculate_hash_nonexistent_file() {
+        let nonexistent = std::path::PathBuf::from("/nonexistent/file.txt");
+        let result = calculate_file_hash(&nonexistent).await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_collect_files_empty_dir() {
+        let temp_dir = std::env::temp_dir().join("empty_dir");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let files = collect_files_recursive(&temp_dir).unwrap();
+        assert_eq!(files.len(), 0);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_count_files_empty_directory() {
+        let temp_dir = std::env::temp_dir().join("empty_count");
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let (count, size) = count_files_and_size(temp_dir.to_str().unwrap()).unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(size, 0);
+
+        std::fs::remove_dir_all(temp_dir).ok();
+    }
 }
