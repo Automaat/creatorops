@@ -57,6 +57,7 @@ panic = "deny"
 todo = "warn"
 unimplemented = "warn"
 unreachable = "deny"
+wildcard_imports = "allow" # Tauri macros use wildcard imports
 
 # Additional quality lints
 dbg_macro = "warn"

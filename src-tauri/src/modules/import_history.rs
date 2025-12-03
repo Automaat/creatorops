@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -124,6 +125,7 @@ fn get_history_file_path() -> Result<PathBuf, String> {
     Ok(base_path.join("import_history.json"))
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

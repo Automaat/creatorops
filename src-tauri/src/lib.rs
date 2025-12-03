@@ -1,4 +1,11 @@
+//! `CreatorOps` - Photography workflow management application
+//!
+//! This is the core library for the `CreatorOps` Tauri application.
+
 mod modules;
+
+/// Result type for application-level operations
+pub type AppResult = Result<(), Box<dyn std::error::Error>>;
 
 use modules::archive::{create_archive, get_archive_queue, remove_archive_job, start_archive};
 use modules::backup::{
@@ -23,10 +30,16 @@ use modules::project::{
 };
 use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 
+/// Run the Tauri application
+///
+/// # Errors
+///
+/// Returns error if database initialization or Tauri runtime fails
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+#[allow(clippy::exit)] // Tauri's run() internally uses process::exit
+pub fn run() -> AppResult {
     // Initialize database with dependency injection
-    let db = modules::db::Database::new().expect("Failed to initialize database");
+    let db = modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
 
     tauri::Builder::default()
         .manage(db)
@@ -72,6 +85,7 @@ pub fn run() {
             open_in_final_cut_pro,
             get_home_directory,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(tauri::generate_context!())?;
+
+    Ok(())
 }

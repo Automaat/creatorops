@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -58,7 +59,9 @@ pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 /// Count files and calculate total size
-pub fn count_files_and_size(path: &str) -> Result<(usize, u64), String> {
+type FileSizeResult = Result<(usize, u64), String>;
+
+pub fn count_files_and_size(path: &str) -> FileSizeResult {
     let files = collect_files_recursive(Path::new(path))?;
     let mut total_size = 0_u64;
 
@@ -109,7 +112,7 @@ pub fn get_home_dir() -> Result<PathBuf, String> {
 pub fn get_timestamp() -> String {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .expect("System time before UNIX epoch")
+        .unwrap_or_else(|_| std::time::Duration::from_secs(0))
         .as_secs()
         .to_string()
 }
@@ -122,6 +125,7 @@ pub fn get_home_directory() -> Result<String, String> {
         .ok_or_else(|| "Failed to convert path to string".to_owned())
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

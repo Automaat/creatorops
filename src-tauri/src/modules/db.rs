@@ -100,6 +100,7 @@ impl Database {
     }
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

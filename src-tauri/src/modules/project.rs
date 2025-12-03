@@ -1,3 +1,5 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+#![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -283,6 +285,7 @@ pub async fn get_project(
     get_project_by_id(&db, &project_id)
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

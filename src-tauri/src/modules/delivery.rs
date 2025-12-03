@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
 use serde::{Deserialize, Serialize};
@@ -450,6 +451,7 @@ pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

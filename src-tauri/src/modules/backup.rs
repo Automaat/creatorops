@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
 };
@@ -487,6 +488,7 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use std::process::Command;
 
 // Windows application paths for external editors
@@ -189,6 +190,7 @@ pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
     )
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

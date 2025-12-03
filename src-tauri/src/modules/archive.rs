@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -242,6 +243,7 @@ pub async fn remove_archive_job(job_id: String) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

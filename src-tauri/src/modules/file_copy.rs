@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -37,8 +38,10 @@ fn get_file_type(path: &Path) -> Option<&'static str> {
 }
 
 // Global map of active import cancellation tokens
+type ImportTokensMap = Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>>;
+
 lazy_static::lazy_static! {
-    static ref IMPORT_TOKENS: Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>> =
+    static ref IMPORT_TOKENS: ImportTokensMap =
         Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 }
 
@@ -123,7 +126,7 @@ pub async fn copy_files(
         let app_clone = app.clone();
 
         let task = tokio::spawn(async move {
-            let _permit = semaphore_clone.acquire().await.unwrap();
+            let _permit = semaphore_clone.acquire().await.map_err(|e| e.to_string())?;
 
             // Check if cancelled before starting work
             if cancel_token_clone.is_cancelled() {
@@ -249,6 +252,7 @@ pub async fn cancel_import(import_id: String) -> Result<(), String> {
     }
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

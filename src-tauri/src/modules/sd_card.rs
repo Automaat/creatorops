@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -210,6 +211,7 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
     ("Unknown".to_owned(), true)
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
