@@ -404,9 +404,8 @@ async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let file_size = src_file.metadata().await.map_err(|e| e.to_string())?.len();
-
     let mut buffer = vec![0u8; CHUNK_SIZE];
+    let mut total_bytes = 0u64;
 
     loop {
         let bytes_read = src_file
@@ -422,9 +421,14 @@ async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
             .write_all(&buffer[..bytes_read])
             .await
             .map_err(|e| e.to_string())?;
+
+        total_bytes += bytes_read as u64;
     }
 
-    Ok(file_size)
+    // Ensure all data is written to disk
+    dest_file.sync_all().await.map_err(|e| e.to_string())?;
+
+    Ok(total_bytes)
 }
 
 // Global mutex for backup history file access
@@ -445,7 +449,11 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 
     let mut history: Vec<BackupHistory> = if history_path.exists() {
         let data = fs::read_to_string(&history_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&data).unwrap_or_default()
+        serde_json::from_str(&data).map_err(|e| {
+            eprintln!("Failed to deserialize backup history: {}", e);
+            eprintln!("File content: {}", data);
+            e.to_string()
+        })?
     } else {
         Vec::new()
     };
@@ -468,7 +476,12 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     history.push(entry);
 
     let json_data = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
-    fs::write(&history_path, json_data).map_err(|e| e.to_string())?;
+
+    // Write and sync file to ensure data is persisted immediately
+    use std::io::Write;
+    let mut file = fs::File::create(&history_path).map_err(|e| e.to_string())?;
+    file.write_all(json_data.as_bytes()).map_err(|e| e.to_string())?;
+    file.sync_all().map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -476,6 +489,11 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Global mutex to serialize tests that manipulate HOME environment variable
+    lazy_static::lazy_static! {
+        static ref HOME_TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+    }
 
     #[test]
     fn test_backup_status_serialization() {
@@ -1127,6 +1145,9 @@ mod tests {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
+        // Acquire lock to prevent parallel tests from interfering with HOME
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+
         // Save and set HOME to temp dir
         let original_home = std::env::var_os("HOME");
         std::env::set_var("HOME", temp_dir.path());
@@ -1178,6 +1199,9 @@ mod tests {
     async fn test_save_backup_to_history_multiple_entries() {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
+
+        // Acquire lock to prevent parallel tests from interfering with HOME
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
 
         // Save and set HOME
         let original_home = std::env::var_os("HOME");
@@ -1247,6 +1271,9 @@ mod tests {
     async fn test_get_backup_history_with_entries() {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
+
+        // Acquire lock to prevent parallel tests from interfering with HOME
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
 
         // Save original HOME and restore it at the end
         let original_home = std::env::var_os("HOME");

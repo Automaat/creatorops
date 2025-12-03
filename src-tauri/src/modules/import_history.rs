@@ -128,6 +128,12 @@ fn get_history_file_path() -> Result<PathBuf, String> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use std::sync::{Arc, Mutex};
+
+    // Global mutex to serialize tests that manipulate HOME environment variable
+    lazy_static::lazy_static! {
+        static ref HOME_TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+    }
 
     #[test]
     fn test_import_status_serialization() {
@@ -213,6 +219,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_success() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         let result = save_import_history(
@@ -242,6 +249,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_partial() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         let result = save_import_history(
@@ -270,6 +278,7 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_failed() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         let result = save_import_history(
@@ -330,6 +339,7 @@ mod tests {
     #[tokio::test]
     async fn test_status_determination_logic() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         // Test Failed status (0 files copied)
@@ -395,6 +405,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_import_history_empty() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         let result = get_import_history(None).await;
@@ -406,6 +417,7 @@ mod tests {
     #[test]
     fn test_get_history_file_path() {
         let _temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
         std::env::set_var("HOME", _temp_dir.path());
 
         let result = get_history_file_path();
