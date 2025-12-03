@@ -1,0 +1,39 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+
+flags:
+  frontend:
+    paths:
+      - src/
+    carryforward: true
+  backend:
+    paths:
+      - src-tauri/src/
+    carryforward: true
+
+comment:
+  layout: "header, diff, flags, components"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "src/test/"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "src-tauri/target/"
+  - "node_modules/"
+  - "dist/"
+  - "vite.config.ts"
+  - "vitest.config.ts"
+  - "eslint.config.js"

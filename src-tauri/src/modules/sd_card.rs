@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use walkdir::WalkDir;
+
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,6 +82,7 @@ fn count_files(path: &Path) -> usize {
         .count()
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
 fn get_disk_usage(path: &Path) -> (u64, u64) {
     #[cfg(target_os = "macos")]
     {
@@ -141,6 +144,7 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
 
 /// Eject an SD card by volume path
 #[tauri::command]
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
 pub async fn eject_sd_card(volume_path: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -164,6 +168,7 @@ pub async fn eject_sd_card(volume_path: String) -> Result<(), String> {
 }
 
 /// Get device type and removability using diskutil (macOS)
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
 fn get_device_info(volume_name: &str) -> (String, bool) {
     #[cfg(target_os = "macos")]
     {

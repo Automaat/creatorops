@@ -56,5 +56,17 @@ jobs:
       - name: Test
         run: cd src-tauri && cargo test
 
+      - name: Generate coverage
+        run: mise run coverage:rust
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@af09b5e394c93991b95a5e7646aeb90c1917f78f # v5.5.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/rust/lcov.info
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: true
+
       - name: Build (release)
         run: cd src-tauri && cargo build --release
