@@ -56,5 +56,20 @@ jobs:
       - name: Test
         run: cd src-tauri && cargo test
 
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Generate coverage
+        run: cd src-tauri && cargo tarpaulin --out Lcov --out Html --output-dir ../coverage/rust --exclude-files 'target/*' --timeout 300
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/rust/lcov.info
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: true
+
       - name: Build (release)
         run: cd src-tauri && cargo build --release
