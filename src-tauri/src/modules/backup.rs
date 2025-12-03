@@ -1201,68 +1201,75 @@ mod tests {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
-        // Hold lock for entire test to prevent other tests from interfering
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        let original_home = std::env::var_os("HOME");
-        std::env::set_var("HOME", temp_dir.path());
+        // Hold lock during setup and save operations to prevent other tests from interfering
+        let original_home = {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            let original_home = std::env::var_os("HOME");
+            std::env::set_var("HOME", temp_dir.path());
 
-        // Save first backup
-        let job1 = BackupJob {
-            id: "hist-1".to_string(),
-            project_id: "proj-1".to_string(),
-            project_name: "Project 1".to_string(),
-            source_path: "/src1".to_string(),
-            destination_id: "dest-1".to_string(),
-            destination_name: "Dest 1".to_string(),
-            destination_path: "/dest1".to_string(),
-            status: BackupStatus::Completed,
-            total_files: 3,
-            files_copied: 3,
-            files_skipped: 0,
-            total_bytes: 512,
-            bytes_transferred: 512,
-            created_at: "2024-01-01T00:00:00Z".to_string(),
-            started_at: Some("2024-01-01T00:01:00Z".to_string()),
-            completed_at: Some("2024-01-01T00:02:00Z".to_string()),
-            error_message: None,
-        };
+            // Save first backup
+            let job1 = BackupJob {
+                id: "hist-1".to_string(),
+                project_id: "proj-1".to_string(),
+                project_name: "Project 1".to_string(),
+                source_path: "/src1".to_string(),
+                destination_id: "dest-1".to_string(),
+                destination_name: "Dest 1".to_string(),
+                destination_path: "/dest1".to_string(),
+                status: BackupStatus::Completed,
+                total_files: 3,
+                files_copied: 3,
+                files_skipped: 0,
+                total_bytes: 512,
+                bytes_transferred: 512,
+                created_at: "2024-01-01T00:00:00Z".to_string(),
+                started_at: Some("2024-01-01T00:01:00Z".to_string()),
+                completed_at: Some("2024-01-01T00:02:00Z".to_string()),
+                error_message: None,
+            };
 
-        save_backup_to_history(&job1).unwrap();
+            save_backup_to_history(&job1).unwrap();
 
-        // Save second backup
-        let job2 = BackupJob {
-            id: "hist-2".to_string(),
-            project_id: "proj-2".to_string(),
-            project_name: "Project 2".to_string(),
-            source_path: "/src2".to_string(),
-            destination_id: "dest-2".to_string(),
-            destination_name: "Dest 2".to_string(),
-            destination_path: "/dest2".to_string(),
-            status: BackupStatus::Completed,
-            total_files: 5,
-            files_copied: 5,
-            files_skipped: 0,
-            total_bytes: 1024,
-            bytes_transferred: 1024,
-            created_at: "2024-01-02T00:00:00Z".to_string(),
-            started_at: Some("2024-01-02T00:01:00Z".to_string()),
-            completed_at: Some("2024-01-02T00:02:00Z".to_string()),
-            error_message: None,
-        };
+            // Save second backup
+            let job2 = BackupJob {
+                id: "hist-2".to_string(),
+                project_id: "proj-2".to_string(),
+                project_name: "Project 2".to_string(),
+                source_path: "/src2".to_string(),
+                destination_id: "dest-2".to_string(),
+                destination_name: "Dest 2".to_string(),
+                destination_path: "/dest2".to_string(),
+                status: BackupStatus::Completed,
+                total_files: 5,
+                files_copied: 5,
+                files_skipped: 0,
+                total_bytes: 1024,
+                bytes_transferred: 1024,
+                created_at: "2024-01-02T00:00:00Z".to_string(),
+                started_at: Some("2024-01-02T00:01:00Z".to_string()),
+                completed_at: Some("2024-01-02T00:02:00Z".to_string()),
+                error_message: None,
+            };
 
-        save_backup_to_history(&job2).unwrap();
+            save_backup_to_history(&job2).unwrap();
 
-        // Verify both entries exist
+            original_home
+        }; // Lock dropped here before await
+
+        // Verify both entries exist (no lock held during await)
         let history = get_backup_history().await.unwrap();
         assert_eq!(history.len(), 2);
         assert!(history.iter().any(|h| h.id == "hist-1"));
         assert!(history.iter().any(|h| h.id == "hist-2"));
 
         // Restore HOME at the end
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            if let Some(home) = original_home {
+                std::env::set_var("HOME", home);
+            } else {
+                std::env::remove_var("HOME");
+            }
         }
     }
 
