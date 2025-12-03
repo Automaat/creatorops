@@ -721,4 +721,202 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].name, "normal.txt");
     }
+
+    #[test]
+    fn test_delivery_status_all_variants() {
+        let statuses = vec![
+            DeliveryStatus::Pending,
+            DeliveryStatus::InProgress,
+            DeliveryStatus::Completed,
+            DeliveryStatus::Failed,
+        ];
+
+        for status in statuses {
+            let job = DeliveryJob {
+                id: "test".to_string(),
+                project_id: "proj".to_string(),
+                project_name: "Test".to_string(),
+                selected_files: vec![],
+                delivery_path: "/delivery".to_string(),
+                naming_template: None,
+                status: status.clone(),
+                total_files: 0,
+                files_copied: 0,
+                total_bytes: 0,
+                bytes_transferred: 0,
+                created_at: "2024-01-01".to_string(),
+                started_at: None,
+                completed_at: None,
+                error_message: None,
+                manifest_path: None,
+            };
+            assert_eq!(job.status, status);
+        }
+    }
+
+    #[test]
+    fn test_delivery_status_deserialization() {
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""pending""#).unwrap(),
+            DeliveryStatus::Pending
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""inprogress""#).unwrap(),
+            DeliveryStatus::InProgress
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""completed""#).unwrap(),
+            DeliveryStatus::Completed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<DeliveryStatus>(r#""failed""#).unwrap(),
+            DeliveryStatus::Failed
+        ));
+    }
+
+    #[test]
+    fn test_delivery_progress_calculation() {
+        let progress = DeliveryProgress {
+            job_id: "delivery-123".to_string(),
+            file_name: "image.jpg".to_string(),
+            current_file: 30,
+            total_files: 100,
+            bytes_transferred: 307200,
+            total_bytes: 1024000,
+            speed: 102400.0,
+            eta: 7,
+        };
+
+        let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(progress_percent, 30.0);
+    }
+
+    #[test]
+    fn test_delivery_constants() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+    }
+
+    #[tokio::test]
+    async fn test_create_delivery_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let project = temp_dir.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let file = project.join("photo.jpg");
+        std::fs::write(&file, "photo data").unwrap();
+
+        let delivery_path = temp_dir.path().join("delivery");
+        std::fs::create_dir(&delivery_path).unwrap();
+
+        let job = create_delivery(
+            "proj-del".to_string(),
+            "Delivery Test".to_string(),
+            vec![file.to_string_lossy().to_string()],
+            delivery_path.to_string_lossy().to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.status, DeliveryStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_delivery_job() {
+        // remove_delivery_job returns Ok even for nonexistent jobs
+        let result = remove_delivery_job("nonexistent-id".to_string()).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_project_file_complete_struct() {
+        let file = ProjectFile {
+            name: "photo.jpg".to_string(),
+            path: "/path/to/photo.jpg".to_string(),
+            size: 2048000,
+            modified: "2024-01-01T10:00:00Z".to_string(),
+            file_type: "image/jpeg".to_string(),
+            relative_path: "Selects/photo.jpg".to_string(),
+        };
+
+        assert_eq!(file.name, "photo.jpg");
+        assert_eq!(file.size, 2048000);
+        assert_eq!(file.file_type, "image/jpeg");
+    }
+
+    #[test]
+    fn test_apply_naming_template_with_index() {
+        let template = "{name}_{index}";
+        // index is 1-based and zero-padded to 3 digits: index 5 becomes "006"
+        let result = apply_naming_template(template, "photo.jpg", 5);
+        assert_eq!(result, "photo_006");
+    }
+
+    #[test]
+    fn test_apply_naming_template_with_ext() {
+        let template = "{name}.{ext}";
+        let result = apply_naming_template(template, "photo.jpg", 1);
+        assert_eq!(result, "photo.jpg");
+    }
+
+    #[tokio::test]
+    async fn test_delivery_job_with_naming_template() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let project = temp_dir.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        let file = project.join("original.jpg");
+        std::fs::write(&file, "data").unwrap();
+
+        let delivery_path = temp_dir.path().join("delivery");
+        std::fs::create_dir(&delivery_path).unwrap();
+
+        let job = create_delivery(
+            "proj-template".to_string(),
+            "Template Test".to_string(),
+            vec![file.to_string_lossy().to_string()],
+            delivery_path.to_string_lossy().to_string(),
+            Some("{name}_{index}".to_string()),
+        )
+        .await
+        .unwrap();
+
+        assert!(job.naming_template.is_some());
+        assert_eq!(job.naming_template.unwrap(), "{name}_{index}");
+
+        let _ = remove_delivery_job(job.id).await;
+    }
+
+    #[test]
+    fn test_delivery_job_deserialization() {
+        let json = r#"{
+            "id": "del-123",
+            "projectId": "proj-456",
+            "projectName": "Wedding",
+            "selectedFiles": ["/file1.jpg", "/file2.jpg"],
+            "deliveryPath": "/delivery",
+            "namingTemplate": null,
+            "status": "pending",
+            "totalFiles": 2,
+            "filesCopied": 0,
+            "totalBytes": 2048,
+            "bytesTransferred": 0,
+            "createdAt": "2024-01-01",
+            "startedAt": null,
+            "completedAt": null,
+            "errorMessage": null,
+            "manifestPath": null
+        }"#;
+
+        let job: DeliveryJob = serde_json::from_str(json).unwrap();
+        assert_eq!(job.id, "del-123");
+        assert_eq!(job.project_id, "proj-456");
+        assert_eq!(job.total_files, 2);
+    }
 }

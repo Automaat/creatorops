@@ -807,4 +807,157 @@ mod tests {
         let _ = remove_backup_job(job1.id).await;
         let _ = remove_backup_job(job2.id).await;
     }
+
+    #[test]
+    fn test_backup_status_all_variants() {
+        let statuses = vec![
+            BackupStatus::Pending,
+            BackupStatus::InProgress,
+            BackupStatus::Completed,
+            BackupStatus::Failed,
+            BackupStatus::Cancelled,
+        ];
+
+        for status in statuses {
+            let job = BackupJob {
+                id: "test".to_string(),
+                project_id: "proj".to_string(),
+                project_name: "Test".to_string(),
+                source_path: "/src".to_string(),
+                destination_id: "dest".to_string(),
+                destination_name: "Dest".to_string(),
+                destination_path: "/dst".to_string(),
+                status: status.clone(),
+                total_files: 0,
+                files_copied: 0,
+                files_skipped: 0,
+                total_bytes: 0,
+                bytes_transferred: 0,
+                created_at: "2024-01-01".to_string(),
+                started_at: None,
+                completed_at: None,
+                error_message: None,
+            };
+            assert_eq!(job.status, status);
+        }
+    }
+
+    #[test]
+    fn test_backup_status_deserialization() {
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""pending""#).unwrap(),
+            BackupStatus::Pending
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""inprogress""#).unwrap(),
+            BackupStatus::InProgress
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""completed""#).unwrap(),
+            BackupStatus::Completed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""failed""#).unwrap(),
+            BackupStatus::Failed
+        ));
+        assert!(matches!(
+            serde_json::from_str::<BackupStatus>(r#""cancelled""#).unwrap(),
+            BackupStatus::Cancelled
+        ));
+    }
+
+    #[test]
+    fn test_backup_progress_calculation() {
+        let progress = BackupProgress {
+            job_id: "backup-123".to_string(),
+            file_name: "photo.jpg".to_string(),
+            current_file: 25,
+            total_files: 100,
+            bytes_transferred: 256000,
+            total_bytes: 1024000,
+            speed: 128000.0,
+            eta: 6,
+        };
+
+        let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
+        assert_eq!(progress_percent, 25.0);
+
+        let bytes_percent = (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
+        assert_eq!(bytes_percent, 25.0);
+    }
+
+    #[test]
+    fn test_backup_constants() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+        assert_eq!(MAX_RETRY_ATTEMPTS, 3);
+    }
+
+    #[tokio::test]
+    async fn test_queue_backup_creates_job() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let source = temp_dir.path().join("project");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("file.txt"), "data").unwrap();
+
+        let job = queue_backup(
+            "proj-create".to_string(),
+            "Create Test".to_string(),
+            source.to_string_lossy().to_string(),
+            "dest-create".to_string(),
+            "Create Drive".to_string(),
+            "/backup".to_string(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(job.status, BackupStatus::Pending);
+        assert_eq!(job.total_files, 1);
+        assert!(job.total_bytes > 0);
+        assert_eq!(job.files_copied, 0);
+        assert_eq!(job.bytes_transferred, 0);
+
+        let _ = remove_backup_job(job.id).await;
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_backup_job() {
+        // remove_backup_job returns Ok even for nonexistent jobs
+        let result = remove_backup_job("nonexistent-id".to_string()).await;
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_backup_job_with_skipped_files() {
+        let job = BackupJob {
+            id: "backup-skip".to_string(),
+            project_id: "proj-123".to_string(),
+            project_name: "Partial Backup".to_string(),
+            source_path: "/source".to_string(),
+            destination_id: "dest-123".to_string(),
+            destination_name: "Backup Drive".to_string(),
+            destination_path: "/backup".to_string(),
+            status: BackupStatus::Completed,
+            total_files: 10,
+            files_copied: 8,
+            files_skipped: 2,
+            total_bytes: 1024,
+            bytes_transferred: 820,
+            created_at: "2024-01-01".to_string(),
+            started_at: Some("2024-01-01T10:00:00Z".to_string()),
+            completed_at: Some("2024-01-01T10:10:00Z".to_string()),
+            error_message: Some("2 files skipped".to_string()),
+        };
+
+        assert_eq!(job.files_copied + job.files_skipped, job.total_files);
+        assert!(job.error_message.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_cancel_nonexistent_backup() {
+        let result = cancel_backup("nonexistent-id".to_string()).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Backup job not found");
+    }
 }

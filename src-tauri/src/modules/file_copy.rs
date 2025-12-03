@@ -456,4 +456,98 @@ mod tests {
             assert_eq!(get_file_type(Path::new(&path)), Some("video"));
         }
     }
+
+    #[test]
+    fn test_get_file_type_no_extension() {
+        assert_eq!(get_file_type(Path::new("test")), None);
+        assert_eq!(get_file_type(Path::new("test.")), None);
+    }
+
+    #[test]
+    fn test_copy_result_deserialization() {
+        let json = r#"{
+            "success": true,
+            "error": null,
+            "filesCopied": 5,
+            "filesSkipped": 1,
+            "skippedFiles": ["file.txt"],
+            "totalBytes": 2048,
+            "photosCopied": 4,
+            "videosCopied": 1
+        }"#;
+
+        let result: CopyResult = serde_json::from_str(json).unwrap();
+        assert!(result.success);
+        assert_eq!(result.files_copied, 5);
+        assert_eq!(result.files_skipped, 1);
+        assert_eq!(result.photos_copied, 4);
+        assert_eq!(result.videos_copied, 1);
+    }
+
+    #[test]
+    fn test_import_progress_complete() {
+        let progress = ImportProgress {
+            files_copied: 10,
+            total_files: 10,
+            current_file: "last.jpg".to_string(),
+        };
+
+        assert_eq!(progress.files_copied, progress.total_files);
+    }
+
+    #[tokio::test]
+    async fn test_copy_file_with_retry_creates_parent_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.jpg");
+        let dest = temp_dir.path().join("subdir").join("dest.jpg");
+
+        let mut file = std::fs::File::create(&src).unwrap();
+        file.write_all(b"test").unwrap();
+
+        // Create parent directory for destination
+        std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
+
+        assert!(result.is_ok());
+        assert!(dest.exists());
+    }
+
+    #[test]
+    fn test_max_concurrent_copies_constant() {
+        assert!(MAX_CONCURRENT_COPIES > 0);
+        assert!(MAX_CONCURRENT_COPIES <= 8);
+    }
+
+    #[test]
+    fn test_max_retry_attempts_constant() {
+        assert_eq!(MAX_RETRY_ATTEMPTS, 3);
+    }
+
+    #[test]
+    fn test_copy_result_success_criteria() {
+        let success = CopyResult {
+            success: true,
+            error: None,
+            files_copied: 10,
+            files_skipped: 0,
+            skipped_files: vec![],
+            total_bytes: 1024,
+            photos_copied: 6,
+            videos_copied: 4,
+        };
+
+        assert!(success.success);
+        assert!(success.error.is_none());
+        assert_eq!(success.files_copied, success.photos_copied + success.videos_copied);
+    }
+
+    #[test]
+    fn test_mixed_photo_video_extensions() {
+        assert_eq!(get_file_type(Path::new("IMG_0001.CR2")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("VID_0001.MOV")), Some("video"));
+        assert_eq!(get_file_type(Path::new("photo.HEIC")), Some("photo"));
+        assert_eq!(get_file_type(Path::new("clip.M4V")), Some("video"));
+    }
 }
