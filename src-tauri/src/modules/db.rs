@@ -120,11 +120,15 @@ mod tests {
         assert!(db_path.exists());
 
         // Verify schema was initialized
-        let result = db.execute(|conn| {
-            let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projects'")?;
-            let exists = stmt.exists([])?;
-            Ok(exists)
-        }).unwrap();
+        let result = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'",
+                )?;
+                let exists = stmt.exists([])?;
+                Ok(exists)
+            })
+            .unwrap();
 
         assert!(result);
     }
@@ -135,13 +139,17 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db = Database::new_with_path(db_path).unwrap();
 
-        let indexes = db.execute(|conn| {
-            let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='projects'")?;
-            let index_names: Vec<String> = stmt
-                .query_map([], |row| row.get(0))?
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(index_names)
-        }).unwrap();
+        let indexes = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='projects'",
+                )?;
+                let index_names: Vec<String> = stmt
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(index_names)
+            })
+            .unwrap();
 
         assert!(indexes.contains(&"idx_projects_status".to_string()));
         assert!(indexes.contains(&"idx_projects_updated_at".to_string()));
@@ -185,10 +193,13 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db = Database::new_with_path(db_path).unwrap();
 
-        let count: usize = db.execute(|conn| {
-            let count: usize = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
-            Ok(count)
-        }).unwrap();
+        let count: usize = db
+            .execute(|conn| {
+                let count: usize =
+                    conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+                Ok(count)
+            })
+            .unwrap();
 
         assert_eq!(count, 0);
     }
@@ -227,10 +238,13 @@ mod tests {
             Ok(())
         }).unwrap();
 
-        let count: usize = db.execute(|conn| {
-            let count: usize = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
-            Ok(count)
-        }).unwrap();
+        let count: usize = db
+            .execute(|conn| {
+                let count: usize =
+                    conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+                Ok(count)
+            })
+            .unwrap();
 
         assert_eq!(count, 2);
     }

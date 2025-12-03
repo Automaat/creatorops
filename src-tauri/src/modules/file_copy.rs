@@ -618,25 +618,33 @@ mod tests {
     fn test_photo_and_video_extensions_comprehensive() {
         // Test all photo extensions
         let photo_files = vec![
-            "IMG.jpg", "IMG.jpeg", "IMG.png", "IMG.gif", "IMG.bmp",
-            "IMG.tiff", "IMG.tif", "IMG.raw", "IMG.cr2", "IMG.nef",
-            "IMG.arw", "IMG.dng", "IMG.orf", "IMG.rw2", "IMG.pef",
+            "IMG.jpg", "IMG.jpeg", "IMG.png", "IMG.gif", "IMG.bmp", "IMG.tiff", "IMG.tif",
+            "IMG.raw", "IMG.cr2", "IMG.nef", "IMG.arw", "IMG.dng", "IMG.orf", "IMG.rw2", "IMG.pef",
             "IMG.srw", "IMG.heic", "IMG.heif", "IMG.webp",
         ];
 
         for file in photo_files {
-            assert_eq!(get_file_type(Path::new(file)), Some("photo"), "Failed for {}", file);
+            assert_eq!(
+                get_file_type(Path::new(file)),
+                Some("photo"),
+                "Failed for {}",
+                file
+            );
         }
 
         // Test all video extensions
         let video_files = vec![
-            "VID.mp4", "VID.mov", "VID.avi", "VID.mkv", "VID.wmv",
-            "VID.flv", "VID.webm", "VID.m4v", "VID.mpg", "VID.mpeg",
-            "VID.3gp", "VID.mts", "VID.m2ts",
+            "VID.mp4", "VID.mov", "VID.avi", "VID.mkv", "VID.wmv", "VID.flv", "VID.webm",
+            "VID.m4v", "VID.mpg", "VID.mpeg", "VID.3gp", "VID.mts", "VID.m2ts",
         ];
 
         for file in video_files {
-            assert_eq!(get_file_type(Path::new(file)), Some("video"), "Failed for {}", file);
+            assert_eq!(
+                get_file_type(Path::new(file)),
+                Some("video"),
+                "Failed for {}",
+                file
+            );
         }
     }
 
@@ -675,7 +683,10 @@ mod tests {
         assert_eq!(result.files_copied, 8);
         assert_eq!(result.files_skipped, 2);
         assert_eq!(result.skipped_files.len(), 2);
-        assert_eq!(result.photos_copied + result.videos_copied, result.files_copied);
+        assert_eq!(
+            result.photos_copied + result.videos_copied,
+            result.files_copied
+        );
     }
 
     #[test]
@@ -695,7 +706,10 @@ mod tests {
         assert!(result.error.is_none());
         assert_eq!(result.files_skipped, 0);
         assert!(result.skipped_files.is_empty());
-        assert_eq!(result.photos_copied + result.videos_copied, result.files_copied);
+        assert_eq!(
+            result.photos_copied + result.videos_copied,
+            result.files_copied
+        );
     }
 
     #[tokio::test]
@@ -763,7 +777,6 @@ mod tests {
         let percent = (progress.files_copied as f64 / progress.total_files as f64) * 100.0;
         assert_eq!(percent, 50.0);
     }
-
 
     #[test]
     fn test_get_file_type_real_world_filenames() {

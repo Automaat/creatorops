@@ -1066,8 +1066,14 @@ mod tests {
         let file1 = temp_dir.path().join("f1.jpg");
         let file2 = temp_dir.path().join("f2.jpg");
 
-        std::fs::File::create(&file1).unwrap().write_all(b"1").unwrap();
-        std::fs::File::create(&file2).unwrap().write_all(b"2").unwrap();
+        std::fs::File::create(&file1)
+            .unwrap()
+            .write_all(b"1")
+            .unwrap();
+        std::fs::File::create(&file2)
+            .unwrap()
+            .write_all(b"2")
+            .unwrap();
 
         // Create two jobs
         let job1 = create_delivery(

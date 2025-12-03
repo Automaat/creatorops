@@ -868,18 +868,24 @@ mod tests {
         assert!(project_folder.exists());
 
         // Simulate delete_project
-        let folder_path = db.execute(|conn| {
-            let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
-            let path: String = stmt.query_row(rusqlite::params!["del-1"], |row| row.get(0))?;
-            Ok(path)
-        }).unwrap();
+        let folder_path = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
+                let path: String = stmt.query_row(rusqlite::params!["del-1"], |row| row.get(0))?;
+                Ok(path)
+            })
+            .unwrap();
 
         std::fs::remove_dir_all(&folder_path).unwrap();
 
         db.execute(|conn| {
-            conn.execute("DELETE FROM projects WHERE id = ?1", rusqlite::params!["del-1"])?;
+            conn.execute(
+                "DELETE FROM projects WHERE id = ?1",
+                rusqlite::params!["del-1"],
+            )?;
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         assert!(!project_folder.exists());
         assert!(get_project_by_id(&db, "del-1").is_err());
@@ -905,7 +911,8 @@ mod tests {
                 rusqlite::params![ProjectStatus::Editing.to_string(), now, "upd-1"],
             )?;
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let project = get_project_by_id(&db, "upd-1").unwrap();
         assert_eq!(project.status, ProjectStatus::Editing);
@@ -931,7 +938,8 @@ mod tests {
                 rusqlite::params![Some("2024-03-01"), now, "upd-2"],
             )?;
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let project = get_project_by_id(&db, "upd-2").unwrap();
         assert_eq!(project.deadline, Some("2024-03-01".to_string()));

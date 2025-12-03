@@ -1155,7 +1155,10 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify history file was created
-        let history_path = temp_dir.path().join("CreatorOps").join("backup_history.json");
+        let history_path = temp_dir
+            .path()
+            .join("CreatorOps")
+            .join("backup_history.json");
         assert!(history_path.exists());
 
         // Verify content
@@ -1384,7 +1387,7 @@ mod tests {
 
     #[test]
     fn test_backup_status_ordering() {
-        let statuses = vec![
+        let statuses = [
             BackupStatus::Pending,
             BackupStatus::InProgress,
             BackupStatus::Completed,
