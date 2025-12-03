@@ -219,8 +219,10 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_success() {
         let _temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            std::env::set_var("HOME", _temp_dir.path());
+        } // Lock dropped here
 
         let result = save_import_history(
             "proj-123".to_string(),
@@ -249,8 +251,10 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_partial() {
         let _temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            std::env::set_var("HOME", _temp_dir.path());
+        } // Lock dropped here
 
         let result = save_import_history(
             "proj-456".to_string(),
@@ -278,8 +282,10 @@ mod tests {
     #[tokio::test]
     async fn test_save_import_history_failed() {
         let _temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            std::env::set_var("HOME", _temp_dir.path());
+        } // Lock dropped here
 
         let result = save_import_history(
             "proj-789".to_string(),
@@ -339,8 +345,10 @@ mod tests {
     #[tokio::test]
     async fn test_status_determination_logic() {
         let _temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            std::env::set_var("HOME", _temp_dir.path());
+        } // Lock dropped here
 
         // Test Failed status (0 files copied)
         let failed = save_import_history(
@@ -405,8 +413,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_import_history_empty() {
         let _temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            std::env::set_var("HOME", _temp_dir.path());
+        } // Lock dropped here
 
         let result = get_import_history(None).await;
         assert!(result.is_ok());

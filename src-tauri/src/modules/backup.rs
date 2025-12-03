@@ -1201,12 +1201,13 @@ mod tests {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
-        // Acquire lock to prevent parallel tests from interfering with HOME
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
-
-        // Save and set HOME
-        let original_home = std::env::var_os("HOME");
-        std::env::set_var("HOME", temp_dir.path());
+        // Setup HOME in locked scope, then drop lock but keep HOME set
+        let original_home = {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            let original_home = std::env::var_os("HOME");
+            std::env::set_var("HOME", temp_dir.path());
+            original_home
+        }; // Lock dropped here, but HOME still set to temp_dir
 
         // Save first backup
         let job1 = BackupJob {
@@ -1254,17 +1255,20 @@ mod tests {
 
         save_backup_to_history(&job2).unwrap();
 
-        // Verify both entries exist
+        // Verify both entries exist (no lock held during await)
         let history = get_backup_history().await.unwrap();
         assert_eq!(history.len(), 2);
         assert!(history.iter().any(|h| h.id == "hist-1"));
         assert!(history.iter().any(|h| h.id == "hist-2"));
 
-        // Restore HOME
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
+        // Restore HOME at the end
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            if let Some(home) = original_home {
+                std::env::set_var("HOME", home);
+            } else {
+                std::env::remove_var("HOME");
+            }
         }
     }
 
@@ -1273,18 +1277,20 @@ mod tests {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
-        // Acquire lock to prevent parallel tests from interfering with HOME
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        // Setup HOME in locked scope, then drop lock but keep HOME set
+        let (source, original_home) = {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            let original_home = std::env::var_os("HOME");
+            std::env::set_var("HOME", temp_dir.path());
 
-        // Save original HOME and restore it at the end
-        let original_home = std::env::var_os("HOME");
-        std::env::set_var("HOME", temp_dir.path());
+            let source = temp_dir.path().join("project");
+            std::fs::create_dir(&source).unwrap();
+            std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let source = temp_dir.path().join("project");
-        std::fs::create_dir(&source).unwrap();
-        std::fs::write(source.join("file.txt"), "data").unwrap();
+            (source, original_home)
+        }; // Lock dropped here, but HOME still set
 
-        // Queue and complete a backup
+        // Queue and complete a backup (no lock held during await)
         let _job = queue_backup(
             "proj-hist".to_string(),
             "History Test".to_string(),
@@ -1300,11 +1306,14 @@ mod tests {
         // This tests the history retrieval mechanism
         let _history = get_backup_history().await.unwrap();
 
-        // Restore original HOME
-        if let Some(home) = original_home {
-            std::env::set_var("HOME", home);
-        } else {
-            std::env::remove_var("HOME");
+        // Restore HOME at the end
+        {
+            let _lock = HOME_TEST_MUTEX.lock().unwrap();
+            if let Some(home) = original_home {
+                std::env::set_var("HOME", home);
+            } else {
+                std::env::remove_var("HOME");
+            }
         }
     }
 
