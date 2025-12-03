@@ -39,7 +39,8 @@ use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 #[allow(clippy::exit)] // Tauri's run() internally uses process::exit
 pub fn run() -> AppResult {
     // Initialize database with dependency injection
-    let db = modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
+    let db =
+        modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
 
     tauri::Builder::default()
         .manage(db)

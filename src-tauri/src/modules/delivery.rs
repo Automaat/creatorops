@@ -145,13 +145,15 @@ fn collect_project_files(
             let modified = metadata
                 .modified()
                 .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or_else(|| "0".to_owned(), |d| d.as_secs().to_string());
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or_else(|| "0".to_owned(), |d| d.as_secs().to_string());
 
             files.push(ProjectFile {
                 name: path
                     .file_name()
                     .and_then(|n| n.to_str())
-                    .unwrap_or("unknown").to_owned(),
+                    .unwrap_or("unknown")
+                    .to_owned(),
                 path: path.to_string_lossy().to_string(),
                 size: metadata.len(),
                 modified,
@@ -400,7 +402,11 @@ async fn copy_file_with_progress(
         };
 
         let remaining_bytes = total_bytes.saturating_sub(*bytes_transferred);
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let eta = if speed > 0.0 {
             // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64

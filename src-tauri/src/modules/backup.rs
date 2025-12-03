@@ -357,7 +357,11 @@ async fn perform_backup(
         };
 
         let remaining_bytes = job.total_bytes - bytes_transferred;
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let eta = if speed > 0.0 {
             // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64
