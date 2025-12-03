@@ -50,6 +50,7 @@ const createMockBackupDestination = (
   name: 'External Drive',
   path: '/Volumes/Backup',
   enabled: true,
+  createdAt: '2024-01-01T00:00:00Z',
   ...overrides,
 })
 
@@ -1011,7 +1012,7 @@ describe('Projects', () => {
           startedAt: '2024-01-15T10:00:00Z',
           completedAt: '2024-01-15T10:30:00Z',
           status: 'success',
-          errorMessage: null,
+          errorMessage: undefined,
         },
       ]
 

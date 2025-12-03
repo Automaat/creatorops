@@ -397,10 +397,7 @@ mod tests {
     async fn test_cancel_import_not_found() {
         let result = cancel_import("nonexistent-import".to_string()).await;
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Import not found or already completed"
-        );
+        assert_eq!(result.unwrap_err(), "Import not found or already completed");
     }
 
     #[test]

@@ -187,7 +187,7 @@ describe('BackupQueue', () => {
       const progress = createMockProgress()
       if (progressCallback) {
         await act(async () => {
-          progressCallback({ payload: progress })
+          progressCallback!({ payload: progress })
         })
       }
 
@@ -225,7 +225,7 @@ describe('BackupQueue', () => {
       const progress = createMockProgress()
       if (progressCallback) {
         await act(async () => {
-          progressCallback({ payload: progress })
+          progressCallback!({ payload: progress })
         })
       }
 
@@ -493,7 +493,7 @@ describe('BackupQueue', () => {
       const updatedJob = createMockJob({ id: 'job-1', status: 'inprogress' })
       if (jobUpdateCallback) {
         await act(async () => {
-          jobUpdateCallback({ payload: updatedJob })
+          jobUpdateCallback!({ payload: updatedJob })
         })
       }
 
