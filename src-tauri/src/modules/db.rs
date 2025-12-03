@@ -2,89 +2,100 @@ use rusqlite::{Connection, Result};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-lazy_static::lazy_static! {
-    static ref DB_CONNECTION: Mutex<Option<Connection>> = Mutex::new(None);
+/// Database wrapper for dependency injection
+pub struct Database {
+    conn: Mutex<Connection>,
 }
 
-/// Initialize database connection and create schema
-pub fn init_db() -> Result<()> {
-    let db_path = get_db_path()?;
-
-    // Create parent directory if it doesn't exist
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+impl Database {
+    /// Create new database instance with default path
+    pub fn new() -> Result<Self> {
+        let db_path = Self::get_default_path()?;
+        Self::new_with_path(db_path)
     }
 
-    let conn = Connection::open(&db_path)?;
+    /// Create new database instance with custom path (for testing)
+    pub fn new_with_path(db_path: PathBuf) -> Result<Self> {
+        // Create parent directory if it doesn't exist
+        if let Some(parent) = db_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+        }
 
-    // Create projects table
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS projects (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            client_name TEXT NOT NULL,
-            date TEXT NOT NULL,
-            shoot_type TEXT NOT NULL,
-            status TEXT NOT NULL,
-            folder_path TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            deadline TEXT
-        )",
-        [],
-    )?;
+        let conn = Connection::open(&db_path)?;
 
-    // Create indexes for common queries
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
-        [],
-    )?;
+        // Initialize schema
+        Self::init_schema(&conn)?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC)",
-        [],
-    )?;
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
+    }
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_projects_date ON projects(date)",
-        [],
-    )?;
+    /// Initialize database schema
+    fn init_schema(conn: &Connection) -> Result<()> {
+        // Create projects table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                client_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                shoot_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                folder_path TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                deadline TEXT
+            )",
+            [],
+        )?;
 
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_projects_client_name ON projects(client_name)",
-        [],
-    )?;
+        // Create indexes for common queries
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
+            [],
+        )?;
 
-    // Store connection in global state
-    let mut db = DB_CONNECTION
-        .lock()
-        .map_err(|_| rusqlite::Error::InvalidQuery)?;
-    *db = Some(conn);
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC)",
+            [],
+        )?;
 
-    Ok(())
-}
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_date ON projects(date)",
+            [],
+        )?;
 
-/// Get database file path
-fn get_db_path() -> Result<PathBuf> {
-    let home_dir = crate::modules::file_utils::get_home_dir().map_err(|e| {
-        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            e,
-        )))
-    })?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_client_name ON projects(client_name)",
+            [],
+        )?;
 
-    Ok(home_dir.join("CreatorOps").join("creatorops.db"))
-}
+        Ok(())
+    }
 
-/// Execute a query with the database connection
-pub fn with_db<F, R>(f: F) -> Result<R>
-where
-    F: FnOnce(&Connection) -> Result<R>,
-{
-    let db = DB_CONNECTION
-        .lock()
-        .map_err(|_| rusqlite::Error::InvalidQuery)?;
-    let conn = db.as_ref().ok_or(rusqlite::Error::InvalidQuery)?;
-    f(conn)
+    /// Get default database file path
+    fn get_default_path() -> Result<PathBuf> {
+        let home_dir = crate::modules::file_utils::get_home_dir().map_err(|e| {
+            rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                e,
+            )))
+        })?;
+
+        Ok(home_dir.join("CreatorOps").join("creatorops.db"))
+    }
+
+    /// Execute a query with the database connection
+    pub fn execute<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&Connection) -> Result<R>,
+    {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        f(&conn)
+    }
 }

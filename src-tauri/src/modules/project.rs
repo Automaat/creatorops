@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use uuid::Uuid;
 
-use crate::modules::db::with_db;
+use crate::modules::db::Database;
 use crate::modules::file_utils::get_home_dir;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +96,7 @@ fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
 
 #[tauri::command]
 pub async fn create_project(
+    db: tauri::State<'_, Database>,
     name: String,
     client_name: String,
     date: String,
@@ -141,7 +142,7 @@ pub async fn create_project(
     };
 
     // Insert into database
-    with_db(|conn| {
+    db.execute(|conn| {
         conn.execute(
             "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -166,8 +167,8 @@ pub async fn create_project(
 }
 
 #[tauri::command]
-pub async fn list_projects() -> Result<Vec<Project>, String> {
-    with_db(|conn| {
+pub async fn list_projects(db: tauri::State<'_, Database>) -> Result<Vec<Project>, String> {
+    db.execute(|conn| {
         let mut stmt = conn
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC")?;
 
@@ -182,28 +183,32 @@ pub async fn list_projects() -> Result<Vec<Project>, String> {
 
 /// Force refresh project cache (now just returns list)
 #[tauri::command]
-pub async fn refresh_projects() -> Result<Vec<Project>, String> {
-    list_projects().await
+pub async fn refresh_projects(db: tauri::State<'_, Database>) -> Result<Vec<Project>, String> {
+    list_projects(db).await
 }
 
 #[tauri::command]
-pub async fn delete_project(project_id: String) -> Result<(), String> {
+pub async fn delete_project(
+    db: tauri::State<'_, Database>,
+    project_id: String,
+) -> Result<(), String> {
     // Get project folder path before deletion
-    let folder_path = with_db(|conn| {
-        let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
+    let folder_path = db
+        .execute(|conn| {
+            let mut stmt = conn.prepare("SELECT folder_path FROM projects WHERE id = ?1")?;
 
-        let path: String = stmt.query_row(params![project_id], |row| row.get(0))?;
+            let path: String = stmt.query_row(params![project_id], |row| row.get(0))?;
 
-        Ok(path)
-    })
-    .map_err(|e| format!("Database error: {}", e))?;
+            Ok(path)
+        })
+        .map_err(|e| format!("Database error: {}", e))?;
 
     // Delete project folder first (if this fails, DB remains consistent)
     fs::remove_dir_all(&folder_path)
         .map_err(|e| format!("Failed to delete project folder: {}", e))?;
 
     // Delete from database (only after filesystem deletion succeeds)
-    with_db(|conn| {
+    db.execute(|conn| {
         conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
         Ok(())
     })
@@ -214,13 +219,14 @@ pub async fn delete_project(project_id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn update_project_status(
+    db: tauri::State<'_, Database>,
     project_id: String,
     new_status: ProjectStatus,
 ) -> Result<Project, String> {
     let now = chrono::Utc::now().to_rfc3339();
 
     // Update in database
-    with_db(|conn| {
+    db.execute(|conn| {
         conn.execute(
             "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
             params![new_status.to_string(), now, project_id],
@@ -230,11 +236,12 @@ pub async fn update_project_status(
     .map_err(|e| format!("Failed to update project status: {}", e))?;
 
     // Fetch and return updated project
-    get_project_by_id(&project_id)
+    get_project_by_id(&db, &project_id)
 }
 
 #[tauri::command]
 pub async fn update_project_deadline(
+    db: tauri::State<'_, Database>,
     project_id: String,
     deadline: Option<String>,
 ) -> Result<Project, String> {
@@ -242,7 +249,7 @@ pub async fn update_project_deadline(
     let deadline_value = deadline.filter(|d| !d.is_empty());
 
     // Update in database
-    with_db(|conn| {
+    db.execute(|conn| {
         conn.execute(
             "UPDATE projects SET deadline = ?1, updated_at = ?2 WHERE id = ?3",
             params![deadline_value, now, project_id],
@@ -252,12 +259,12 @@ pub async fn update_project_deadline(
     .map_err(|e| format!("Failed to update project deadline: {}", e))?;
 
     // Fetch and return updated project
-    get_project_by_id(&project_id)
+    get_project_by_id(&db, &project_id)
 }
 
 /// Helper function to get project by ID
-fn get_project_by_id(project_id: &str) -> Result<Project, String> {
-    with_db(|conn| {
+fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, String> {
+    db.execute(|conn| {
         let mut stmt = conn
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
 
@@ -269,20 +276,24 @@ fn get_project_by_id(project_id: &str) -> Result<Project, String> {
 }
 
 #[tauri::command]
-pub async fn get_project(project_id: String) -> Result<Project, String> {
-    get_project_by_id(&project_id)
+pub async fn get_project(
+    db: tauri::State<'_, Database>,
+    project_id: String,
+) -> Result<Project, String> {
+    get_project_by_id(&db, &project_id)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::db::init_db;
+    use crate::modules::db::Database;
     use tempfile::TempDir;
 
-    fn setup_test_db() {
+    fn setup_test_db() -> (TempDir, Database) {
         let temp_dir = TempDir::new().unwrap();
-        std::env::set_var("HOME", temp_dir.path());
-        init_db().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(db_path).unwrap();
+        (temp_dir, db)
     }
 
     #[test]
@@ -416,28 +427,249 @@ mod tests {
         assert_eq!(project.deadline, None);
     }
 
-    #[tokio::test]
-    #[ignore] // Skip DB tests due to parallel execution conflicts
-    async fn test_create_project() {
-        setup_test_db();
+    #[test]
+    fn test_db_insert_and_query_project() {
+        let (_temp_dir, db) = setup_test_db();
 
-        let result = create_project(
-            "Wedding Shoot".to_string(),
-            "John Doe".to_string(),
-            "2024-06-15".to_string(),
-            "Wedding".to_string(),
-            Some("2024-07-01".to_string()),
-        )
-        .await;
+        // Insert a project directly into the database
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "test-123",
+                    "Wedding Shoot",
+                    "John Doe",
+                    "2024-06-15",
+                    "Wedding",
+                    "New",
+                    "/path/to/project",
+                    "2024-01-15T10:00:00Z",
+                    "2024-01-15T10:00:00Z",
+                    Some("2024-07-01"),
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
 
-        assert!(result.is_ok());
-        let project = result.unwrap();
+        // Query the project back
+        let project = get_project_by_id(&db, "test-123").unwrap();
         assert_eq!(project.name, "Wedding Shoot");
         assert_eq!(project.client_name, "John Doe");
         assert_eq!(project.status, ProjectStatus::New);
         assert_eq!(project.deadline, Some("2024-07-01".to_string()));
+    }
 
-        std::env::remove_var("HOME");
+    #[test]
+    fn test_db_list_projects_empty() {
+        let (_temp_dir, db) = setup_test_db();
+
+        let projects = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC",
+                )?;
+                let projects = stmt
+                    .query_map([], map_project_row)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(projects)
+            })
+            .unwrap();
+
+        assert_eq!(projects.len(), 0);
+    }
+
+    #[test]
+    fn test_db_list_projects_multiple() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert multiple projects
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "proj-1",
+                    "Project 1",
+                    "Client A",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    "/path1",
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-01T10:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "proj-2",
+                    "Project 2",
+                    "Client B",
+                    "2024-01-02",
+                    "Portrait",
+                    "Editing",
+                    "/path2",
+                    "2024-01-02T10:00:00Z",
+                    "2024-01-02T11:00:00Z",
+                    Some("2024-02-01"),
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Query all projects
+        let projects = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC",
+                )?;
+                let projects = stmt
+                    .query_map([], map_project_row)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(projects)
+            })
+            .unwrap();
+
+        assert_eq!(projects.len(), 2);
+        // Most recent first (proj-2 has newer updated_at)
+        assert_eq!(projects[0].id, "proj-2");
+        assert_eq!(projects[1].id, "proj-1");
+    }
+
+    #[test]
+    fn test_db_update_project_status() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert a project
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "proj-1",
+                    "Project 1",
+                    "Client A",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    "/path1",
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-01T10:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Update status
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
+                params!["Editing", "2024-01-01T12:00:00Z", "proj-1"],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify update
+        let project = get_project_by_id(&db, "proj-1").unwrap();
+        assert_eq!(project.status, ProjectStatus::Editing);
+        assert_eq!(project.updated_at, "2024-01-01T12:00:00Z");
+    }
+
+    #[test]
+    fn test_db_update_project_deadline() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert a project without deadline
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "proj-1",
+                    "Project 1",
+                    "Client A",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    "/path1",
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-01T10:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Set deadline
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE projects SET deadline = ?1, updated_at = ?2 WHERE id = ?3",
+                params![Some("2024-02-01"), "2024-01-01T12:00:00Z", "proj-1"],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify update
+        let project = get_project_by_id(&db, "proj-1").unwrap();
+        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+    }
+
+    #[test]
+    fn test_db_delete_project() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert a project
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    "proj-1",
+                    "Project 1",
+                    "Client A",
+                    "2024-01-01",
+                    "Wedding",
+                    "New",
+                    "/path1",
+                    "2024-01-01T10:00:00Z",
+                    "2024-01-01T10:00:00Z",
+                    None::<String>,
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify it exists
+        assert!(get_project_by_id(&db, "proj-1").is_ok());
+
+        // Delete it
+        db.execute(|conn| {
+            conn.execute("DELETE FROM projects WHERE id = ?1", params!["proj-1"])?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify it's gone
+        assert!(get_project_by_id(&db, "proj-1").is_err());
+    }
+
+    #[test]
+    fn test_db_get_project_not_found() {
+        let (_temp_dir, db) = setup_test_db();
+
+        let result = get_project_by_id(&db, "nonexistent");
+        assert!(result.is_err());
     }
 
     #[test]

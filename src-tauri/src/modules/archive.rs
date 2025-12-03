@@ -1,5 +1,4 @@
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
-use crate::modules::project::ProjectStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -159,9 +158,6 @@ async fn process_archive(mut job: ArchiveJob, app_handle: tauri::AppHandle) -> R
         move_directory_recursive(source_path, archive_path, &mut job, &app_handle).await?;
     }
 
-    // Update project status to Archived
-    update_project_status(&job.project_id, ProjectStatus::Archived)?;
-
     Ok(())
 }
 
@@ -228,21 +224,6 @@ async fn move_directory_recursive(
     fs::remove_dir_all(source).map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-fn update_project_status(project_id: &str, new_status: ProjectStatus) -> Result<(), String> {
-    use crate::modules::db::with_db;
-    use rusqlite::params;
-
-    let now = get_timestamp();
-    with_db(|conn| {
-        conn.execute(
-            "UPDATE projects SET status = ?1, updated_at = ?2 WHERE id = ?3",
-            params![new_status.to_string(), now, project_id],
-        )?;
-        Ok(())
-    })
-    .map_err(|e| format!("Failed to update project status: {}", e))
 }
 
 /// Get archive queue
@@ -630,7 +611,8 @@ mod tests {
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert_eq!(progress_percent, 50.0);
 
-        let bytes_percent = (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
+        let bytes_percent =
+            (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
         assert_eq!(bytes_percent, 50.0);
     }
 

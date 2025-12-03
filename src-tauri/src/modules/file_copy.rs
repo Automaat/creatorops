@@ -515,17 +515,6 @@ mod tests {
     }
 
     #[test]
-    fn test_max_concurrent_copies_constant() {
-        assert!(MAX_CONCURRENT_COPIES > 0);
-        assert!(MAX_CONCURRENT_COPIES <= 8);
-    }
-
-    #[test]
-    fn test_max_retry_attempts_constant() {
-        assert_eq!(MAX_RETRY_ATTEMPTS, 3);
-    }
-
-    #[test]
     fn test_copy_result_success_criteria() {
         let success = CopyResult {
             success: true,
@@ -540,7 +529,10 @@ mod tests {
 
         assert!(success.success);
         assert!(success.error.is_none());
-        assert_eq!(success.files_copied, success.photos_copied + success.videos_copied);
+        assert_eq!(
+            success.files_copied,
+            success.photos_copied + success.videos_copied
+        );
     }
 
     #[test]

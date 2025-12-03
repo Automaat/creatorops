@@ -25,10 +25,11 @@ use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize database
-    modules::db::init_db().expect("Failed to initialize database");
+    // Initialize database with dependency injection
+    let db = modules::db::Database::new().expect("Failed to initialize database");
 
     tauri::Builder::default()
+        .manage(db)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())

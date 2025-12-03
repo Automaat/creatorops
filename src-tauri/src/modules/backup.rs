@@ -882,7 +882,8 @@ mod tests {
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert_eq!(progress_percent, 25.0);
 
-        let bytes_percent = (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
+        let bytes_percent =
+            (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
         assert_eq!(bytes_percent, 25.0);
     }
 
