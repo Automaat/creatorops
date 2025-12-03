@@ -480,7 +480,8 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
     // Write and sync file to ensure data is persisted immediately
     use std::io::Write;
     let mut file = fs::File::create(&history_path).map_err(|e| e.to_string())?;
-    file.write_all(json_data.as_bytes()).map_err(|e| e.to_string())?;
+    file.write_all(json_data.as_bytes())
+        .map_err(|e| e.to_string())?;
     file.sync_all().map_err(|e| e.to_string())?;
 
     Ok(())

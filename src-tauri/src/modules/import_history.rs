@@ -127,8 +127,8 @@ fn get_history_file_path() -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::sync::{Arc, Mutex};
+    use tempfile::TempDir;
 
     // Global mutex to serialize tests that manipulate HOME environment variable
     lazy_static::lazy_static! {
