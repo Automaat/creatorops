@@ -55,27 +55,6 @@ Add Google Drive as delivery destination alongside existing local filesystem des
 
 ### Phase 1: Backend Foundation
 
-**STATUS**: ✅ Foundation Complete | ⏳ OAuth Pending
-
-**Completed Work**:
-
-- ✅ Dependencies added (google-drive3, yup-oauth2, hyper, keyring)
-- ✅ Database schema with google_drive_accounts table (includes parent_folder_id)
-- ✅ google_drive.rs module created with data structures
-- ✅ Working Tauri commands: get_google_drive_account, set_drive_parent_folder, remove_google_drive_account
-- ✅ Token management functions: store_tokens_in_keychain, get_tokens_from_keychain
-- ✅ Module registered in mod.rs and lib.rs
-- ✅ 7 unit tests passing (serialization, timestamp, CRUD)
-
-**Pending**:
-
-- ⏳ OAuth flow implementation (start_google_drive_auth, complete_google_drive_auth currently stubbed)
-- ⏳ PKCE generation/verification
-- ⏳ Localhost server for OAuth redirect
-- ⏳ Token refresh logic (refresh_access_token currently stubbed)
-
----
-
 **1. New Module: `src-tauri/src/modules/google_drive.rs`**
 - OAuth functions: `start_auth()`, `complete_auth()`, `refresh_token()`
 - Account functions: `get_account()`, `remove_account()`

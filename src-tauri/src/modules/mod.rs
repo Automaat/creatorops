@@ -5,7 +5,6 @@ pub mod delivery;
 pub mod file_copy;
 pub mod file_system;
 pub mod file_utils;
-pub mod google_drive;
 pub mod import_history;
 pub mod project;
 pub mod sd_card;

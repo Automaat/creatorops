@@ -337,8 +337,8 @@ Project Detail View:
 
 ---
 
-**Last Updated**: 2025-11-29
-**Status**: Phase 5 complete - MVP operational. Post-MVP features in progress.
+**Last Updated**: 2025-11-19
+**Status**: Phase 5 complete - MVP ready for distribution
 
 ## Implementation Status
 
@@ -415,60 +415,3 @@ Project Detail View:
   - DMG and .app bundle targets
   - Custom window layout for installer
   - Minimum macOS 10.15 requirement
-
-## Current Status & Next Steps
-
-**Last Updated**: 2025-11-29
-
-### Completed ✓
-- MVP (Phases 0-5): All features operational
-- Post-MVP: Project deadline tracking w/ overdue indicators
-
-### In Progress 🚧
-- Google Drive integration: Backend scaffolding only (not functional)
-  - Stubs in `src-tauri/src/modules/google_drive.rs` (132 lines)
-  - DB schema + dependencies added
-  - No OAuth, upload, or UI implementation
-  - Plan: `plans/gd-integration.md`
-
-### Uncommitted Changes
-- `src-tauri/Cargo.{toml,lock}`: Google Drive deps (keyring, google-drive3, yup-oauth2)
-- `src-tauri/src/lib.rs`: Google Drive commands registered
-- `src-tauri/src/modules/db.rs`: Added deadline column, google_drive_accounts table
-- `src-tauri/src/modules/mod.rs`: google_drive module imported
-- `src-tauri/src/modules/google_drive.rs`: Untracked (new module)
-
-### Immediate TODOs
-
-**Option 1: Complete Google Drive Integration**
-- [ ] Commit current scaffolding or stash
-- [ ] Implement OAuth flow (loopback server, PKCE)
-- [ ] Implement Drive API (upload, folder creation, progress tracking)
-- [ ] Add Settings UI (connect/disconnect, parent folder config)
-- [ ] Update Delivery UI (Drive destination support, shareable links)
-- [ ] Add conflict handling (overwrite/rename/skip)
-- [ ] Write tests (OAuth, upload, retry logic, conflict modes)
-- **Estimate**: 2-3 weeks (per `plans/gd-integration.md`)
-
-**Option 2: Implement Client Management** (simpler, shorter)
-- [ ] Backend: `client.rs` module (CRUD, migration, tests)
-- [ ] DB: clients table, client_id FK in projects
-- [ ] Frontend: Clients view, CreateClient form, ClientSelector dropdown
-- [ ] Integration: Update CreateProject, App routing, Layout nav
-- [ ] Migration: Extract clients from existing projects
-- [ ] Tests: Backend + component tests
-- **Estimate**: ~6 hours (per `plans/client-view.md`)
-
-**Option 3: Start Phase 6 (Enhanced Import)**
-- [ ] Photo/video thumbnail previews
-- [ ] Smart duplicate detection (visual similarity)
-- [ ] Import filtering (file type, date range)
-- [ ] RAW + JPEG pairing detection
-- [ ] Burst sequence detection
-
-### Remaining from Original Plan (Not Started)
-- Phase 6: Enhanced Import
-- Phase 7: Metadata & Organization
-- Phase 8: Cloud & Network (except Google Drive scaffolding)
-- Phase 9: Advanced Features
-- Phase 10: Professional Features
