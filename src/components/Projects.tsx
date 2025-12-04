@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { ProjectStatus, type ArchiveJob, type BackupDestination, type CopyResult, type ImportHistory, type Project, type SDCard } from '../types'
+import {
+  ProjectStatus,
+  type ArchiveJob,
+  type BackupDestination,
+  type CopyResult,
+  type ImportHistory,
+  type Project,
+  type SDCard,
+} from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { useNotification } from '../hooks/useNotification'

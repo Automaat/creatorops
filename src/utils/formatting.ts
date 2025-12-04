@@ -39,7 +39,7 @@ function formatETA(seconds: number): string {
 function formatDate(dateString: string): string {
   try {
     const timestamp = Number.parseInt(dateString, 10) * MILLISECONDS_PER_SECOND
-    if (isNaN(timestamp)) {
+    if (Number.isNaN(timestamp)) {
       return dateString
     }
 
@@ -59,7 +59,7 @@ function formatDate(dateString: string): string {
 function formatDateShort(dateString: string): string {
   try {
     const date = new Date(dateString)
-    if (isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime())) {
       return dateString
     }
 
@@ -105,6 +105,9 @@ const MONTH_NAMES_FULL = [
 
 function formatDisplayDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
+  if (!d || Number.isNaN(d.getTime())) {
+    return typeof date === 'string' ? date : ''
+  }
   return `${MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
