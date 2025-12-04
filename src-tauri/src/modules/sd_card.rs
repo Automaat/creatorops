@@ -56,7 +56,7 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
                     let (size, free_space) = get_disk_usage(&path);
 
                     // Get device information
-                    let (device_type, is_removable) = get_device_info(&name);
+                    let (device_type, is_removable) = get_device_info(&path.to_string_lossy());
 
                     // Only show removable storage: SD cards, USB drives, external drives
                     // Filter out: disk images (app installers), internal HDDs, unknown
