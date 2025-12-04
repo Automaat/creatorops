@@ -29,10 +29,10 @@
   // Fine-tune specific rules for AI coding workflow
   "rules": {
     // === Reasonable Limits (Override impossible defaults) ===
-    "eslint/max-lines-per-function": ["warn", { "max": 150, "skipBlankLines": true, "skipComments": true }],
-    "eslint/max-depth": ["warn", { "max": 4 }],
-    "eslint/max-nested-callbacks": ["warn", { "max": 5 }],
-    "eslint/max-lines": ["warn", { "max": 500, "skipBlankLines": true, "skipComments": true }],
+    "eslint/max-lines-per-function": ["warn", { "max": 100, "skipBlankLines": true, "skipComments": true }],
+    "eslint/max-depth": ["warn", { "max": 3 }],
+    "eslint/max-nested-callbacks": ["warn", { "max": 3 }],
+    "eslint/max-lines": ["warn", { "max": 300, "skipBlankLines": true, "skipComments": true }],
 
     // === Type Safety (Critical for AI to understand intent) ===
     "typescript/no-explicit-any": "error",
