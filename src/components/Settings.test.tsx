@@ -332,9 +332,7 @@ describe('settings', () => {
     await user.click(resetButton)
 
     await waitFor(() => {
-      expect(localStorage.getItem('folder_template')).toBe(
-        '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
-      )
+      expect(localStorage.getItem('folder_template')).toBe('{YYYY}-{MM}-{DD}_{ClientName}_{Type}')
       expect(localStorage.getItem('file_rename_template')).toBe('{original}')
     })
   })
@@ -377,7 +375,12 @@ describe('settings', () => {
 
     expect(screen.getByText('/custom/import')).toBeTruthy()
     expect(screen.getByText('/custom/archive')).toBeTruthy()
-    expect((screen.getByPlaceholderText('{YYYY}-{MM}-{DD}_{ClientName}_{Type}') as HTMLInputElement).value).toBe('custom_folder')
-    expect((screen.getByPlaceholderText('{original}') as HTMLInputElement).value).toBe('custom_file')
+    expect(
+      (screen.getByPlaceholderText('{YYYY}-{MM}-{DD}_{ClientName}_{Type}') as HTMLInputElement)
+        .value
+    ).toBe('custom_folder')
+    expect((screen.getByPlaceholderText('{original}') as HTMLInputElement).value).toBe(
+      'custom_file'
+    )
   })
 })
