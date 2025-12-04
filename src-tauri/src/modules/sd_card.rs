@@ -58,6 +58,15 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
                     // Get device information
                     let (device_type, is_removable) = get_device_info(&name);
 
+                    // Only show removable storage: SD cards, USB drives, external drives
+                    // Filter out: disk images (app installers), internal HDDs, unknown
+                    if device_type == "Disk Image"
+                        || device_type == "Internal Drive"
+                        || device_type == "Unknown"
+                    {
+                        continue;
+                    }
+
                     cards.push(SDCard {
                         name,
                         path: path.to_string_lossy().to_string(),
@@ -182,8 +191,11 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
         if let Ok(output) = output {
             let info = String::from_utf8_lossy(&output.stdout);
 
-            // Parse device type
-            let device_type = if info.contains("SD Card") || info.contains("SD_Card") {
+            // Parse device type - check Protocol field for accuracy
+            let device_type = if (info.contains("Protocol:") && info.contains("Secure Digital"))
+                || info.contains("SD Card")
+                || info.contains("SD_Card")
+            {
                 "SD Card".to_owned()
             } else if info.contains("USB") {
                 "USB Drive".to_owned()
