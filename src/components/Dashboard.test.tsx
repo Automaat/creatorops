@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { Dashboard } from './Dashboard'
 import { Project, ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'

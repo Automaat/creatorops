@@ -126,7 +126,7 @@ describe('useSDCardScanner', () => {
       })
     })
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(invoke).toHaveBeenCalledTimes(1)
     })
 
@@ -134,7 +134,7 @@ describe('useSDCardScanner', () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(invoke).toHaveBeenCalledTimes(2)
     })
 
@@ -142,7 +142,7 @@ describe('useSDCardScanner', () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(invoke).toHaveBeenCalledTimes(3)
     })
 
@@ -207,7 +207,7 @@ describe('useSDCardScanner', () => {
       unmount = result.unmount
     })
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(invoke).toHaveBeenCalledTimes(1)
     })
 

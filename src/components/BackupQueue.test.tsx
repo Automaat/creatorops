@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { BackupQueue } from './BackupQueue'
 import { NotificationProvider } from '../contexts/NotificationContext'
 import type { BackupJob, BackupProgress } from '../types'
@@ -22,7 +22,9 @@ describe('BackupQueue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockInvoke.mockResolvedValue([])
-    mockListen.mockImplementation(() => Promise.resolve(() => {}))
+    mockListen.mockImplementation(() => {
+      return Promise.resolve(() => {})
+    })
   })
 
   const renderComponent = () =>

@@ -149,7 +149,7 @@ function SDCardItem({
     })
 
     return () => {
-      unlistenProgress.then((fn) => fn())
+      unlistenProgress.then((fn) => fn()).catch(() => {})
     }
   }, [])
 

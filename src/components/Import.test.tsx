@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { Import } from './Import'
 import { NotificationProvider } from '../contexts/NotificationContext'
 import type { SDCard, Project, CopyResult } from '../types'

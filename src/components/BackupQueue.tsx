@@ -25,8 +25,8 @@ export function BackupQueue() {
     const interval = setInterval(loadQueue, QUEUE_REFRESH_INTERVAL)
 
     return () => {
-      unlistenProgress.then((fn) => fn())
-      unlistenJobUpdate.then((fn) => fn())
+      unlistenProgress.then((fn) => fn()).catch(() => {})
+      unlistenJobUpdate.then((fn) => fn()).catch(() => {})
       clearInterval(interval)
     }
   }, [])

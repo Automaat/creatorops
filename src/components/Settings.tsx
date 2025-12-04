@@ -241,7 +241,7 @@ export function Settings() {
             <div className="card">
               <div className="flex flex-col gap-md">
                 <div>
-                  <label className="font-medium">Theme</label>
+                  <div className="font-medium">Theme</div>
                   <p className="text-secondary text-sm" style={{ marginBottom: 'var(--space-sm)' }}>
                     Choose how CreatorOps looks
                   </p>

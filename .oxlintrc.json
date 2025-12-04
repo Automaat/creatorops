@@ -28,6 +28,12 @@
 
   // Fine-tune specific rules for AI coding workflow
   "rules": {
+    // === Reasonable Limits (Override impossible defaults) ===
+    "eslint/max-lines-per-function": ["warn", { "max": 150, "skipBlankLines": true, "skipComments": true }],
+    "eslint/max-depth": ["warn", { "max": 4 }],
+    "eslint/max-nested-callbacks": ["warn", { "max": 5 }],
+    "eslint/max-lines": ["warn", { "max": 500, "skipBlankLines": true, "skipComments": true }],
+
     // === Type Safety (Critical for AI to understand intent) ===
     "typescript/no-explicit-any": "error",
     "typescript/no-unsafe-assignment": "error",
@@ -69,6 +75,7 @@
     "eslint/no-empty-pattern": "error",
 
     // === React Best Practices ===
+    "react/react-in-jsx-scope": "off",
     "react/jsx-key": "error",
     "react/no-array-index-key": "warn",
     "react/jsx-no-target-blank": "error",
@@ -88,6 +95,9 @@
     // === Import Management ===
     "import/no-duplicates": "error",
     "import/no-unresolved": "error",
+    "import/no-unassigned-import": ["error", {
+      "allow": ["**/*.css", "@testing-library/jest-dom"]
+    }],
     "import/order": ["warn", {
       "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
       "newlines-between": "always",
@@ -105,6 +115,7 @@
     "jest/no-disabled-tests": "warn",
     "jest/no-focused-tests": "error",
     "jest/valid-expect": "error",
+    "jest/no-standalone-expect": ["error", { "additionalTestBlockFunctions": ["waitFor", "waitForElementToBeRemoved", "vi.waitFor"] }],
 
     // === Documentation (Critical for AI context) ===
     "jsdoc/check-alignment": "warn",

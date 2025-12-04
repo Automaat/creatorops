@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+
 import { formatBytes, formatDate } from '../utils/formatting'
 import { useNotification } from '../hooks/useNotification'
 import '../styles/history.css'

@@ -51,7 +51,7 @@ export function Delivery() {
     })
 
     return () => {
-      unlisten.then((fn) => fn())
+      unlisten.then((fn) => fn()).catch(() => {})
     }
   }, [])
 
