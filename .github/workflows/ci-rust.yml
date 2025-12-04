@@ -115,13 +115,7 @@ jobs:
           path: ~/.cargo/bin
           key: ${{ runner.os }}-cargo-tools-llvm-cov-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build (dev)
-        run: cd src-tauri && cargo build
-
-      - name: Test
-        run: cd src-tauri && cargo test
-
-      - name: Generate coverage
+      - name: Test with coverage
         run: mise run coverage:rust
 
       - name: Upload coverage to Codecov
