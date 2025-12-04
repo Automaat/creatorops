@@ -34,8 +34,22 @@ export function Delivery() {
     loadDestinations()
     loadDeliveryQueue().catch(console.error)
 
-    // Listen for delivery progress events
-    const unlisten = listen<DeliveryProgress>('delivery-progress', (event) => {
+    const unlistenDelivery = listen<DeliveryProgress>('delivery-progress', (event) => {
+      const progress = event.payload
+      setDeliveryJobs((prev) =>
+        prev.map((job) =>
+          job.id === progress.jobId
+            ? {
+                ...job,
+                bytesTransferred: progress.bytesTransferred,
+                filesCopied: progress.currentFile,
+              }
+            : job
+        )
+      )
+    })
+
+    const unlistenDrive = listen<DeliveryProgress>('drive-upload-progress', (event) => {
       const progress = event.payload
       setDeliveryJobs((prev) =>
         prev.map((job) =>
@@ -51,7 +65,8 @@ export function Delivery() {
     })
 
     return () => {
-      void unlisten.then((fn) => fn()).catch(() => {})
+      void unlistenDelivery.then((fn) => fn()).catch(() => {})
+      void unlistenDrive.then((fn) => fn()).catch(() => {})
     }
   }, [])
 
@@ -129,18 +144,27 @@ export function Delivery() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (
-          Array.isArray(parsed) &&
-          parsed.every(
-            (item): item is DeliveryDestination =>
-              typeof item === 'object' &&
-              item !== null &&
-              'id' in item &&
-              'name' in item &&
-              'path' in item
-          )
-        ) {
-          setDestinations(parsed)
+        if (Array.isArray(parsed)) {
+          const migrated = parsed.map((item): DeliveryDestination => {
+            if (typeof item === 'object' && item !== null) {
+              if ('type' in item) {
+                return item as DeliveryDestination
+              }
+              if ('path' in item && 'id' in item && 'name' in item) {
+                return {
+                  type: 'local',
+                  id: item.id as string,
+                  name: item.name as string,
+                  path: item.path as string,
+                  enabled: (item.enabled as boolean) ?? true,
+                  createdAt: (item.createdAt as string) ?? new Date().toISOString(),
+                }
+              }
+            }
+            throw new Error('Invalid destination format')
+          })
+          localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+          setDestinations(migrated)
         }
       }
     } catch (error) {
@@ -183,18 +207,28 @@ export function Delivery() {
     }
 
     try {
-      const job = await invoke<DeliveryJob>('create_delivery', {
-        deliveryPath: destination.path,
-        namingTemplate: namingTemplate || undefined,
-        projectId: selectedProject.id,
-        projectName: selectedProject.name,
-        selectedFiles: [...selectedFiles],
-      })
+      let job: DeliveryJob
+
+      if (destination.type === 'local') {
+        job = await invoke<DeliveryJob>('create_delivery', {
+          deliveryPath: destination.path,
+          namingTemplate: namingTemplate || undefined,
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          selectedFiles: [...selectedFiles],
+        })
+        await invoke('start_delivery', { jobId: job.id })
+      } else {
+        const conflictMode = localStorage.getItem('drive_conflict_mode') || 'rename'
+        job = await invoke<DeliveryJob>('upload_to_google_drive', {
+          conflictMode,
+          files: [...selectedFiles],
+          folderName: `${selectedProject.name}_${new Date().toISOString().split('T')[0]}`,
+          projectName: selectedProject.name,
+        })
+      }
 
       setDeliveryJobs((prev) => [...prev, job])
-
-      // Auto-start the delivery
-      await invoke('start_delivery', { jobId: job.id })
     } catch (error) {
       console.error('Failed to create delivery:', error)
     }
@@ -206,6 +240,14 @@ export function Delivery() {
       setDeliveryJobs((prev) => prev.filter((j) => j.id !== jobId))
     } catch (error) {
       console.error('Failed to remove job:', error)
+    }
+  }
+
+  async function copyShareableLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+    } catch (error) {
+      console.error('Failed to copy link:', error)
     }
   }
 
@@ -417,8 +459,13 @@ export function Delivery() {
                       onClick={() => void createDelivery(dest)}
                       className="destination-button"
                     >
-                      <span className="destination-name">{dest.name}</span>
-                      <span className="destination-path">{dest.path}</span>
+                      <span className="destination-name">
+                        {dest.type === 'google-drive' && '☁️ '}
+                        {dest.name}
+                      </span>
+                      <span className="destination-path">
+                        {dest.type === 'local' ? dest.path : 'Google Drive'}
+                      </span>
                     </button>
                   ))}
               </div>
@@ -451,7 +498,11 @@ export function Delivery() {
                   <div className="job-details">
                     <div className="detail-item">
                       <span className="detail-label">Destination:</span>
-                      <span>{job.deliveryPath}</span>
+                      <span>
+                        {job.destinationType === 'google-drive'
+                          ? '☁️ Google Drive'
+                          : job.deliveryPath}
+                      </span>
                     </div>
                     <div className="detail-item">
                       <span className="detail-label">Files:</span>
@@ -479,6 +530,23 @@ export function Delivery() {
                   )}
 
                   {job.errorMessage && <div className="error-message">{job.errorMessage}</div>}
+
+                  {job.shareableLink && job.status === 'completed' && (
+                    <div className="shareable-link">
+                      <span className="detail-label">Shareable Link:</span>
+                      <div className="link-container">
+                        <a href={job.shareableLink} target="_blank" rel="noopener noreferrer">
+                          {job.shareableLink}
+                        </a>
+                        <button
+                          onClick={() => void copyShareableLink(job.shareableLink!)}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Copy Link
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {job.manifestPath && (
                     <div className="manifest-link">
