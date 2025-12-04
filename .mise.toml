@@ -21,7 +21,7 @@ description = "Run Rust linter (clippy)"
 run = "cargo clippy --all-targets --all-features --manifest-path src-tauri/Cargo.toml -- -D warnings"
 
 [tasks."lint:frontend"]
-description = "Run frontend linter (eslint)"
+description = "Run frontend linter (oxlint)"
 run = "npm run lint"
 
 [tasks.fmt]

@@ -1,0 +1,144 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // Enable all strict categories for maximum code quality
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "warn",
+    "perf": "warn",
+    "style": "warn",
+    "restriction": "warn"
+  },
+
+  // Enable plugins for React + TypeScript + Tauri project
+  "plugins": [
+    "eslint",
+    "typescript",
+    "react",
+    "unicorn",
+    "oxc",
+    "jsx-a11y",
+    "jest",
+    "jsdoc",
+    "import",
+    "promise",
+    "react-perf"
+  ],
+
+  // Fine-tune specific rules for AI coding workflow
+  "rules": {
+    // === Type Safety (Critical for AI to understand intent) ===
+    "typescript/no-explicit-any": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/strict-boolean-expressions": "warn",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+
+    // === Code Clarity (Helps AI understand context) ===
+    "eslint/no-implicit-coercion": "warn",
+    "eslint/prefer-template": "warn",
+    "eslint/no-nested-ternary": "warn",
+    "eslint/no-magic-numbers": ["warn", {
+      "ignore": [0, 1, -1],
+      "ignoreArrayIndexes": true
+    }],
+    "eslint/consistent-return": "error",
+    "eslint/no-else-return": "warn",
+
+    // === Modern JavaScript (AI trained on modern patterns) ===
+    "eslint/prefer-arrow-callback": "warn",
+    "eslint/prefer-const": "error",
+    "eslint/no-var": "error",
+    "eslint/prefer-destructuring": "warn",
+    "eslint/prefer-spread": "warn",
+    "eslint/prefer-rest-params": "warn",
+    "unicorn/prefer-modern-math-apis": "warn",
+    "unicorn/prefer-node-protocol": "error",
+
+    // === Error Prevention (Catch AI mistakes early) ===
+    "eslint/no-unreachable": "error",
+    "eslint/no-constant-condition": "error",
+    "eslint/no-dupe-keys": "error",
+    "eslint/no-dupe-else-if": "error",
+    "eslint/no-duplicate-case": "error",
+    "eslint/no-empty-pattern": "error",
+
+    // === React Best Practices ===
+    "react/jsx-key": "error",
+    "react/no-array-index-key": "warn",
+    "react/jsx-no-target-blank": "error",
+    "react/jsx-no-useless-fragment": "warn",
+    "react/self-closing-comp": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-function-as-prop": "warn",
+
+    // === Accessibility (Often missed by AI) ===
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/click-events-have-key-events": "warn",
+
+    // === Import Management ===
+    "import/no-duplicates": "error",
+    "import/no-unresolved": "error",
+    "import/order": ["warn", {
+      "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
+      "newlines-between": "always",
+      "alphabetize": { "order": "asc" }
+    }],
+
+    // === Promise Handling ===
+    "promise/always-return": "warn",
+    "promise/catch-or-return": "error",
+    "promise/no-nesting": "warn",
+    "promise/no-promise-in-callback": "warn",
+
+    // === Testing Best Practices (Vitest uses Jest-compatible API) ===
+    "jest/expect-expect": "warn",
+    "jest/no-disabled-tests": "warn",
+    "jest/no-focused-tests": "error",
+    "jest/valid-expect": "error",
+
+    // === Documentation (Critical for AI context) ===
+    "jsdoc/check-alignment": "warn",
+    "jsdoc/check-param-names": "warn",
+    "jsdoc/check-tag-names": "warn",
+    "jsdoc/require-jsdoc": ["warn", {
+      "require": {
+        "FunctionDeclaration": true,
+        "ClassDeclaration": true,
+        "MethodDefinition": true
+      },
+      "publicOnly": true
+    }],
+
+    // === Unicorn Quality Rules ===
+    "unicorn/better-regex": "warn",
+    "unicorn/catch-error-name": "warn",
+    "unicorn/consistent-function-scoping": "warn",
+    "unicorn/explicit-length-check": "warn",
+    "unicorn/no-array-for-each": "warn",
+    "unicorn/no-for-loop": "warn",
+    "unicorn/no-null": "warn",
+    "unicorn/prefer-array-flat-map": "warn",
+    "unicorn/prefer-array-some": "warn",
+    "unicorn/prefer-includes": "warn",
+    "unicorn/prefer-optional-catch-binding": "warn",
+    "unicorn/prefer-set-has": "warn",
+    "unicorn/prefer-string-replace-all": "warn",
+    "unicorn/prefer-ternary": "warn"
+  },
+
+  // Environment settings for Tauri (browser + modern ES)
+  "env": {
+    "browser": true,
+    "es2024": true
+  }
+}
