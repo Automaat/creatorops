@@ -516,21 +516,24 @@ mod tests {
         // Note: diskutil output has multiple spaces, we match with a single space after colon
 
         // Simulate diskutil output for Secure Digital protocol (with multiple spaces like real output)
-        let sd_output = "   Protocol:                  Secure Digital\n   Device Location:           Internal";
-        let has_sd_protocol = sd_output
-            .lines()
-            .any(|line| line.trim_start().starts_with("Protocol:") && line.contains("Secure Digital"));
+        let sd_output =
+            "   Protocol:                  Secure Digital\n   Device Location:           Internal";
+        let has_sd_protocol = sd_output.lines().any(|line| {
+            line.trim_start().starts_with("Protocol:") && line.contains("Secure Digital")
+        });
         assert!(has_sd_protocol);
 
         // Simulate diskutil output for USB protocol
-        let usb_output = "   Protocol:                  USB\n   Device Location:           External";
+        let usb_output =
+            "   Protocol:                  USB\n   Device Location:           External";
         let has_usb_protocol = usb_output
             .lines()
             .any(|line| line.trim_start().starts_with("Protocol:") && line.contains("USB"));
         assert!(has_usb_protocol);
 
         // Simulate diskutil output for Disk Image protocol
-        let disk_image_output = "   Protocol:                  Disk Image\n   Device Location:           External";
+        let disk_image_output =
+            "   Protocol:                  Disk Image\n   Device Location:           External";
         let has_disk_image_protocol = disk_image_output
             .lines()
             .any(|line| line.trim_start().starts_with("Protocol:") && line.contains("Disk Image"));
