@@ -26,8 +26,34 @@
     "react-perf"
   ],
 
-  // Fine-tune specific rules for AI coding workflow
+  // Fine-tune specific rules for React + TypeScript best practices
   "rules": {
+    // === Disable Rules That Conflict With React Patterns ===
+    "eslint/no-ternary": "off",
+    "eslint/func-style": "off",
+    "eslint/no-console": "off",
+    "eslint/no-extend-native": "off",
+    "eslint/prefer-destructuring": "off",
+    "eslint/sort-imports": "off",
+    "eslint/no-empty-function": "off",
+    "eslint/arrow-body-style": "off",
+    "eslint/id-length": "off",
+    "import/no-named-export": "off",
+    "import/prefer-default-export": "off",
+    "import/unambiguous": "off",
+    "unicorn/filename-case": "off",
+    "unicorn/prefer-dom-node-dataset": "off",
+    "unicorn/prefer-global-this": "off",
+    "promise/prefer-await-to-callbacks": "off",
+    "jest/max-expects": "off",
+    "typescript/no-confusing-void-expression": "off",
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-module-boundary-types": "off",
+    "typescript/strict-boolean-expressions": "off",
+    "typescript/promise-function-async": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+
     // === Reasonable Limits (Override impossible defaults) ===
     "eslint/max-lines-per-function": ["warn", { "max": 100, "skipBlankLines": true, "skipComments": true }],
     "eslint/max-depth": ["warn", { "max": 3 }],
@@ -36,11 +62,10 @@
 
     // === Type Safety (Critical for AI to understand intent) ===
     "typescript/no-explicit-any": "error",
-    "typescript/no-unsafe-assignment": "error",
-    "typescript/no-unsafe-call": "error",
-    "typescript/no-unsafe-member-access": "error",
-    "typescript/no-unsafe-return": "error",
-    "typescript/strict-boolean-expressions": "warn",
+    "typescript/no-unsafe-assignment": "warn",
+    "typescript/no-unsafe-call": "warn",
+    "typescript/no-unsafe-member-access": "warn",
+    "typescript/no-unsafe-return": "warn",
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error",
     "typescript/await-thenable": "error",
