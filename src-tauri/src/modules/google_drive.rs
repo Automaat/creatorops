@@ -188,6 +188,7 @@ fn get_current_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[test]
     fn test_timestamp_format() {
@@ -250,7 +251,481 @@ mod tests {
         assert_eq!(deserialized.refresh_token, "refresh_token_456");
     }
 
-    // Note: Database-dependent tests (get_account, set_parent_folder, remove_account)
-    // are omitted because they require Database instance which is managed by Tauri.
-    // These should be tested as integration tests with a test database.
+    #[tokio::test]
+    async fn test_start_google_drive_auth_not_implemented() {
+        let result = start_google_drive_auth().await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Not implemented yet");
+    }
+
+    #[tokio::test]
+    async fn test_complete_google_drive_auth_not_implemented() {
+        let result = complete_google_drive_auth().await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Not implemented yet");
+    }
+
+    #[test]
+    fn test_refresh_access_token_not_implemented() {
+        let result = refresh_access_token("test_token");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Not implemented yet");
+    }
+
+    // Database-dependent tests
+    use tempfile::TempDir;
+
+    fn setup_test_db() -> (TempDir, Database) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(&db_path).unwrap();
+        (temp_dir, db)
+    }
+
+    #[test]
+    fn test_db_get_google_drive_account_none() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+        let result = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts LIMIT 1")?;
+                let account = stmt
+                    .query_row([], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
+                    })
+                    .optional()?;
+                Ok(account)
+            })
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_db_get_google_drive_account_exists() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert account
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "test-id",
+                    "test@example.com",
+                    "Test User",
+                    Some("folder-123"),
+                    1,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        let result = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts LIMIT 1")?;
+                let account = stmt
+                    .query_row([], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
+                    })
+                    .optional()?;
+                Ok(account)
+            })
+            .unwrap();
+
+        assert!(result.is_some());
+        let account = result.unwrap();
+        assert_eq!(account.id, "test-id");
+        assert_eq!(account.email, "test@example.com");
+        assert_eq!(account.display_name, "Test User");
+        assert_eq!(account.parent_folder_id, Some("folder-123".to_owned()));
+        assert!(account.enabled);
+    }
+
+    #[test]
+    fn test_db_get_google_drive_account_disabled() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert disabled account
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "disabled-id",
+                    "disabled@example.com",
+                    "Disabled User",
+                    None::<String>,
+                    0,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        let result = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts LIMIT 1")?;
+                let account = stmt
+                    .query_row([], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
+                    })
+                    .optional()?;
+                Ok(account)
+            })
+            .unwrap();
+
+        assert!(result.is_some());
+        let account = result.unwrap();
+        assert!(!account.enabled);
+        assert_eq!(account.parent_folder_id, None);
+    }
+
+    #[test]
+    fn test_db_set_drive_parent_folder_success() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert account
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "account-1",
+                    "user@example.com",
+                    "User Name",
+                    None::<String>,
+                    1,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Set parent folder
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE google_drive_accounts SET parent_folder_id = ?1 WHERE id = ?2",
+                [&Some("new-folder-id"), &Some("account-1")],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify it was set
+        let account: Option<GoogleDriveAccount> = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
+                stmt.query_row(["account-1"], |row| {
+                    Ok(GoogleDriveAccount {
+                        id: row.get(0)?,
+                        email: row.get(1)?,
+                        display_name: row.get(2)?,
+                        parent_folder_id: row.get(3)?,
+                        enabled: row.get::<_, i32>(4)? != 0,
+                        created_at: row.get(5)?,
+                        last_authenticated: row.get(6)?,
+                    })
+                })
+                .optional()
+            })
+            .unwrap();
+
+        assert!(account.is_some());
+        assert_eq!(
+            account.unwrap().parent_folder_id,
+            Some("new-folder-id".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_db_set_drive_parent_folder_clear() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert account with folder
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "account-2",
+                    "user2@example.com",
+                    "User Two",
+                    Some("existing-folder"),
+                    1,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Clear parent folder
+        db.execute(|conn| {
+            conn.execute(
+                "UPDATE google_drive_accounts SET parent_folder_id = ?1 WHERE id = ?2",
+                rusqlite::params![None::<String>, "account-2"],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify it was cleared
+        let account: Option<GoogleDriveAccount> = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
+                stmt.query_row(["account-2"], |row| {
+                    Ok(GoogleDriveAccount {
+                        id: row.get(0)?,
+                        email: row.get(1)?,
+                        display_name: row.get(2)?,
+                        parent_folder_id: row.get(3)?,
+                        enabled: row.get::<_, i32>(4)? != 0,
+                        created_at: row.get(5)?,
+                        last_authenticated: row.get(6)?,
+                    })
+                })
+                .optional()
+            })
+            .unwrap();
+
+        assert!(account.is_some());
+        assert_eq!(account.unwrap().parent_folder_id, None);
+    }
+
+    #[test]
+    fn test_db_remove_google_drive_account_success() {
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert account
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "remove-id",
+                    "remove@example.com",
+                    "Remove User",
+                    None::<String>,
+                    1,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify account exists
+        let count: i32 = db
+            .execute(|conn| {
+                conn.query_row(
+                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                    ["remove-id"],
+                    |row| row.get(0),
+                )
+            })
+            .unwrap();
+        assert_eq!(count, 1);
+
+        // Remove account
+        db.execute(|conn| {
+            conn.execute(
+                "DELETE FROM google_drive_accounts WHERE id = ?1",
+                ["remove-id"],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Verify account is gone
+        let count: i32 = db
+            .execute(|conn| {
+                conn.query_row(
+                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                    ["remove-id"],
+                    |row| row.get(0),
+                )
+            })
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_store_tokens_serialization() {
+        // Test token serialization without keychain
+        let token_data = TokenData {
+            access_token: "test_access_token".to_owned(),
+            refresh_token: "test_refresh_token".to_owned(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+        };
+
+        let json = serde_json::to_string(&token_data).unwrap();
+        assert!(json.contains("test_access_token"));
+        assert!(json.contains("test_refresh_token"));
+
+        let deserialized: TokenData = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.access_token, "test_access_token");
+        assert_eq!(deserialized.refresh_token, "test_refresh_token");
+    }
+
+    #[test]
+    fn test_get_tokens_from_keychain_not_found() {
+        let nonexistent_email = format!("nonexistent-{}@example.com", Uuid::new_v4());
+        let result = get_tokens_from_keychain(&nonexistent_email);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Failed to get tokens from keychain"));
+    }
+
+    #[test]
+    fn test_oauth_state_camel_case_serialization() {
+        let state = OAuthState {
+            auth_url: "https://example.com/auth".to_owned(),
+            server_port: 3000,
+        };
+
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(json.contains("authUrl"));
+        assert!(json.contains("serverPort"));
+        assert!(!json.contains("auth_url"));
+        assert!(!json.contains("server_port"));
+    }
+
+    #[test]
+    fn test_token_data_camel_case_serialization() {
+        let token_data = TokenData {
+            access_token: "access".to_owned(),
+            refresh_token: "refresh".to_owned(),
+            expires_at: Utc::now(),
+        };
+
+        let json = serde_json::to_string(&token_data).unwrap();
+        assert!(json.contains("accessToken"));
+        assert!(json.contains("refreshToken"));
+        assert!(json.contains("expiresAt"));
+        assert!(!json.contains("access_token"));
+        assert!(!json.contains("refresh_token"));
+        assert!(!json.contains("expires_at"));
+    }
+
+    #[test]
+    fn test_google_drive_account_with_none_values() {
+        let account = GoogleDriveAccount {
+            id: "test".to_owned(),
+            email: "test@example.com".to_owned(),
+            display_name: "Test".to_owned(),
+            parent_folder_id: None,
+            enabled: false,
+            created_at: get_current_timestamp(),
+            last_authenticated: get_current_timestamp(),
+        };
+
+        let json = serde_json::to_string(&account).unwrap();
+        let deserialized: GoogleDriveAccount = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.parent_folder_id, None);
+        assert!(!deserialized.enabled);
+    }
+
+    #[test]
+    fn test_db_get_google_drive_account_multiple_rows() {
+        use rusqlite::OptionalExtension;
+
+        let (_temp_dir, db) = setup_test_db();
+
+        // Insert multiple accounts (edge case)
+        db.execute(|conn| {
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "first-id",
+                    "first@example.com",
+                    "First User",
+                    None::<String>,
+                    1,
+                    "2025-01-01T00:00:00Z",
+                    "2025-01-01T00:00:00Z",
+                ],
+            )?;
+            conn.execute(
+                "INSERT INTO google_drive_accounts (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "second-id",
+                    "second@example.com",
+                    "Second User",
+                    None::<String>,
+                    1,
+                    "2025-01-02T00:00:00Z",
+                    "2025-01-02T00:00:00Z",
+                ],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+        // Should return first account only (LIMIT 1)
+        let result = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts LIMIT 1")?;
+                let account = stmt
+                    .query_row([], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
+                    })
+                    .optional()?;
+                Ok(account)
+            })
+            .unwrap();
+        assert!(result.is_some());
+    }
 }
