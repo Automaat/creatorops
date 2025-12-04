@@ -10,13 +10,13 @@ describe('isOverdue', () => {
   it('returns true when deadline is in the past', () => {
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    const pastDate = yesterday.toISOString().split('T')[0]
+    const [pastDate] = yesterday.toISOString().split('T')
 
     expect(isOverdue(pastDate)).toBe(true)
   })
 
   it('returns false when deadline is today', () => {
-    const today = new Date().toISOString().split('T')[0]
+    const [today] = new Date().toISOString().split('T')
 
     expect(isOverdue(today)).toBe(false)
   })
@@ -24,7 +24,7 @@ describe('isOverdue', () => {
   it('returns false when deadline is in the future', () => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    const futureDate = tomorrow.toISOString().split('T')[0]
+    const [futureDate] = tomorrow.toISOString().split('T')
 
     expect(isOverdue(futureDate)).toBe(false)
   })

@@ -1,5 +1,4 @@
-import type { Project } from '../types'
-import { ProjectStatus } from '../types'
+import { ProjectStatus, type Project } from '../types'
 import { formatDateShort } from './formatting'
 
 export function formatProjectInfo(project: Project): string {
@@ -12,6 +11,8 @@ export function formatProjectInfo(project: Project): string {
 
 /**
  * Check if a project deadline is overdue
+ * @param deadline - ISO date string to check
+ * @returns True if deadline is in the past
  */
 export function isOverdue(deadline?: string): boolean {
   if (!deadline) {
@@ -24,28 +25,37 @@ export function isOverdue(deadline?: string): boolean {
   return deadlineDate < today
 }
 
+const STATUS_ORDER_NEW = 0
+const STATUS_ORDER_IMPORTING = 1
+const STATUS_ORDER_EDITING = 2
+const STATUS_ORDER_DELIVERED = 3
+const STATUS_ORDER_ARCHIVED = 4
+const STATUS_ORDER_UNKNOWN = 999
+
 /**
  * Get sort order for project status (lower is higher priority)
+ * @param status - Project status
+ * @returns Numeric sort order
  */
 function getStatusOrder(status: ProjectStatus): number {
   switch (status) {
     case ProjectStatus.New: {
-      return 0
+      return STATUS_ORDER_NEW
     }
     case ProjectStatus.Importing: {
-      return 1
+      return STATUS_ORDER_IMPORTING
     }
     case ProjectStatus.Editing: {
-      return 2
+      return STATUS_ORDER_EDITING
     }
     case ProjectStatus.Delivered: {
-      return 3
+      return STATUS_ORDER_DELIVERED
     }
     case ProjectStatus.Archived: {
-      return 4
+      return STATUS_ORDER_ARCHIVED
     }
     default: {
-      return 999
+      return STATUS_ORDER_UNKNOWN
     }
   }
 }
@@ -53,6 +63,8 @@ function getStatusOrder(status: ProjectStatus): number {
 /**
  * Sort projects by status (New -> Importing -> Editing -> Delivered -> Archived)
  * then alphabetically by name
+ * @param projects - Array of projects to sort
+ * @returns Sorted array of projects
  */
 export function sortProjectsByStatus(projects: Project[]): Project[] {
   return [...projects].toSorted((a: Project, b: Project) => {
@@ -64,15 +76,22 @@ export function sortProjectsByStatus(projects: Project[]): Project[] {
   })
 }
 
+const STATUS_PRIORITY_IMPORTING = 0
+const STATUS_PRIORITY_EDITING = 1
+const STATUS_PRIORITY_DELIVERED = 2
+const DEFAULT_STATUS_PRIORITY = 999
+
 const STATUS_ORDER_FOR_ACTIVE: Record<string, number> = {
-  Delivered: 2,
-  Editing: 1,
-  Importing: 0,
+  Delivered: STATUS_PRIORITY_DELIVERED,
+  Editing: STATUS_PRIORITY_EDITING,
+  Importing: STATUS_PRIORITY_IMPORTING,
 }
 
 /**
  * Sort projects by deadline (earliest first), then status, then name.
  * Used in Dashboard and Projects views for active project ordering.
+ * @param projects - Array of projects to sort
+ * @returns Sorted array of projects
  */
 export function sortProjects(projects: Project[]): Project[] {
   return [...projects].toSorted((a: Project, b: Project) => {
@@ -91,8 +110,8 @@ export function sortProjects(projects: Project[]): Project[] {
     }
 
     // 2. Sort by status
-    const statusA = STATUS_ORDER_FOR_ACTIVE[a.status] ?? 999
-    const statusB = STATUS_ORDER_FOR_ACTIVE[b.status] ?? 999
+    const statusA = STATUS_ORDER_FOR_ACTIVE[a.status] ?? DEFAULT_STATUS_PRIORITY
+    const statusB = STATUS_ORDER_FOR_ACTIVE[b.status] ?? DEFAULT_STATUS_PRIORITY
     if (statusA !== statusB) {
       return statusA - statusB
     }

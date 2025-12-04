@@ -42,7 +42,7 @@ export function History() {
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
   const [backupHistory, setBackupHistory] = useState<BackupHistory[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const { error } = useNotification()
+  const { error: showError } = useNotification()
 
   useEffect(() => {
     async function loadHistory() {
@@ -55,15 +55,15 @@ export function History() {
           const history = await invoke<BackupHistory[]>('get_backup_history')
           setBackupHistory(history)
         }
-      } catch (err) {
-        console.error('Failed to load history:', err)
-        error('Failed to load history')
+      } catch (error) {
+        console.error('Failed to load history:', error)
+        showError('Failed to load history')
       } finally {
         setIsLoading(false)
       }
     }
     void loadHistory()
-  }, [historyType, error])
+  }, [historyType, showError])
 
   function getStatusClass(status: string): string {
     switch (status) {

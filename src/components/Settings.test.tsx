@@ -118,7 +118,9 @@ describe('settings', () => {
     const toggle = screen.getAllByRole('checkbox')[0]
     await user.click(toggle)
 
-    const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]')
+    const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]') as Array<{
+      enabled: boolean
+    }>
     expect(stored[0].enabled).toBe(false)
   })
 
@@ -149,7 +151,7 @@ describe('settings', () => {
     await user.click(removeButton)
 
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]')
+      const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]') as unknown[]
       expect(stored).toHaveLength(0)
     })
   })
@@ -248,7 +250,7 @@ describe('settings', () => {
     await user.click(addButton)
 
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]')
+      const stored = JSON.parse(localStorage.getItem('backup_destinations') || '[]') as unknown[]
       expect(stored).toHaveLength(0)
     })
   })

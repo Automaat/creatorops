@@ -124,7 +124,7 @@ export function Delivery() {
     }
   }
 
-  async function loadDestinations() {
+  function loadDestinations() {
     try {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
