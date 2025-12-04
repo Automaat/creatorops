@@ -19,6 +19,13 @@ pub struct SDCard {
     pub is_removable: bool,
 }
 
+/// Determines if a device type should be excluded from the scan results.
+/// Excludes: disk images (app installers), internal drives, and unknown devices.
+/// Includes: SD cards, USB drives, and external drives.
+fn should_exclude_device_type(device_type: &str) -> bool {
+    device_type == "Disk Image" || device_type == "Internal Drive" || device_type == "Unknown"
+}
+
 /// Scan /Volumes/ directory for mounted SD cards
 #[tauri::command]
 pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
@@ -54,10 +61,7 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
 
                     // Only show removable storage: SD cards, USB drives, external drives
                     // Filter out: disk images (app installers), internal HDDs, unknown
-                    if device_type == "Disk Image"
-                        || device_type == "Internal Drive"
-                        || device_type == "Unknown"
-                    {
+                    if should_exclude_device_type(&device_type) {
                         continue;
                     }
 
@@ -444,21 +448,15 @@ mod tests {
     #[test]
     fn test_device_type_filter_logic() {
         // Test that filter logic correctly identifies which device types to exclude
-        let should_exclude = |device_type: &str| -> bool {
-            device_type == "Disk Image"
-                || device_type == "Internal Drive"
-                || device_type == "Unknown"
-        };
-
         // Should be filtered out (excluded)
-        assert!(should_exclude("Disk Image"));
-        assert!(should_exclude("Internal Drive"));
-        assert!(should_exclude("Unknown"));
+        assert!(should_exclude_device_type("Disk Image"));
+        assert!(should_exclude_device_type("Internal Drive"));
+        assert!(should_exclude_device_type("Unknown"));
 
         // Should pass filter (included)
-        assert!(!should_exclude("SD Card"));
-        assert!(!should_exclude("USB Drive"));
-        assert!(!should_exclude("External Drive"));
+        assert!(!should_exclude_device_type("SD Card"));
+        assert!(!should_exclude_device_type("USB Drive"));
+        assert!(!should_exclude_device_type("External Drive"));
     }
 
     #[cfg(target_os = "macos")]
