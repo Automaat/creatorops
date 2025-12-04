@@ -87,10 +87,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }, [])
 
   useEffect(() => {
-    void loadProjects()
-    void loadDestinations()
-    void loadArchiveLocation()
-    void loadHomeDirectory()
+    loadProjects().catch(console.error)
+    loadDestinations()
+    loadArchiveLocation()
+    loadHomeDirectory().catch(console.error)
   }, [loadProjects])
 
   async function loadHomeDirectory() {
