@@ -175,10 +175,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.every((item): item is BackupDestination =>
-          typeof item === 'object' && item !== null &&
-          'id' in item && 'name' in item && 'path' in item
-        )) {
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is BackupDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
           setDestinations(parsed)
         }
       }

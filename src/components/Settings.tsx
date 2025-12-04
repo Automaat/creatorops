@@ -35,10 +35,17 @@ export function Settings() {
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.every((item): item is BackupDestination =>
-          typeof item === 'object' && item !== null &&
-          'id' in item && 'name' in item && 'path' in item
-        )) {
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is BackupDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
           setDestinations(parsed)
         }
       }
@@ -95,10 +102,17 @@ export function Settings() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.every((item): item is DeliveryDestination =>
-          typeof item === 'object' && item !== null &&
-          'id' in item && 'name' in item && 'path' in item
-        )) {
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is DeliveryDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
           setDeliveryDestinations(parsed)
         }
       }
