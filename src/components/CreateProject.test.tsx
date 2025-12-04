@@ -63,15 +63,12 @@ describe('createProject', () => {
     await user.type(clientInput, 'Test Client')
     await user.type(shootTypeInput, 'Wedding')
 
-    if (nameInput instanceof HTMLInputElement) {
-      expect(nameInput.value).toBe('Test Project')
-    }
-    if (clientInput instanceof HTMLInputElement) {
-      expect(clientInput.value).toBe('Test Client')
-    }
-    if (shootTypeInput instanceof HTMLInputElement) {
-      expect(shootTypeInput.value).toBe('Wedding')
-    }
+    expect(nameInput).toBeInstanceOf(HTMLInputElement)
+    expect(nameInput).toHaveProperty('value', 'Test Project')
+    expect(clientInput).toBeInstanceOf(HTMLInputElement)
+    expect(clientInput).toHaveProperty('value', 'Test Client')
+    expect(shootTypeInput).toBeInstanceOf(HTMLInputElement)
+    expect(shootTypeInput).toHaveProperty('value', 'Wedding')
   })
 
   it('calls onProjectCreated with created project on submit', async () => {

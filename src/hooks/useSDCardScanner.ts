@@ -54,7 +54,7 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
 
           if (permissionGranted.current) {
             try {
-              await sendNotification({
+              sendNotification({
                 body: `${card.name} has been mounted`,
                 title: 'SD Card Detected',
               })

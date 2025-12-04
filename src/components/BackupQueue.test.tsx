@@ -232,9 +232,7 @@ describe('backupQueue', () => {
       await waitFor(() => {
         const progressBar = document.querySelector('.progress-fill')
         expect(progressBar).toBeTruthy()
-        if (progressBar instanceof HTMLElement) {
-          expect(progressBar.style.width).toBe('50%')
-        }
+        expect(progressBar).toHaveStyle({ width: '50%' })
       })
     })
   })

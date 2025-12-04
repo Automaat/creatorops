@@ -130,9 +130,7 @@ describe('datePicker', () => {
     expect(firstCall).toBeDefined()
     const callArg: unknown = firstCall?.[0]
     expect(typeof callArg).toBe('string')
-    if (typeof callArg === 'string') {
-      expect(callArg).toMatch(/^\d{4}-\d{2}-15$/)
-    }
+    expect(String(callArg)).toMatch(/^\d{4}-\d{2}-15$/)
   })
 
   it('closes calendar after selecting date', async () => {
@@ -222,8 +220,6 @@ describe('datePicker', () => {
     expect(firstCall).toBeDefined()
     const callArg: unknown = firstCall?.[0]
     expect(typeof callArg).toBe('string')
-    if (typeof callArg === 'string') {
-      expect(callArg).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-    }
+    expect(String(callArg)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })

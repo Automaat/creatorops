@@ -566,9 +566,8 @@ describe('projects', () => {
       await waitFor(() => {
         const button = screen.getByText('Already Archived')
         expect(button).toBeTruthy()
-        if (button instanceof HTMLButtonElement) {
-          expect(button.disabled).toBe(true)
-        }
+        expect(button).toBeInstanceOf(HTMLButtonElement)
+        expect(button).toHaveProperty('disabled', true)
       })
     })
 

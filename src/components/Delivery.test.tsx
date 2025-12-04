@@ -667,9 +667,8 @@ describe('delivery', () => {
       const input = screen.getByPlaceholderText(/e.g.,/)
       await user.type(input, 'photo_001.jpg')
 
-      if (input instanceof HTMLInputElement) {
-        expect(input.value).toBe('photo_001.jpg')
-      }
+      expect(input).toBeInstanceOf(HTMLInputElement)
+      expect(input).toHaveProperty('value', 'photo_001.jpg')
     })
   })
 

@@ -35,8 +35,11 @@ export function Settings() {
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          setDestinations(parsed as BackupDestination[])
+        if (Array.isArray(parsed) && parsed.every((item): item is BackupDestination =>
+          typeof item === 'object' && item !== null &&
+          'id' in item && 'name' in item && 'path' in item
+        )) {
+          setDestinations(parsed)
         }
       }
     } catch (error) {
@@ -92,8 +95,11 @@ export function Settings() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          setDeliveryDestinations(parsed as DeliveryDestination[])
+        if (Array.isArray(parsed) && parsed.every((item): item is DeliveryDestination =>
+          typeof item === 'object' && item !== null &&
+          'id' in item && 'name' in item && 'path' in item
+        )) {
+          setDeliveryDestinations(parsed)
         }
       }
     } catch (error) {

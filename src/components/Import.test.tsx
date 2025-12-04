@@ -323,9 +323,8 @@ describe('import', () => {
     await waitFor(() => {
       const startButton = screen.getByText('Start Import')
       expect(startButton).toBeTruthy()
-      if (startButton instanceof HTMLButtonElement) {
-        expect(startButton.disabled).toBe(true)
-      }
+      expect(startButton).toBeInstanceOf(HTMLButtonElement)
+      expect(startButton).toHaveProperty('disabled', true)
     })
   })
 
@@ -361,9 +360,8 @@ describe('import', () => {
 
     await waitFor(() => {
       const startButton = screen.getByText('Start Import')
-      if (startButton instanceof HTMLButtonElement) {
-        expect(startButton.disabled).toBe(false)
-      }
+      expect(startButton).toBeInstanceOf(HTMLButtonElement)
+      expect(startButton).toHaveProperty('disabled', false)
     })
   })
 
