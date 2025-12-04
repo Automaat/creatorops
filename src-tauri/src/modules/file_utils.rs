@@ -146,7 +146,7 @@ mod tests {
         // SHA-256 of "Hello, World!"
         assert_eq!(
             hash,
-            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a428688a362182986f"
+            "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
         );
 
         std::fs::remove_file(test_file).ok();

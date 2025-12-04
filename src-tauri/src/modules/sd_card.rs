@@ -231,7 +231,7 @@ mod tests {
 
         let json = serde_json::to_string(&card).unwrap();
         assert!(json.contains("SD_CARD"));
-        assert!(json.contains("32_000_000_000"));
+        assert!(json.contains("32000000000"));
         assert!(json.contains("true"));
     }
 
@@ -240,8 +240,8 @@ mod tests {
         let json = r#"{
             "name": "USB_DRIVE",
             "path": "/Volumes/USB_DRIVE",
-            "size": 64_000_000_000,
-            "freeSpace": 32_000_000_000,
+            "size": 64000000000,
+            "freeSpace": 32000000000,
             "fileCount": 200,
             "deviceType": "USB Drive",
             "isRemovable": true
