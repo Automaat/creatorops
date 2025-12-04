@@ -5,12 +5,7 @@ export default defineConfig({
   // @ts-expect-error vite/vitest plugin type mismatch
   plugins: [react()],
   test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/',
         'src/test/',
@@ -21,7 +16,7 @@ export default defineConfig({
         'vite.config.ts',
         'vitest.config.ts',
         'eslint.config.js',
-      ],
-    },
+      ], provider: 'v8', reporter: ['text', 'json', 'html', 'lcov'],
+    }, environment: 'jsdom', globals: true, setupFiles: './src/test/setup.ts',
   },
 })

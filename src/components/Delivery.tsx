@@ -1,19 +1,19 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes } from '../utils/formatting'
 import { sortProjectsByStatus } from '../utils/project'
 import type {
+  DeliveryDestination,
+  DeliveryJob,
+  DeliveryProgress,
   Project,
   ProjectFile,
-  DeliveryJob,
-  DeliveryDestination,
-  DeliveryProgress,
 } from '../types'
 
 export function Delivery() {
   const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>()
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [destinations, setDestinations] = useState<DeliveryDestination[]>([])
@@ -25,14 +25,14 @@ export function Delivery() {
     top: number
     left: number
     width: number
-  } | null>(null)
+  } | null>()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadProjects()
-    loadDestinations()
-    loadDeliveryQueue()
+    void loadProjects()
+    void loadDestinations()
+    void loadDeliveryQueue()
 
     // Listen for delivery progress events
     const unlisten = listen<DeliveryProgress>('delivery-progress', (event) => {
@@ -51,13 +51,13 @@ export function Delivery() {
     })
 
     return () => {
-      unlisten.then((fn) => fn())
+      void unlisten.then((fn) => fn()).catch(() => {})
     }
   }, [])
 
   useEffect(() => {
     if (selectedProject) {
-      loadProjectFiles(selectedProject.id)
+      void loadProjectFiles(selectedProject.id)
     }
   }, [selectedProject])
 
@@ -73,8 +73,9 @@ export function Delivery() {
         showProjectSelect &&
         triggerRef.current &&
         dropdownRef.current &&
-        !triggerRef.current.contains(event.target as Node) &&
-        !dropdownRef.current.contains(event.target as Node)
+        event.target instanceof Node &&
+        !triggerRef.current.contains(event.target) &&
+        !dropdownRef.current.contains(event.target)
       ) {
         setShowProjectSelect(false)
       }
@@ -93,8 +94,8 @@ export function Delivery() {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setDropdownPosition({
-        top: rect.bottom + 8,
         left: rect.left,
+        top: rect.bottom + 8,
         width: rect.width,
       })
     }
@@ -106,8 +107,8 @@ export function Delivery() {
       const data = await invoke<Project[]>('list_projects')
       const sortedProjects = sortProjectsByStatus(data)
       setProjects(sortedProjects)
-    } catch (err) {
-      console.error('Failed to load projects:', err)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
     } finally {
       setLoading(false)
     }
@@ -118,8 +119,8 @@ export function Delivery() {
       const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
       setProjectFiles(files)
       setSelectedFiles(new Set())
-    } catch (err) {
-      console.error('Failed to load project files:', err)
+    } catch (error) {
+      console.error('Failed to load project files:', error)
     }
   }
 
@@ -127,10 +128,23 @@ export function Delivery() {
     try {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
-        setDestinations(JSON.parse(stored))
+        const parsed: unknown = JSON.parse(stored)
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is DeliveryDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
+          setDestinations(parsed)
+        }
       }
-    } catch (err) {
-      console.error('Failed to load destinations:', err)
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
     }
   }
 
@@ -138,8 +152,8 @@ export function Delivery() {
     try {
       const queue = await invoke<DeliveryJob[]>('get_delivery_queue')
       setDeliveryJobs(queue)
-    } catch (err) {
-      console.error('Failed to load delivery queue:', err)
+    } catch (error) {
+      console.error('Failed to load delivery queue:', error)
     }
   }
 
@@ -164,23 +178,25 @@ export function Delivery() {
   }
 
   async function createDelivery(destination: DeliveryDestination) {
-    if (!selectedProject || selectedFiles.size === 0) return
+    if (!selectedProject || selectedFiles.size === 0) {
+      return
+    }
 
     try {
       const job = await invoke<DeliveryJob>('create_delivery', {
+        deliveryPath: destination.path,
+        namingTemplate: namingTemplate || undefined,
         projectId: selectedProject.id,
         projectName: selectedProject.name,
-        selectedFiles: Array.from(selectedFiles),
-        deliveryPath: destination.path,
-        namingTemplate: namingTemplate || null,
+        selectedFiles: [...selectedFiles],
       })
 
       setDeliveryJobs((prev) => [...prev, job])
 
       // Auto-start the delivery
       await invoke('start_delivery', { jobId: job.id })
-    } catch (err) {
-      console.error('Failed to create delivery:', err)
+    } catch (error) {
+      console.error('Failed to create delivery:', error)
     }
   }
 
@@ -188,40 +204,51 @@ export function Delivery() {
     try {
       await invoke('remove_delivery_job', { jobId })
       setDeliveryJobs((prev) => prev.filter((j) => j.id !== jobId))
-    } catch (err) {
-      console.error('Failed to remove job:', err)
+    } catch (error) {
+      console.error('Failed to remove job:', error)
     }
   }
 
   function getStatusClass(status: string): string {
     switch (status) {
-      case 'pending':
+      case 'pending': {
         return 'status-pending'
-      case 'inprogress':
+      }
+      case 'inprogress': {
         return 'status-inprogress'
-      case 'completed':
+      }
+      case 'completed': {
         return 'status-completed'
-      case 'failed':
+      }
+      case 'failed': {
         return 'status-failed'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
   function getProjectStatusColor(status: string): string {
     switch (status) {
-      case 'New':
+      case 'New': {
         return 'status-new'
-      case 'Importing':
+      }
+      case 'Importing': {
         return 'status-importing'
-      case 'Editing':
+      }
+      case 'Editing': {
         return 'status-editing'
-      case 'Delivered':
+      }
+      case 'Delivered': {
         return 'status-delivered'
-      case 'Archived':
+      }
+      case 'Archived': {
         return 'status-archived'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
@@ -272,8 +299,8 @@ export function Delivery() {
                 ref={dropdownRef}
                 className="project-dropdown-list project-dropdown-list-fixed"
                 style={{
-                  top: `${dropdownPosition.top}px`,
                   left: `${dropdownPosition.left}px`,
+                  top: `${dropdownPosition.top}px`,
                   width: `${dropdownPosition.width}px`,
                 }}
               >
@@ -387,7 +414,7 @@ export function Delivery() {
                   .map((dest) => (
                     <button
                       key={dest.id}
-                      onClick={() => createDelivery(dest)}
+                      onClick={() => void createDelivery(dest)}
                       className="destination-button"
                     >
                       <span className="destination-name">{dest.name}</span>
@@ -415,7 +442,7 @@ export function Delivery() {
                       </span>
                     </div>
                     {(job.status === 'completed' || job.status === 'failed') && (
-                      <button onClick={() => removeJob(job.id)} className="btn-remove">
+                      <button onClick={() => void removeJob(job.id)} className="btn-remove">
                         Remove
                       </button>
                     )}

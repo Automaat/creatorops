@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useCallback, ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { createContext, useCallback, useState } from 'react'
 
 const DEFAULT_NOTIFICATION_DURATION = 5000
 
@@ -34,7 +35,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const addNotification = useCallback(
     (type: NotificationType, message: string, duration = DEFAULT_NOTIFICATION_DURATION) => {
       const id = crypto.randomUUID()
-      const notification: Notification = { id, type, message, duration }
+      const notification: Notification = { duration, id, message, type }
 
       setNotifications((prev) => [...prev, notification])
 
@@ -70,13 +71,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   return (
     <NotificationContext.Provider
       value={{
-        notifications,
         addNotification,
+        error,
+        info,
+        notifications,
         removeNotification,
         success,
-        error,
         warning,
-        info,
       }}
     >
       {children}

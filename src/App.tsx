@@ -18,11 +18,17 @@ import type { Project } from './types'
 
 type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'history' | 'settings'
 
+function isView(value: string): value is View {
+  return ['dashboard', 'import', 'projects', 'backup', 'delivery', 'history', 'settings'].includes(
+    value
+  )
+}
+
 function App() {
   const [currentView, setCurrentView] = useState<View>('dashboard')
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>()
   const [projectsCount, setProjectsCount] = useState<number>(0)
   const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
   const [projectsResetKey, setProjectsResetKey] = useState<number>(0)
@@ -35,13 +41,13 @@ function App() {
     try {
       const projects = await invoke<Project[]>('list_projects')
       setProjectsCount(projects.length)
-    } catch (err) {
-      console.error('Failed to load project count:', err)
+    } catch (error) {
+      console.error('Failed to load project count:', error)
     }
   }
 
   useEffect(() => {
-    loadProjectCount()
+    void loadProjectCount()
   }, [])
 
   // Global SD card scanner - runs in background across all pages
@@ -53,61 +59,66 @@ function App() {
   const shortcuts = useMemo(
     () => [
       {
+        action: () => setCurrentView('settings'),
+        description: 'Open Settings',
         key: ',',
         metaKey: true,
-        description: 'Open Settings',
-        action: () => setCurrentView('settings'),
       },
       {
+        action: () => setShowShortcuts(true),
+        description: 'Show Keyboard Shortcuts',
         key: '/',
         metaKey: true,
-        description: 'Show Keyboard Shortcuts',
-        action: () => setShowShortcuts(true),
       },
       {
+        action: () => setShowCommandPalette(true),
+        description: 'Open Command Palette',
         key: 'k',
         metaKey: true,
-        description: 'Open Command Palette',
-        action: () => setShowCommandPalette(true),
       },
       {
+        action: () => setCurrentView('dashboard'),
+        description: 'Go to Dashboard',
         key: '1',
         metaKey: true,
-        description: 'Go to Dashboard',
-        action: () => setCurrentView('dashboard'),
       },
       {
+        action: () => setCurrentView('import'),
+        description: 'Go to Import',
         key: '2',
         metaKey: true,
-        description: 'Go to Import',
-        action: () => setCurrentView('import'),
       },
       {
+        action: () => setCurrentView('projects'),
+        description: 'Go to Projects',
         key: '3',
         metaKey: true,
-        description: 'Go to Projects',
-        action: () => setCurrentView('projects'),
       },
       {
+        action: () => setCurrentView('backup'),
+        description: 'Go to Backup Queue',
         key: '4',
         metaKey: true,
-        description: 'Go to Backup Queue',
-        action: () => setCurrentView('backup'),
       },
       {
+        action: () => setCurrentView('delivery'),
+        description: 'Go to Delivery',
         key: '5',
         metaKey: true,
-        description: 'Go to Delivery',
-        action: () => setCurrentView('delivery'),
       },
       {
+        action: () => setCurrentView('history'),
+        description: 'Go to History',
         key: '6',
         metaKey: true,
-        description: 'Go to History',
-        action: () => setCurrentView('history'),
       },
-      { key: 'r', metaKey: true, description: 'Refresh SD Cards', action: () => scanForSDCards() },
-      { key: 'Escape', description: 'Close Shortcuts', action: () => setShowShortcuts(false) },
+      {
+        action: () => void scanForSDCards(),
+        description: 'Refresh SD Cards',
+        key: 'r',
+        metaKey: true,
+      },
+      { action: () => setShowShortcuts(false), description: 'Close Shortcuts', key: 'Escape' },
     ],
     [scanForSDCards]
   )
@@ -118,27 +129,29 @@ function App() {
     setViewBeforeProject(currentView)
     setSelectedProjectId(projectId)
     setCurrentView('projects')
-    loadProjectCount() // Refresh count after project creation
+    void loadProjectCount() // Refresh count after project creation
   }
 
   const handleBackFromProject = () => {
-    setSelectedProjectId(null)
+    setSelectedProjectId(undefined)
     setCurrentView(viewBeforeProject)
   }
 
   const handleViewChange = (view: string) => {
     // When navigating to Projects view via sidebar, always clear selection to show list
     if (view === 'projects') {
-      setSelectedProjectId(null)
+      setSelectedProjectId(undefined)
       // If already on projects view, force remount to reset local state
       if (currentView === 'projects') {
         setProjectsResetKey((prev) => prev + 1)
       }
     }
-    setCurrentView(view as View)
+    if (isView(view)) {
+      setCurrentView(view)
+    }
     // Refresh count when switching to views that show projects
     if (view === 'dashboard' || view === 'projects') {
-      loadProjectCount()
+      void loadProjectCount()
     }
   }
 
@@ -162,7 +175,7 @@ function App() {
         </div>
         <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
           <Projects
-            key={`${selectedProjectId || 'projects-list'}-${projectsResetKey}`}
+            key={`${selectedProjectId ?? 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
             onBackFromProject={handleBackFromProject}
           />
@@ -181,10 +194,17 @@ function App() {
         </div>
       </Layout>
       <NotificationToast />
-      <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <KeyboardShortcutsHelp
+        isOpen={showShortcuts}
+        onClose={() => {
+          setShowShortcuts(false)
+        }}
+      />
       <CommandPalette
         isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
+        onClose={() => {
+          setShowCommandPalette(false)
+        }}
         onSelectProject={handleNavigateToProject}
       />
     </>

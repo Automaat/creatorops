@@ -12,26 +12,26 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
   const [formData, setFormData] = useState(() => {
     const today = new Date().toISOString().split('T')[0]
     return {
-      name: '',
       clientName: '',
       date: today,
-      shootType: '',
       deadline: '',
+      name: '',
+      shootType: '',
     }
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setError(null)
+    setError(undefined)
 
     try {
       const project = await invoke<Project>('create_project', { ...formData })
       onProjectCreated?.(project)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create project')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create project')
     } finally {
       setIsSubmitting(false)
     }
@@ -42,7 +42,12 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        void handleSubmit(e)
+      }}
+    >
       <div className="flex flex-col gap-sm">
         <div className="flex flex-col gap-xxs">
           <label htmlFor="name" className="form-label">
@@ -122,18 +127,18 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
         <div
           className="form-footer"
           style={{
-            marginTop: 'var(--space-lg)',
-            paddingTop: 'var(--space-lg)',
-            borderTop: '1px solid var(--color-border)',
             backgroundColor: 'var(--color-bg-secondary)',
-            marginLeft: 'calc(-1 * var(--space-xxl))',
-            marginRight: 'calc(-1 * var(--space-xxl))',
-            marginBottom: 'calc(-1 * var(--space-xl))',
-            paddingLeft: 'var(--space-xxl)',
-            paddingRight: 'var(--space-xxl)',
-            paddingBottom: 'var(--space-xl)',
             borderBottomLeftRadius: 'var(--radius-xl)',
             borderBottomRightRadius: 'var(--radius-xl)',
+            borderTop: '1px solid var(--color-border)',
+            marginBottom: 'calc(-1 * var(--space-xl))',
+            marginLeft: 'calc(-1 * var(--space-xxl))',
+            marginRight: 'calc(-1 * var(--space-xxl))',
+            marginTop: 'var(--space-lg)',
+            paddingBottom: 'var(--space-xl)',
+            paddingLeft: 'var(--space-xxl)',
+            paddingRight: 'var(--space-xxl)',
+            paddingTop: 'var(--space-lg)',
           }}
         >
           <div className="flex gap-md" style={{ justifyContent: 'flex-end' }}>

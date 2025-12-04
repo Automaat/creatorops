@@ -14,7 +14,7 @@ on:
       - 'tsconfig.json'
       - 'vite.config.ts'
       - 'vitest.config.ts'
-      - 'eslint.config.js'
+      - '.oxlintrc.json'
       - '.prettierrc'
       - '.mise.toml'
 

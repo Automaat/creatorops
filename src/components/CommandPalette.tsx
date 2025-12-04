@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type { Project } from '../types'
 
@@ -17,7 +17,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
 
   useEffect(() => {
     if (isOpen) {
-      loadProjects()
+      void loadProjects()
       setSearchQuery('')
       setSelectedIndex(0)
       // Focus input after render
@@ -49,7 +49,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   }, [searchQuery])
 
   useEffect(() => {
-    selectedItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    selectedItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [selectedIndex])
 
   const handleSelectProject = useCallback(
@@ -61,7 +61,9 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   )
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -84,22 +86,30 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'New':
+      case 'New': {
         return 'status-new'
-      case 'Importing':
+      }
+      case 'Importing': {
         return 'status-importing'
-      case 'Editing':
+      }
+      case 'Editing': {
         return 'status-editing'
-      case 'Delivered':
+      }
+      case 'Delivered': {
         return 'status-delivered'
-      case 'Archived':
+      }
+      case 'Archived': {
         return 'status-archived'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
-  if (!isOpen) return null
+  if (!isOpen) {
+    return
+  }
 
   return (
     <div className="command-palette-overlay" onClick={onClose}>
@@ -120,7 +130,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
             filteredProjects.map((project, index) => (
               <div
                 key={project.id}
-                ref={index === selectedIndex ? selectedItemRef : null}
+                ref={index === selectedIndex ? selectedItemRef : undefined}
                 className={`command-palette-item ${index === selectedIndex ? 'selected' : ''}`}
                 onClick={() => handleSelectProject(project.id)}
                 onMouseEnter={() => setSelectedIndex(index)}

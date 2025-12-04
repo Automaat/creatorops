@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import dashboardIcon from '../assets/icons/dashboard.png'
 import dashboardIconSelected from '../assets/icons/dashboard_selected.png'
 import importIcon from '../assets/icons/import.png'

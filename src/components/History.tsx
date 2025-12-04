@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+
 import { formatBytes, formatDate } from '../utils/formatting'
 import { useNotification } from '../hooks/useNotification'
 import '../styles/history.css'
@@ -61,21 +62,25 @@ export function History() {
         setIsLoading(false)
       }
     }
-    loadHistory()
+    void loadHistory()
   }, [historyType, error])
 
   function getStatusClass(status: string): string {
     switch (status) {
       case 'success':
-      case 'completed':
+      case 'completed': {
         return 'status-success'
-      case 'partial':
+      }
+      case 'partial': {
         return 'status-warning'
+      }
       case 'failed':
-      case 'cancelled':
+      case 'cancelled': {
         return 'status-error'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 

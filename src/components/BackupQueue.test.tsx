@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { BackupQueue } from './BackupQueue'
 import { NotificationProvider } from '../contexts/NotificationContext'
 import type { BackupJob, BackupProgress } from '../types'
@@ -10,19 +10,19 @@ const mockListen = vi.fn()
 
 // Mock Tauri API
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
+  invoke: (...args: unknown[]): ReturnType<typeof mockInvoke> => mockInvoke(...args),
 }))
 
 // Mock Tauri events
 vi.mock('@tauri-apps/api/event', () => ({
-  listen: (...args: unknown[]) => mockListen(...args),
+  listen: (...args: unknown[]): ReturnType<typeof mockListen> => mockListen(...args),
 }))
 
-describe('BackupQueue', () => {
+describe('backupQueue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockInvoke.mockResolvedValue([])
-    mockListen.mockImplementation(() => Promise.resolve(() => {}))
+    mockListen.mockResolvedValue(() => {})
   })
 
   const renderComponent = () =>
@@ -44,7 +44,7 @@ describe('BackupQueue', () => {
     totalFiles: 100,
     filesCopied: 0,
     filesSkipped: 0,
-    totalBytes: 1000000,
+    totalBytes: 1_000_000,
     bytesTransferred: 0,
     createdAt: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -55,14 +55,14 @@ describe('BackupQueue', () => {
     fileName: 'test.jpg',
     currentFile: 50,
     totalFiles: 100,
-    bytesTransferred: 500000,
-    totalBytes: 1000000,
-    speed: 1000000,
+    bytesTransferred: 500_000,
+    totalBytes: 1_000_000,
+    speed: 1_000_000,
     eta: 30,
     ...overrides,
   })
 
-  describe('Empty state', () => {
+  describe('empty state', () => {
     it('shows empty state when no jobs', async () => {
       mockInvoke.mockResolvedValue([])
       renderComponent()
@@ -74,7 +74,7 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Pending jobs', () => {
+  describe('pending jobs', () => {
     it('displays pending jobs section', async () => {
       const pendingJob = createMockJob({ status: 'pending' })
       mockInvoke.mockResolvedValue([pendingJob])
@@ -91,8 +91,8 @@ describe('BackupQueue', () => {
     it('displays job metadata for pending jobs', async () => {
       const pendingJob = createMockJob({
         status: 'pending',
+        totalBytes: 2_000_000,
         totalFiles: 150,
-        totalBytes: 2000000,
       })
       mockInvoke.mockResolvedValue([pendingJob])
       renderComponent()
@@ -136,7 +136,7 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Active jobs', () => {
+  describe('active jobs', () => {
     it('displays active jobs section', async () => {
       const activeJob = createMockJob({ status: 'inprogress' })
       mockInvoke.mockResolvedValue([activeJob])
@@ -150,9 +150,9 @@ describe('BackupQueue', () => {
 
     it('displays progress bar for active jobs without progress data', async () => {
       const activeJob = createMockJob({
+        bytesTransferred: 500_000,
         status: 'inprogress',
-        totalBytes: 1000000,
-        bytesTransferred: 500000,
+        totalBytes: 1_000_000,
       })
       mockInvoke.mockResolvedValue([activeJob])
       renderComponent()
@@ -164,9 +164,9 @@ describe('BackupQueue', () => {
 
     it('displays progress information when progress data available', async () => {
       const activeJob = createMockJob({
+        bytesTransferred: 500_000,
         status: 'inprogress',
-        totalBytes: 1000000,
-        bytesTransferred: 500000,
+        totalBytes: 1_000_000,
       })
       mockInvoke.mockResolvedValue([activeJob])
 
@@ -202,9 +202,9 @@ describe('BackupQueue', () => {
 
     it('calculates progress percentage correctly', async () => {
       const activeJob = createMockJob({
+        bytesTransferred: 500,
         status: 'inprogress',
         totalBytes: 1000,
-        bytesTransferred: 500,
       })
       mockInvoke.mockResolvedValue([activeJob])
 
@@ -232,17 +232,17 @@ describe('BackupQueue', () => {
       await waitFor(() => {
         const progressBar = document.querySelector('.progress-fill')
         expect(progressBar).toBeTruthy()
-        expect((progressBar as HTMLElement).style.width).toBe('50%')
+        expect(progressBar).toHaveStyle({ width: '50%' })
       })
     })
   })
 
-  describe('Completed jobs', () => {
+  describe('completed jobs', () => {
     it('displays completed jobs section', async () => {
       const completedJob = createMockJob({
-        status: 'completed',
+        bytesTransferred: 1_000_000,
         filesCopied: 100,
-        bytesTransferred: 1000000,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -254,7 +254,7 @@ describe('BackupQueue', () => {
     })
 
     it('displays completed status', async () => {
-      const completedJob = createMockJob({ status: 'completed', filesCopied: 100 })
+      const completedJob = createMockJob({ filesCopied: 100, status: 'completed' })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
 
@@ -266,8 +266,8 @@ describe('BackupQueue', () => {
 
     it('displays failed status', async () => {
       const failedJob = createMockJob({
-        status: 'failed',
         errorMessage: 'Disk full',
+        status: 'failed',
       })
       mockInvoke.mockResolvedValue([failedJob])
       renderComponent()
@@ -290,9 +290,9 @@ describe('BackupQueue', () => {
 
     it('displays skipped files warning', async () => {
       const completedJob = createMockJob({
-        status: 'completed',
         filesCopied: 90,
         filesSkipped: 10,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -314,9 +314,9 @@ describe('BackupQueue', () => {
 
     it('does not show skipped files when zero', async () => {
       const completedJob = createMockJob({
-        status: 'completed',
         filesCopied: 100,
         filesSkipped: 0,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -327,9 +327,9 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Job actions', () => {
+  describe('job actions', () => {
     it('calls start_backup when Start Backup clicked', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const pendingJob = createMockJob({ status: 'pending' })
       mockInvoke.mockResolvedValue([pendingJob])
       renderComponent()
@@ -348,7 +348,7 @@ describe('BackupQueue', () => {
     })
 
     it('calls cancel_backup when Cancel clicked', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const pendingJob = createMockJob({ status: 'pending' })
       mockInvoke.mockResolvedValue([pendingJob])
       renderComponent()
@@ -367,7 +367,7 @@ describe('BackupQueue', () => {
     })
 
     it('calls remove_backup_job when Remove clicked', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const completedJob = createMockJob({ status: 'completed' })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -386,7 +386,7 @@ describe('BackupQueue', () => {
     })
 
     it('handles start backup error gracefully', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       const pendingJob = createMockJob({ status: 'pending' })
       mockInvoke.mockResolvedValueOnce([pendingJob])
@@ -409,7 +409,7 @@ describe('BackupQueue', () => {
     })
 
     it('handles cancel backup error gracefully', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       const pendingJob = createMockJob({ status: 'pending' })
       mockInvoke.mockResolvedValueOnce([pendingJob])
@@ -432,7 +432,7 @@ describe('BackupQueue', () => {
     })
 
     it('handles remove job error gracefully', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup({ delay: undefined })
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       const completedJob = createMockJob({ status: 'completed' })
       mockInvoke.mockResolvedValueOnce([completedJob])
@@ -455,7 +455,7 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Event listeners', () => {
+  describe('event listeners', () => {
     it('sets up backup-progress event listener', async () => {
       renderComponent()
 
@@ -507,8 +507,12 @@ describe('BackupQueue', () => {
       const mockUnlisten2 = vi.fn()
 
       mockListen.mockImplementation((event: string) => {
-        if (event === 'backup-progress') return Promise.resolve(mockUnlisten1)
-        if (event === 'backup-job-updated') return Promise.resolve(mockUnlisten2)
+        if (event === 'backup-progress') {
+          return Promise.resolve(mockUnlisten1)
+        }
+        if (event === 'backup-job-updated') {
+          return Promise.resolve(mockUnlisten2)
+        }
         return Promise.resolve(() => {})
       })
 
@@ -527,7 +531,7 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Queue refresh', () => {
+  describe('queue refresh', () => {
     it('loads queue on mount', async () => {
       renderComponent()
 
@@ -561,7 +565,7 @@ describe('BackupQueue', () => {
 
       // Advance timers
       act(() => {
-        vi.advanceTimersByTime(30000)
+        vi.advanceTimersByTime(30_000)
       })
 
       // Should have called again
@@ -584,7 +588,7 @@ describe('BackupQueue', () => {
       unmount()
 
       act(() => {
-        vi.advanceTimersByTime(30000)
+        vi.advanceTimersByTime(30_000)
       })
 
       // Should not have called again
@@ -594,7 +598,7 @@ describe('BackupQueue', () => {
     })
   })
 
-  describe('Multiple jobs with mixed statuses', () => {
+  describe('multiple jobs with mixed statuses', () => {
     it('displays jobs in correct sections', async () => {
       const pendingJob = createMockJob({
         id: 'job-1',

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { CreateProject } from './CreateProject'
@@ -13,7 +13,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 const mockInvoke = vi.mocked(invoke)
 
-describe('CreateProject', () => {
+describe('createProject', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -63,21 +63,24 @@ describe('CreateProject', () => {
     await user.type(clientInput, 'Test Client')
     await user.type(shootTypeInput, 'Wedding')
 
-    expect((nameInput as HTMLInputElement).value).toBe('Test Project')
-    expect((clientInput as HTMLInputElement).value).toBe('Test Client')
-    expect((shootTypeInput as HTMLInputElement).value).toBe('Wedding')
+    expect(nameInput).toBeInstanceOf(HTMLInputElement)
+    expect(nameInput).toHaveProperty('value', 'Test Project')
+    expect(clientInput).toBeInstanceOf(HTMLInputElement)
+    expect(clientInput).toHaveProperty('value', 'Test Client')
+    expect(shootTypeInput).toBeInstanceOf(HTMLInputElement)
+    expect(shootTypeInput).toHaveProperty('value', 'Wedding')
   })
 
   it('calls onProjectCreated with created project on submit', async () => {
     const mockProject: Project = {
+      clientName: 'Test Client',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
       id: '123',
       name: 'Test Project',
-      clientName: 'Test Client',
-      date: '2025-11-20',
       shootType: '',
       status: ProjectStatus.Editing,
-      folderPath: '/test/path',
-      createdAt: '2025-11-20',
       updatedAt: '2025-11-20',
     }
 
@@ -139,14 +142,14 @@ describe('CreateProject', () => {
     })
 
     resolveInvoke!({
+      clientName: 'Test',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
       id: '1',
       name: 'Test',
-      clientName: 'Test',
-      date: '2025-11-20',
       shootType: '',
       status: ProjectStatus.Editing,
-      folderPath: '/test/path',
-      createdAt: '2025-11-20',
       updatedAt: '2025-11-20',
     })
   })
@@ -197,14 +200,14 @@ describe('CreateProject', () => {
   it('clears error on new submit attempt', async () => {
     mockInvoke.mockRejectedValueOnce(new Error('First error'))
     mockInvoke.mockResolvedValueOnce({
+      clientName: 'Test',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
       id: '1',
       name: 'Test',
-      clientName: 'Test',
-      date: '2025-11-20',
       shootType: '',
       status: ProjectStatus.Editing,
-      folderPath: '/test/path',
-      createdAt: '2025-11-20',
       updatedAt: '2025-11-20',
     })
 

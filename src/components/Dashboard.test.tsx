@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { Dashboard } from './Dashboard'
-import { Project, ProjectStatus } from '../types'
+import type { Project } from '../types'
+import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
@@ -33,7 +34,7 @@ vi.mock('./CreateProject', () => ({
   ),
 }))
 
-describe('Dashboard', () => {
+describe('dashboard', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
@@ -45,26 +46,26 @@ describe('Dashboard', () => {
 
   const mockProjects: Project[] = [
     {
+      clientName: 'John Doe',
+      createdAt: '2025-11-01',
+      date: '2025-11-15',
+      deadline: '2025-12-01',
+      folderPath: '/path/to/wedding',
       id: '1',
       name: 'Wedding Photos',
-      status: ProjectStatus.Editing,
-      deadline: '2025-12-01',
-      clientName: 'John Doe',
-      date: '2025-11-15',
       shootType: 'Wedding',
-      folderPath: '/path/to/wedding',
-      createdAt: '2025-11-01',
+      status: ProjectStatus.Editing,
       updatedAt: '2025-11-01',
     },
     {
+      clientName: 'Acme Corp',
+      createdAt: '2025-11-02',
+      date: '2025-11-20',
+      folderPath: '/path/to/event',
       id: '2',
       name: 'Corporate Event',
-      status: ProjectStatus.Importing,
-      clientName: 'Acme Corp',
-      date: '2025-11-20',
       shootType: 'Event',
-      folderPath: '/path/to/event',
-      createdAt: '2025-11-02',
+      status: ProjectStatus.Importing,
       updatedAt: '2025-11-02',
     },
   ]
@@ -112,14 +113,14 @@ describe('Dashboard', () => {
     const projectsWithArchived: Project[] = [
       ...mockProjects,
       {
+        clientName: 'Old Client',
+        createdAt: '2025-10-01',
+        date: '2025-10-01',
+        folderPath: '/path/to/archived',
         id: '3',
         name: 'Archived Project',
-        status: ProjectStatus.Archived,
-        clientName: 'Old Client',
-        date: '2025-10-01',
         shootType: 'Portrait',
-        folderPath: '/path/to/archived',
-        createdAt: '2025-10-01',
+        status: ProjectStatus.Archived,
         updatedAt: '2025-10-01',
       },
     ]
@@ -203,7 +204,7 @@ describe('Dashboard', () => {
 
   it('handles load data errors gracefully', async () => {
     const consoleError = console.error
-    console.error = vi.fn()
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     mockInvoke.mockRejectedValue(new Error('Load failed'))
 
@@ -216,6 +217,7 @@ describe('Dashboard', () => {
       )
     })
 
+    spy.mockRestore()
     console.error = consoleError
   })
 
@@ -276,7 +278,7 @@ describe('Dashboard', () => {
     })
 
     const overdueElements = document.querySelectorAll('.text-overdue')
-    expect(overdueElements.length).toBe(0)
+    expect(overdueElements).toHaveLength(0)
   })
 
   it('displays deadline date for projects with deadlines', async () => {

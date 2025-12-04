@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import {
-  sendNotification,
   isPermissionGranted,
   requestPermission,
+  sendNotification,
 } from '@tauri-apps/plugin-notification'
 import { useNotification } from './useNotification'
 import type { SDCard } from '../types'
@@ -54,9 +54,9 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
 
           if (permissionGranted.current) {
             try {
-              await sendNotification({
-                title: 'SD Card Detected',
+              sendNotification({
                 body: `${card.name} has been mounted`,
+                title: 'SD Card Detected',
               })
             } catch (error) {
               console.error('Failed to send system notification:', error)
@@ -77,15 +77,15 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
 
   useEffect(() => {
     // Initial scan
-    scanForSDCards()
+    void scanForSDCards()
 
     // Auto-scan for new SD cards every 5 seconds
     const intervalId = setInterval(() => {
-      scanForSDCards()
+      void scanForSDCards()
     }, AUTO_SCAN_INTERVAL_MS)
 
     return () => clearInterval(intervalId)
   }, [scanForSDCards])
 
-  return { sdCards, isScanning, scanForSDCards }
+  return { isScanning, scanForSDCards, sdCards }
 }

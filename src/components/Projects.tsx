@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import type {
-  Project,
-  BackupDestination,
   ArchiveJob,
-  ImportHistory,
-  SDCard,
+  BackupDestination,
   CopyResult,
+  ImportHistory,
+  Project,
+  SDCard,
 } from '../types'
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
 import { DatePicker } from './DatePicker'
 import { formatDisplayDate } from '../utils/formatting'
-import { sortProjects, isOverdue } from '../utils/project'
+import { isOverdue, sortProjects } from '../utils/project'
 import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
@@ -24,7 +24,7 @@ interface ProjectsProps {
 export function Projects({ initialSelectedProjectId, onBackFromProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>()
   const [loading, setLoading] = useState(true)
   const isInternalSelection = useRef(false)
   const [archiveLocation, setArchiveLocation] = useState('')
@@ -34,17 +34,19 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [isDeleting, setIsDeleting] = useState(false)
   const [importHistory, setImportHistory] = useState<ImportHistory[]>([])
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [selectedSDCard, setSelectedSDCard] = useState<SDCard | null>(null)
+  const [selectedSDCard, setSelectedSDCard] = useState<SDCard | null>()
   const [isImporting, setIsImporting] = useState(false)
-  const [importResult, setImportResult] = useState<CopyResult | null>(null)
-  const [importId, setImportId] = useState<string | null>(null)
+  const [importResult, setImportResult] = useState<CopyResult | null>()
+  const [importId, setImportId] = useState<string | null>()
   const [isEditingDeadline, setIsEditingDeadline] = useState(false)
   const [homeDir, setHomeDir] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
 
   const replaceHomeWithTilde = (path: string): string => {
-    if (!homeDir) return path
+    if (!homeDir) {
+      return path
+    }
     const normalizedHome = homeDir.replace(/\/$/, '')
     const normalizedPath = path.replace(/\/$/, '')
     return normalizedPath.startsWith(normalizedHome)
@@ -74,8 +76,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       const data = await invoke<Project[]>('list_projects')
       setProjects(data)
       return data
-    } catch (err) {
-      console.error('Failed to load projects:', err)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
       return []
     } finally {
       setLoading(false)
@@ -83,18 +85,18 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }, [])
 
   useEffect(() => {
-    loadProjects()
-    loadDestinations()
-    loadArchiveLocation()
-    loadHomeDirectory()
+    void loadProjects()
+    void loadDestinations()
+    void loadArchiveLocation()
+    void loadHomeDirectory()
   }, [loadProjects])
 
   async function loadHomeDirectory() {
     try {
       const dir = await invoke<string>('get_home_directory')
       setHomeDir(dir)
-    } catch (err) {
-      console.error('Failed to load home directory:', err)
+    } catch (error) {
+      console.error('Failed to load home directory:', error)
     }
   }
 
@@ -108,19 +110,19 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         .then((project) => {
           setSelectedProject(project)
         })
-        .catch((err) => {
-          console.error('Failed to load project:', err)
+        .catch((error) => {
+          console.error('Failed to load project:', error)
         })
     } else {
       // Clear selection when navigating to projects list
-      setSelectedProject(null)
+      setSelectedProject(undefined)
     }
   }, [initialSelectedProjectId])
 
   // Load import history when project is selected and scroll to top
   useEffect(() => {
     if (selectedProject) {
-      loadProjectImportHistory(selectedProject.id)
+      void loadProjectImportHistory(selectedProject.id)
       scrollToTop()
     }
   }, [selectedProject, scrollToTop])
@@ -131,13 +133,15 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     if (!isInternalSelection.current && onBackFromProject) {
       onBackFromProject()
     } else {
-      setSelectedProject(null)
+      setSelectedProject(undefined)
     }
   }, [onBackFromProject])
 
   // ESC key to return to previous view
   useEffect(() => {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -151,7 +155,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   // Cmd+N to create new project in list view
   useEffect(() => {
-    if (selectedProject) return
+    if (selectedProject) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
@@ -168,10 +174,23 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     try {
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
-        setDestinations(JSON.parse(stored))
+        const parsed: unknown = JSON.parse(stored)
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is BackupDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
+          setDestinations(parsed)
+        }
       }
-    } catch (err) {
-      console.error('Failed to load destinations:', err)
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
     }
   }
 
@@ -181,8 +200,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       if (stored) {
         setArchiveLocation(stored)
       }
-    } catch (err) {
-      console.error('Failed to load archive location:', err)
+    } catch (error) {
+      console.error('Failed to load archive location:', error)
     }
   }
 
@@ -190,23 +209,23 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     try {
       const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
       setImportHistory(history)
-    } catch (err) {
-      console.error('Failed to load import history:', err)
+    } catch (error) {
+      console.error('Failed to load import history:', error)
     }
   }
 
   async function queueBackup(project: Project, destination: BackupDestination) {
     try {
       await invoke('queue_backup', {
-        projectId: project.id,
-        projectName: project.name,
-        sourcePath: project.folderPath,
         destinationId: destination.id,
         destinationName: destination.name,
         destinationPath: destination.path,
+        projectId: project.id,
+        projectName: project.name,
+        sourcePath: project.folderPath,
       })
-    } catch (err) {
-      console.error('Failed to queue backup:', err)
+    } catch (error) {
+      console.error('Failed to queue backup:', error)
     }
   }
 
@@ -218,12 +237,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
     try {
       const job = await invoke<ArchiveJob>('create_archive', {
+        archiveLocation,
+        compress: false,
+        compressionFormat: undefined,
         projectId: project.id,
         projectName: project.name,
         sourcePath: project.folderPath,
-        archiveLocation,
-        compress: false,
-        compressionFormat: null,
       })
 
       // Auto-start the archive job
@@ -232,9 +251,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       setShowArchiveDialog(false)
 
       // Note: No need to reload - cache will be invalidated on backend when archive completes
-    } catch (err) {
-      console.error('Failed to archive project:', err)
-      alert(`Failed to archive project: ${err}`)
+    } catch (error) {
+      console.error('Failed to archive project:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      alert(`Failed to archive project: ${errorMessage}`)
     }
   }
 
@@ -245,19 +265,22 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function deleteProject() {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      return
+    }
 
     setIsDeleting(true)
 
     try {
       await invoke('delete_project', { projectId: selectedProject.id })
       setShowDeleteDialog(false)
-      setSelectedProject(null)
+      setSelectedProject(undefined)
       await loadProjects()
       scrollToTop()
-    } catch (err) {
-      console.error('Failed to delete project:', err)
-      alert(`Failed to delete project: ${err}`)
+    } catch (error) {
+      console.error('Failed to delete project:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      alert(`Failed to delete project: ${errorMessage}`)
     } finally {
       setIsDeleting(false)
     }
@@ -265,23 +288,31 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'New':
+      case 'New': {
         return 'status-new'
-      case 'Importing':
+      }
+      case 'Importing': {
         return 'status-importing'
-      case 'Editing':
+      }
+      case 'Editing': {
         return 'status-editing'
-      case 'Delivered':
+      }
+      case 'Delivered': {
         return 'status-delivered'
-      case 'Archived':
+      }
+      case 'Archived': {
         return 'status-archived'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
   async function handleOpenInApp(command: string, appName: string) {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      return
+    }
 
     try {
       await invoke(command, { path: selectedProject.folderPath })
@@ -293,44 +324,47 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         selectedProject.status !== ProjectStatus.Archived
       ) {
         const updatedProject = await invoke<Project>('update_project_status', {
-          projectId: selectedProject.id,
           newStatus: ProjectStatus.Editing,
+          projectId: selectedProject.id,
         })
         setSelectedProject(updatedProject)
       }
-    } catch (err) {
-      alert(`Failed to open ${appName}: ${err}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      alert(`Failed to open ${appName}: ${errorMessage}`)
     }
   }
 
   const createEmptyResult = (error?: string): CopyResult => ({
-    success: false,
     error,
     filesCopied: 0,
     filesSkipped: 0,
-    skippedFiles: [],
-    totalBytes: 0,
     photosCopied: 0,
+    skippedFiles: [],
+    success: false,
+    totalBytes: 0,
     videosCopied: 0,
   })
 
   async function handleStartImport() {
-    if (!selectedProject || !selectedSDCard) return
+    if (!selectedProject || !selectedSDCard) {
+      return
+    }
 
-    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).slice(7)}`
     setImportId(currentImportId)
     setIsImporting(true)
-    setImportResult(null)
+    setImportResult(undefined)
 
     const startedAt = new Date().toISOString()
 
     try {
       await invoke('update_project_status', {
-        projectId: selectedProject.id,
         newStatus: ProjectStatus.Importing,
+        projectId: selectedProject.id,
       })
-    } catch (err) {
-      console.error('Failed to update project status:', err)
+    } catch (error) {
+      console.error('Failed to update project status:', error)
     }
 
     try {
@@ -342,20 +376,20 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         const result = createEmptyResult('No photo or video files found on SD card')
         setImportResult(result)
         setIsImporting(false)
-        setImportId(null)
+        setImportId(undefined)
 
         await invoke('save_import_history', {
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          errorMessage: result.error,
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
           projectId: selectedProject.id,
           projectName: selectedProject.name,
           sourcePath: selectedSDCard.path,
-          destinationPath: `${selectedProject.folderPath}/RAW`,
-          filesCopied: 0,
-          filesSkipped: 0,
-          totalBytes: 0,
-          photosCopied: 0,
-          videosCopied: 0,
           startedAt,
-          errorMessage: result.error,
+          totalBytes: 0,
+          videosCopied: 0,
         })
 
         return
@@ -364,9 +398,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       const destination = `${selectedProject.folderPath}/RAW`
 
       const result = await invoke<CopyResult>('copy_files', {
+        destination,
         importId: currentImportId,
         sourcePaths,
-        destination,
       })
 
       setImportResult(result)
@@ -375,17 +409,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
       if (!wasCancelled) {
         await invoke('save_import_history', {
+          destinationPath: destination,
+          errorMessage: result.error || undefined,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          photosCopied: result.photosCopied,
           projectId: selectedProject.id,
           projectName: selectedProject.name,
           sourcePath: selectedSDCard.path,
-          destinationPath: destination,
-          filesCopied: result.filesCopied,
-          filesSkipped: result.filesSkipped,
-          totalBytes: result.totalBytes,
-          photosCopied: result.photosCopied,
-          videosCopied: result.videosCopied,
           startedAt,
-          errorMessage: result.error || null,
+          totalBytes: result.totalBytes,
+          videosCopied: result.videosCopied,
         })
       }
 
@@ -395,12 +429,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         // Update project status to Editing after successful import
         try {
           const updatedProject = await invoke<Project>('update_project_status', {
-            projectId: selectedProject.id,
             newStatus: ProjectStatus.Editing,
+            projectId: selectedProject.id,
           })
           setSelectedProject(updatedProject)
-        } catch (err) {
-          console.error('Failed to update project status after import:', err)
+        } catch (error) {
+          console.error('Failed to update project status after import:', error)
         }
       }
     } catch (error) {
@@ -409,29 +443,31 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
       try {
         await invoke('save_import_history', {
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          errorMessage: String(error),
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
           projectId: selectedProject.id,
           projectName: selectedProject.name,
           sourcePath: selectedSDCard.path,
-          destinationPath: `${selectedProject.folderPath}/RAW`,
-          filesCopied: 0,
-          filesSkipped: 0,
-          totalBytes: 0,
-          photosCopied: 0,
-          videosCopied: 0,
           startedAt,
-          errorMessage: String(error),
+          totalBytes: 0,
+          videosCopied: 0,
         })
-      } catch (historyError) {
-        console.error('Failed to save import history:', historyError)
+      } catch (error) {
+        console.error('Failed to save import history:', error)
       }
     } finally {
       setIsImporting(false)
-      setImportId(null)
+      setImportId(undefined)
     }
   }
 
   async function handleCancelImport() {
-    if (!importId) return
+    if (!importId) {
+      return
+    }
 
     try {
       await invoke('cancel_import', { importId })
@@ -441,18 +477,21 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function handleDeadlineChange(newDeadline: string) {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      return
+    }
 
     try {
       const updatedProject = await invoke<Project>('update_project_deadline', {
+        deadline: newDeadline || undefined,
         projectId: selectedProject.id,
-        deadline: newDeadline || null,
       })
       setSelectedProject(updatedProject)
       setIsEditingDeadline(false)
     } catch (error) {
       console.error('Failed to update deadline:', error)
-      alert(`Failed to update deadline: ${error}`)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      alert(`Failed to update deadline: ${errorMessage}`)
     }
   }
 
@@ -505,7 +544,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             {isEditingDeadline ? (
               <DatePicker
                 value={selectedProject.deadline || new Date().toISOString().split('T')[0]}
-                onChange={handleDeadlineChange}
+                onChange={(value) => void handleDeadlineChange(value)}
                 autoOpen
               />
             ) : (
@@ -525,7 +564,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             <span className="info-label">Location:</span>
             <span
               className="folder-path info-row-clickable"
-              onClick={() => invoke('reveal_in_finder', { path: selectedProject.folderPath })}
+              onClick={() => void invoke('reveal_in_finder', { path: selectedProject.folderPath })}
               title="Click to show in Finder"
             >
               {replaceHomeWithTilde(selectedProject.folderPath)}
@@ -533,7 +572,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                invoke('reveal_in_finder', { path: selectedProject.folderPath })
+                void invoke('reveal_in_finder', { path: selectedProject.folderPath })
               }}
               className="btn-icon"
               title="Show in Finder"
@@ -541,7 +580,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               <img
                 src={folderIcon}
                 alt="Show in Finder"
-                style={{ width: '30px', height: '30px' }}
+                style={{ height: '30px', width: '30px' }}
               />
             </button>
           </div>
@@ -566,25 +605,25 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             <h4 className="action-group-heading">Edit</h4>
             <div className="destination-list">
               <button
-                onClick={() => handleOpenInApp('open_in_lightroom', 'Lightroom Classic')}
+                onClick={() => void handleOpenInApp('open_in_lightroom', 'Lightroom Classic')}
                 className="destination-button destination-button-primary"
               >
                 <span className="destination-name">Lightroom Classic</span>
               </button>
               <button
-                onClick={() => handleOpenInApp('open_in_aftershoot', 'AfterShoot')}
+                onClick={() => void handleOpenInApp('open_in_aftershoot', 'AfterShoot')}
                 className="destination-button"
               >
                 <span className="destination-name">AfterShoot</span>
               </button>
               <button
-                onClick={() => handleOpenInApp('open_in_davinci_resolve', 'DaVinci Resolve')}
+                onClick={() => void handleOpenInApp('open_in_davinci_resolve', 'DaVinci Resolve')}
                 className="destination-button"
               >
                 <span className="destination-name">DaVinci Resolve</span>
               </button>
               <button
-                onClick={() => handleOpenInApp('open_in_final_cut_pro', 'Final Cut Pro')}
+                onClick={() => void handleOpenInApp('open_in_final_cut_pro', 'Final Cut Pro')}
                 className="destination-button"
               >
                 <span className="destination-name">Final Cut Pro</span>
@@ -601,7 +640,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                   .map((dest) => (
                     <button
                       key={dest.id}
-                      onClick={() => queueBackup(selectedProject, dest)}
+                      onClick={() => void queueBackup(selectedProject, dest)}
                       className="destination-button"
                     >
                       <span className="destination-name">{dest.name}</span>
@@ -626,9 +665,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               <button
                 onClick={() => setShowArchiveDialog(true)}
                 className="btn-secondary"
-                disabled={selectedProject.status === 'Archived'}
+                disabled={selectedProject.status === ProjectStatus.Archived}
               >
-                {selectedProject.status === 'Archived' ? 'Already Archived' : 'Archive'}
+                {selectedProject.status === ProjectStatus.Archived ? 'Already Archived' : 'Archive'}
               </button>
             </div>
           </div>
@@ -669,7 +708,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                   Cancel
                 </button>
                 <button
-                  onClick={() => archiveProject(selectedProject)}
+                  onClick={() => void archiveProject(selectedProject)}
                   className="btn-primary"
                   disabled={!archiveLocation}
                 >
@@ -690,7 +729,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     className="flex flex-col gap-md"
                     style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
                   >
-                    <div className="spinner"></div>
+                    <div className="spinner" />
                     <p className="text-secondary">Hang tight, removing your project...</p>
                   </div>
                 </>
@@ -706,7 +745,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <button onClick={() => setShowDeleteDialog(false)} className="btn-secondary">
                       Cancel
                     </button>
-                    <button onClick={deleteProject} className="btn-danger">
+                    <button onClick={() => void deleteProject()} className="btn-danger">
                       Delete Project
                     </button>
                   </div>
@@ -743,7 +782,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                         <div
                           key={card.path}
                           className={`destination-button ${selectedSDCard?.path === card.path ? 'selected' : ''}`}
-                          onClick={() => setSelectedSDCard(card)}
+                          onClick={() => {
+                            setSelectedSDCard(card)
+                          }}
                           style={{ cursor: 'pointer' }}
                         >
                           <span className="destination-name">{card.name}</span>
@@ -760,14 +801,14 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <button
                       onClick={() => {
                         setShowImportDialog(false)
-                        setSelectedSDCard(null)
+                        setSelectedSDCard(undefined)
                       }}
                       className="btn-secondary"
                     >
                       Cancel
                     </button>
                     <button
-                      onClick={handleStartImport}
+                      onClick={() => void handleStartImport()}
                       className="btn-primary"
                       disabled={!selectedSDCard}
                     >
@@ -782,11 +823,11 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     className="flex flex-col gap-md"
                     style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
                   >
-                    <div className="spinner"></div>
+                    <div className="spinner" />
                     <p className="text-secondary">Importing from {selectedSDCard?.name}...</p>
                   </div>
                   <div className="dialog-actions">
-                    <button onClick={handleCancelImport} className="btn-secondary">
+                    <button onClick={() => void handleCancelImport()} className="btn-secondary">
                       Cancel Import
                     </button>
                   </div>
@@ -813,7 +854,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     ) : (
                       <>
                         <p className="text-error">Import failed</p>
-                        {importResult.error && (
+                        {importResult.error != null && importResult.error !== '' && (
                           <p className="text-secondary">{importResult.error}</p>
                         )}
                       </>
@@ -823,8 +864,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <button
                       onClick={() => {
                         setShowImportDialog(false)
-                        setSelectedSDCard(null)
-                        setImportResult(null)
+                        setSelectedSDCard(undefined)
+                        setImportResult(undefined)
                       }}
                       className="btn-primary"
                     >
@@ -832,7 +873,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     </button>
                   </div>
                 </>
-              ) : null}
+              ) : undefined}
             </div>
           </div>
         )}
@@ -846,7 +887,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         <div className="projects-header">
           <div className="flex flex-between">
             <h1>Projects</h1>
-            <button className="btn btn-primary" onClick={() => setShowCreateProject(true)}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setShowCreateProject(true)
+              }}
+            >
               Create Project
             </button>
           </div>
@@ -890,7 +936,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <span className="info-label">Date:</span>
                     <span>{project.date}</span>
                   </div>
-                  {project.deadline &&
+                  {project.deadline != null &&
+                    project.deadline !== '' &&
                     (() => {
                       const overdueFlag = isOverdue(project.deadline)
                       return (
@@ -911,12 +958,24 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       </div>
 
       {showCreateProject && (
-        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dialog-overlay"
+          onClick={() => {
+            setShowCreateProject(false)
+          }}
+        >
+          <div
+            className="dialog"
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+          >
             <h2>Create New Project</h2>
             <CreateProject
               onProjectCreated={handleProjectCreated}
-              onCancel={() => setShowCreateProject(false)}
+              onCancel={() => {
+                setShowCreateProject(false)
+              }}
             />
           </div>
         </div>

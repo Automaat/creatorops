@@ -1,21 +1,21 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 
-describe('KeyboardShortcutsHelp', () => {
+describe('keyboardShortcutsHelp', () => {
   it('renders nothing when isOpen is false', () => {
     const { container } = render(<KeyboardShortcutsHelp isOpen={false} onClose={vi.fn()} />)
     expect(container.firstChild).toBeNull()
   })
 
   it('renders modal when isOpen is true', () => {
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={vi.fn()} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={vi.fn()} />)
     expect(screen.getByText('Keyboard Shortcuts')).toBeTruthy()
   })
 
   it('displays navigation shortcuts', () => {
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={vi.fn()} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={vi.fn()} />)
 
     expect(screen.getByText('Navigation')).toBeTruthy()
     expect(screen.getByText('Open Settings')).toBeTruthy()
@@ -30,7 +30,7 @@ describe('KeyboardShortcutsHelp', () => {
   })
 
   it('displays general shortcuts', () => {
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={vi.fn()} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={vi.fn()} />)
 
     expect(screen.getByText('General')).toBeTruthy()
     expect(screen.getByText('Close dialogs')).toBeTruthy()
@@ -41,7 +41,7 @@ describe('KeyboardShortcutsHelp', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={onClose} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={onClose} />)
 
     const closeButton = screen.getByLabelText('Close')
     await user.click(closeButton)
@@ -53,7 +53,7 @@ describe('KeyboardShortcutsHelp', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={onClose} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={onClose} />)
 
     const overlay = document.querySelector('.shortcuts-overlay')
     await user.click(overlay!)
@@ -65,7 +65,7 @@ describe('KeyboardShortcutsHelp', () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
 
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={onClose} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={onClose} />)
 
     const modal = document.querySelector('.shortcuts-modal')
     await user.click(modal!)
@@ -74,7 +74,7 @@ describe('KeyboardShortcutsHelp', () => {
   })
 
   it('displays keyboard shortcut keys correctly', () => {
-    render(<KeyboardShortcutsHelp isOpen={true} onClose={vi.fn()} />)
+    render(<KeyboardShortcutsHelp isOpen onClose={vi.fn()} />)
 
     // Check for meta key shortcuts (⌘)
     const metaKeys = screen.getAllByText('⌘')

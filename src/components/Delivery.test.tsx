@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { Delivery } from './Delivery'
 import { NotificationProvider } from '../contexts/NotificationContext'
-import type { Project, ProjectFile, DeliveryJob, DeliveryDestination } from '../types'
+import type { DeliveryDestination, DeliveryJob, Project, ProjectFile } from '../types'
 import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -40,7 +40,7 @@ const createMockProjectFile = (overrides?: Partial<ProjectFile>): ProjectFile =>
   name: 'test.jpg',
   path: '/path/to/test.jpg',
   relativePath: 'photos/test.jpg',
-  size: 1024000,
+  size: 1_024_000,
   modified: '2024-01-15T10:00:00Z',
   type: 'image/jpeg',
   ...overrides,
@@ -65,8 +65,8 @@ const createMockDeliveryJob = (overrides?: Partial<DeliveryJob>): DeliveryJob =>
   deliveryPath: '/Volumes/ClientDelivery',
   totalFiles: 10,
   filesCopied: 5,
-  totalBytes: 10240000,
-  bytesTransferred: 5120000,
+  totalBytes: 10_240_000,
+  bytesTransferred: 5_120_000,
   status: 'inprogress',
   createdAt: '2024-01-15T10:00:00Z',
   startedAt: '2024-01-15T10:01:00Z',
@@ -77,7 +77,7 @@ const createMockDeliveryJob = (overrides?: Partial<DeliveryJob>): DeliveryJob =>
   ...overrides,
 })
 
-describe('Delivery', () => {
+describe('delivery', () => {
   beforeEach(() => {
     mockInvoke.mockResolvedValue([])
     localStorage.clear()
@@ -88,7 +88,7 @@ describe('Delivery', () => {
     localStorage.clear()
   })
 
-  describe('Basic Rendering', () => {
+  describe('basic Rendering', () => {
     it('renders without crashing', async () => {
       render(
         <NotificationProvider>
@@ -97,7 +97,7 @@ describe('Delivery', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: 'Client Delivery', level: 1 })).toBeTruthy()
+        expect(screen.getByRole('heading', { level: 1, name: 'Client Delivery' })).toBeTruthy()
       })
     })
 
@@ -127,7 +127,7 @@ describe('Delivery', () => {
     })
   })
 
-  describe('Project Selection', () => {
+  describe('project Selection', () => {
     it('shows project dropdown trigger', async () => {
       render(
         <NotificationProvider>
@@ -171,10 +171,10 @@ describe('Delivery', () => {
 
     it('displays project metadata in dropdown', async () => {
       const project = createMockProject({
-        name: 'Wedding Shoot',
         clientName: 'John Doe',
-        shootType: 'Photography',
         date: '2024-01-15',
+        name: 'Wedding Shoot',
+        shootType: 'Photography',
         status: ProjectStatus.Editing,
       })
 
@@ -206,8 +206,12 @@ describe('Delivery', () => {
       const project = createMockProject({ name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve([])
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -242,8 +246,12 @@ describe('Delivery', () => {
       const project = createMockProject({ name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve([])
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -299,14 +307,18 @@ describe('Delivery', () => {
     })
   })
 
-  describe('File Selection', () => {
+  describe('file Selection', () => {
     it('shows file selection section after project selected', async () => {
       const project = createMockProject()
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -355,8 +367,12 @@ describe('Delivery', () => {
       ]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -389,8 +405,12 @@ describe('Delivery', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve([])
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -422,8 +442,12 @@ describe('Delivery', () => {
       const files = [createMockProjectFile({ name: 'photo1.jpg' })]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -466,8 +490,12 @@ describe('Delivery', () => {
       ]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -505,8 +533,12 @@ describe('Delivery', () => {
       const files = [createMockProjectFile({ name: 'photo1.jpg' })]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -546,14 +578,18 @@ describe('Delivery', () => {
     })
   })
 
-  describe('Naming Template', () => {
+  describe('naming Template', () => {
     it('shows naming template section after files selected', async () => {
       const project = createMockProject()
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -591,8 +627,12 @@ describe('Delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -627,11 +667,12 @@ describe('Delivery', () => {
       const input = screen.getByPlaceholderText(/e.g.,/)
       await user.type(input, 'photo_001.jpg')
 
-      expect((input as HTMLInputElement).value).toBe('photo_001.jpg')
+      expect(input).toBeInstanceOf(HTMLInputElement)
+      expect(input).toHaveProperty('value', 'photo_001.jpg')
     })
   })
 
-  describe('Destination Selection', () => {
+  describe('destination Selection', () => {
     it('shows destination section after files selected', async () => {
       const project = createMockProject()
       const files = [createMockProjectFile()]
@@ -640,8 +681,12 @@ describe('Delivery', () => {
       localStorage.setItem('delivery_destinations', JSON.stringify([destination]))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -680,8 +725,12 @@ describe('Delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -718,19 +767,23 @@ describe('Delivery', () => {
       const project = createMockProject()
       const files = [createMockProjectFile()]
       const destinations = [
-        createMockDeliveryDestination({ name: 'Enabled Dest', enabled: true }),
+        createMockDeliveryDestination({ enabled: true, name: 'Enabled Dest' }),
         createMockDeliveryDestination({
+          enabled: false,
           id: 'dest-2',
           name: 'Disabled Dest',
-          enabled: false,
         }),
       ]
 
       localStorage.setItem('delivery_destinations', JSON.stringify(destinations))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -773,10 +826,18 @@ describe('Delivery', () => {
       localStorage.setItem('delivery_destinations', JSON.stringify([destination]))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') return Promise.resolve([project])
-        if (cmd === 'list_project_files') return Promise.resolve(files)
-        if (cmd === 'create_delivery') return Promise.resolve(job)
-        if (cmd === 'start_delivery') return Promise.resolve()
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
+        if (cmd === 'create_delivery') {
+          return Promise.resolve(job)
+        }
+        if (cmd === 'start_delivery') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -817,12 +878,14 @@ describe('Delivery', () => {
     })
   })
 
-  describe('Delivery Queue', () => {
+  describe('delivery Queue', () => {
     it('displays delivery jobs', async () => {
       const job = createMockDeliveryJob({ projectName: 'Wedding Shoot' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -841,7 +904,9 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ status: 'inprogress' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -858,14 +923,16 @@ describe('Delivery', () => {
 
     it('displays job progress', async () => {
       const job = createMockDeliveryJob({
+        bytesTransferred: 5_120_000,
         filesCopied: 5,
+        totalBytes: 10_240_000,
         totalFiles: 10,
-        bytesTransferred: 5120000,
-        totalBytes: 10240000,
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -882,13 +949,15 @@ describe('Delivery', () => {
 
     it('shows progress bar for in-progress jobs', async () => {
       const job = createMockDeliveryJob({
+        bytesTransferred: 5_120_000,
         status: 'inprogress',
-        bytesTransferred: 5120000,
-        totalBytes: 10240000,
+        totalBytes: 10_240_000,
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -908,7 +977,9 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -927,7 +998,9 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ status: 'failed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -946,8 +1019,12 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ id: 'job-1', status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
-        if (cmd === 'remove_delivery_job') return Promise.resolve()
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
+        if (cmd === 'remove_delivery_job') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -972,12 +1049,14 @@ describe('Delivery', () => {
 
     it('displays error message for failed jobs', async () => {
       const job = createMockDeliveryJob({
-        status: 'failed',
         errorMessage: 'Disk full',
+        status: 'failed',
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -998,7 +1077,9 @@ describe('Delivery', () => {
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1015,12 +1096,14 @@ describe('Delivery', () => {
     })
   })
 
-  describe('Status Helpers', () => {
+  describe('status Helpers', () => {
     it('applies correct CSS class for pending status', async () => {
       const job = createMockDeliveryJob({ status: 'pending' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1040,7 +1123,9 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1060,7 +1145,9 @@ describe('Delivery', () => {
       const job = createMockDeliveryJob({ status: 'failed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') return Promise.resolve([job])
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 

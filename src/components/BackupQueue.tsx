@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { formatBytes, formatSpeed, formatETA } from '../utils/formatting'
+import { formatBytes, formatETA, formatSpeed } from '../utils/formatting'
 import type { BackupJob, BackupProgress } from '../types'
 
-const QUEUE_REFRESH_INTERVAL = 30000
+const QUEUE_REFRESH_INTERVAL = 30_000
 
 export function BackupQueue() {
   const [jobs, setJobs] = useState<BackupJob[]>([])
   const [progress, setProgress] = useState<Map<string, BackupProgress>>(new Map())
 
   useEffect(() => {
-    loadQueue()
+    void loadQueue()
 
     const unlistenProgress = listen<BackupProgress>('backup-progress', (event) => {
       setProgress((prev) => new Map(prev).set(event.payload.jobId, event.payload))
@@ -25,8 +25,8 @@ export function BackupQueue() {
     const interval = setInterval(loadQueue, QUEUE_REFRESH_INTERVAL)
 
     return () => {
-      unlistenProgress.then((fn) => fn())
-      unlistenJobUpdate.then((fn) => fn())
+      void unlistenProgress.then((fn) => fn()).catch(() => {})
+      void unlistenJobUpdate.then((fn) => fn()).catch(() => {})
       clearInterval(interval)
     }
   }, [])
@@ -35,8 +35,8 @@ export function BackupQueue() {
     try {
       const data = await invoke<BackupJob[]>('get_backup_queue')
       setJobs(data)
-    } catch (err) {
-      console.error('Failed to load backup queue:', err)
+    } catch (error) {
+      console.error('Failed to load backup queue:', error)
     }
   }
 
@@ -44,8 +44,8 @@ export function BackupQueue() {
     try {
       await invoke('start_backup', { jobId })
       await loadQueue()
-    } catch (err) {
-      console.error('Failed to start backup:', err)
+    } catch (error) {
+      console.error('Failed to start backup:', error)
     }
   }
 
@@ -53,8 +53,8 @@ export function BackupQueue() {
     try {
       await invoke('cancel_backup', { jobId })
       await loadQueue()
-    } catch (err) {
-      console.error('Failed to cancel backup:', err)
+    } catch (error) {
+      console.error('Failed to cancel backup:', error)
     }
   }
 
@@ -62,8 +62,8 @@ export function BackupQueue() {
     try {
       await invoke('remove_backup_job', { jobId })
       await loadQueue()
-    } catch (err) {
-      console.error('Failed to remove job:', err)
+    } catch (error) {
+      console.error('Failed to remove job:', error)
     }
   }
 
@@ -145,10 +145,10 @@ export function BackupQueue() {
                 </div>
 
                 <div className="backup-job-actions">
-                  <button onClick={() => startBackup(job.id)} className="btn-primary">
+                  <button onClick={() => void startBackup(job.id)} className="btn-primary">
                     Start Backup
                   </button>
-                  <button onClick={() => cancelBackup(job.id)} className="btn-secondary">
+                  <button onClick={() => void cancelBackup(job.id)} className="btn-secondary">
                     Cancel
                   </button>
                 </div>
@@ -187,7 +187,7 @@ export function BackupQueue() {
                 {job.errorMessage && <div className="backup-error">{job.errorMessage}</div>}
 
                 <div className="backup-job-actions">
-                  <button onClick={() => removeJob(job.id)} className="btn-secondary">
+                  <button onClick={() => void removeJob(job.id)} className="btn-secondary">
                     Remove
                   </button>
                 </div>

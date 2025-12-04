@@ -12,7 +12,9 @@ export interface KeyboardShortcut {
 
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[], enabled = true) {
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       for (const shortcut of shortcuts) {
@@ -36,13 +38,13 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[], enabled = tr
 }
 
 export const GLOBAL_SHORTCUTS: Omit<KeyboardShortcut, 'action'>[] = [
-  { key: ',', metaKey: true, description: 'Open Settings' },
-  { key: '/', metaKey: true, description: 'Show Keyboard Shortcuts' },
-  { key: '1', metaKey: true, description: 'Go to Dashboard' },
-  { key: '2', metaKey: true, description: 'Go to Import' },
-  { key: '3', metaKey: true, description: 'Go to Projects' },
-  { key: '4', metaKey: true, description: 'Go to Backup Queue' },
-  { key: '5', metaKey: true, description: 'Go to Delivery' },
-  { key: '6', metaKey: true, description: 'Go to History' },
-  { key: 'r', metaKey: true, description: 'Refresh SD Cards' },
+  { description: 'Open Settings', key: ',', metaKey: true },
+  { description: 'Show Keyboard Shortcuts', key: '/', metaKey: true },
+  { description: 'Go to Dashboard', key: '1', metaKey: true },
+  { description: 'Go to Import', key: '2', metaKey: true },
+  { description: 'Go to Projects', key: '3', metaKey: true },
+  { description: 'Go to Backup Queue', key: '4', metaKey: true },
+  { description: 'Go to Delivery', key: '5', metaKey: true },
+  { description: 'Go to History', key: '6', metaKey: true },
+  { description: 'Refresh SD Cards', key: 'r', metaKey: true },
 ]

@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import calendarIcon from '../assets/icons/calendar.png'
-import { formatDisplayDate, MONTH_NAMES_FULL } from '../utils/formatting'
+import { MONTH_NAMES_FULL, formatDisplayDate } from '../utils/formatting'
 
 interface DatePickerProps {
   value: string
@@ -33,7 +34,11 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        event.target instanceof Node &&
+        !containerRef.current.contains(event.target)
+      ) {
         if (selectedDate) {
           onChange(formatDate(selectedDate))
         }
@@ -98,7 +103,9 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
   }
 
   const isSelected = (day: number) => {
-    if (!selectedDate) return false
+    if (!selectedDate) {
+      return false
+    }
     return (
       day === selectedDate.getDate() &&
       viewDate.getMonth() === selectedDate.getMonth() &&

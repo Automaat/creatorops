@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import type { SDCard, Project, CopyResult, ImportProgress } from '../types'
+import type { CopyResult, ImportProgress, Project, SDCard } from '../types'
 import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { sortProjectsByStatus } from '../utils/project'
@@ -15,13 +15,13 @@ interface ImportProps {
 }
 
 export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
-  const [activeCardPath, setActiveCardPath] = useState<string | null>(null)
+  const [activeCardPath, setActiveCardPath] = useState<string | null>()
   const listRef = useRef<HTMLDivElement>(null)
 
   // Reset active card when the active card is no longer in the list
   useEffect(() => {
     if (activeCardPath && !sdCards.some((card) => card.path === activeCardPath)) {
-      setActiveCardPath(null)
+      setActiveCardPath(undefined)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sdCards.length, activeCardPath])
@@ -29,8 +29,13 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
   // Handle clicks outside the list to collapse active card
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (activeCardPath && listRef.current && !listRef.current.contains(event.target as Node)) {
-        setActiveCardPath(null)
+      if (
+        activeCardPath &&
+        listRef.current &&
+        event.target instanceof Node &&
+        !listRef.current.contains(event.target)
+      ) {
+        setActiveCardPath(undefined)
       }
     }
 
@@ -64,7 +69,7 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
                 onImportComplete={onImportComplete}
                 isActive={activeCardPath === card.path}
                 onActivate={() => setActiveCardPath(card.path)}
-                onDeactivate={() => setActiveCardPath(null)}
+                onDeactivate={() => setActiveCardPath(undefined)}
               />
             ))}
           </div>
@@ -94,31 +99,37 @@ function SDCardItem({
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [showCreateNew, setShowCreateNew] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [importResult, setImportResult] = useState<CopyResult | null>(null)
-  const [importId, setImportId] = useState<string | null>(null)
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [importResult, setImportResult] = useState<CopyResult | null>()
+  const [importId, setImportId] = useState<string | null>()
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>()
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number
     left: number
     width: number
-  } | null>(null)
+  } | null>()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'New':
+      case 'New': {
         return 'status-new'
-      case 'Importing':
+      }
+      case 'Importing': {
         return 'status-importing'
-      case 'Editing':
+      }
+      case 'Editing': {
         return 'status-editing'
-      case 'Delivered':
+      }
+      case 'Delivered': {
         return 'status-delivered'
-      case 'Archived':
+      }
+      case 'Archived': {
         return 'status-archived'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
@@ -136,8 +147,8 @@ function SDCardItem({
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setDropdownPosition({
-        top: rect.bottom + 8,
         left: rect.left,
+        top: rect.bottom + 8,
         width: rect.width,
       })
     }
@@ -149,14 +160,14 @@ function SDCardItem({
     })
 
     return () => {
-      unlistenProgress.then((fn) => fn())
+      void unlistenProgress.then((fn) => fn()).catch(() => {})
     }
   }, [])
 
   // Load projects when card becomes active (expanded)
   useEffect(() => {
     if (isActive) {
-      loadProjects()
+      void loadProjects()
     }
   }, [isActive, loadProjects])
 
@@ -172,8 +183,9 @@ function SDCardItem({
         showProjectSelect &&
         triggerRef.current &&
         dropdownRef.current &&
-        !triggerRef.current.contains(event.target as Node) &&
-        !dropdownRef.current.contains(event.target as Node)
+        event.target instanceof Node &&
+        !triggerRef.current.contains(event.target) &&
+        !dropdownRef.current.contains(event.target)
       ) {
         setShowProjectSelect(false)
       }
@@ -208,17 +220,21 @@ function SDCardItem({
   }
 
   const handleStartImport = async () => {
-    if (!selectedProject) return
+    if (!selectedProject) {
+      return
+    }
 
     const project = projects.find((p) => p.id === selectedProject)
-    if (!project) return
+    if (!project) {
+      return
+    }
 
     // Generate unique import ID
-    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    const currentImportId = `import-${Date.now()}-${Math.random().toString(36).slice(7)}`
     setImportId(currentImportId)
     setIsImporting(true)
-    setImportResult(null)
-    setImportProgress(null)
+    setImportResult(undefined)
+    setImportProgress(undefined)
 
     const startedAt = new Date().toISOString()
 
@@ -226,11 +242,11 @@ function SDCardItem({
     // Note: If this fails, we still proceed with import - status update is non-critical
     try {
       await invoke('update_project_status', {
-        projectId: project.id,
         newStatus: ProjectStatus.Importing,
+        projectId: project.id,
       })
-    } catch (err) {
-      console.error('Failed to update project status:', err)
+    } catch (error) {
+      console.error('Failed to update project status:', error)
       // Continue with import - status update failure is not critical
     }
 
@@ -242,32 +258,32 @@ function SDCardItem({
 
       if (sourcePaths.length === 0) {
         const result = {
-          success: false,
           error: 'No photo or video files found on SD card',
           filesCopied: 0,
           filesSkipped: 0,
-          skippedFiles: [],
-          totalBytes: 0,
           photosCopied: 0,
+          skippedFiles: [],
+          success: false,
+          totalBytes: 0,
           videosCopied: 0,
         }
         setImportResult(result)
         setIsImporting(false)
-        setImportId(null)
+        setImportId(undefined)
 
         // Save to history
         await invoke('save_import_history', {
+          destinationPath: `${project.folderPath}/RAW`,
+          errorMessage: result.error,
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
           projectId: project.id,
           projectName: project.name,
           sourcePath: card.path,
-          destinationPath: `${project.folderPath}/RAW`,
-          filesCopied: 0,
-          filesSkipped: 0,
-          totalBytes: 0,
-          photosCopied: 0,
-          videosCopied: 0,
           startedAt,
-          errorMessage: result.error,
+          totalBytes: 0,
+          videosCopied: 0,
         })
 
         return
@@ -276,9 +292,9 @@ function SDCardItem({
       const destination = `${project.folderPath}/RAW`
 
       const result = await invoke<CopyResult>('copy_files', {
+        destination,
         importId: currentImportId,
         sourcePaths,
-        destination,
       })
 
       setImportResult(result)
@@ -289,17 +305,17 @@ function SDCardItem({
       // Save to history (unless cancelled)
       if (!wasCancelled) {
         await invoke('save_import_history', {
+          destinationPath: destination,
+          errorMessage: result.error || undefined,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          photosCopied: result.photosCopied,
           projectId: project.id,
           projectName: project.name,
           sourcePath: card.path,
-          destinationPath: destination,
-          filesCopied: result.filesCopied,
-          filesSkipped: result.filesSkipped,
-          totalBytes: result.totalBytes,
-          photosCopied: result.photosCopied,
-          videosCopied: result.videosCopied,
           startedAt,
-          errorMessage: result.error || null,
+          totalBytes: result.totalBytes,
+          videosCopied: result.videosCopied,
         })
       }
 
@@ -309,8 +325,8 @@ function SDCardItem({
         if (autoEject) {
           try {
             await invoke('eject_sd_card', { volumePath: card.path })
-          } catch (ejectError) {
-            console.error('Failed to eject SD card:', ejectError)
+          } catch (error) {
+            console.error('Failed to eject SD card:', error)
           }
         }
 
@@ -319,42 +335,44 @@ function SDCardItem({
     } catch (error) {
       console.error('Import failed:', error)
       setImportResult({
-        success: false,
         error: String(error),
         filesCopied: 0,
         filesSkipped: 0,
-        skippedFiles: [],
-        totalBytes: 0,
         photosCopied: 0,
+        skippedFiles: [],
+        success: false,
+        totalBytes: 0,
         videosCopied: 0,
       })
 
       // Save failed import to history
       try {
         await invoke('save_import_history', {
+          destinationPath: `${project.folderPath}/RAW`,
+          errorMessage: String(error),
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
           projectId: project.id,
           projectName: project.name,
           sourcePath: card.path,
-          destinationPath: `${project.folderPath}/RAW`,
-          filesCopied: 0,
-          filesSkipped: 0,
-          totalBytes: 0,
-          photosCopied: 0,
-          videosCopied: 0,
           startedAt,
-          errorMessage: String(error),
+          totalBytes: 0,
+          videosCopied: 0,
         })
-      } catch (historyError) {
-        console.error('Failed to save import history:', historyError)
+      } catch (error) {
+        console.error('Failed to save import history:', error)
       }
     } finally {
       setIsImporting(false)
-      setImportId(null)
+      setImportId(undefined)
     }
   }
 
   const handleCancelImport = async () => {
-    if (!importId) return
+    if (!importId) {
+      return
+    }
 
     try {
       await invoke('cancel_import', { importId })
@@ -386,7 +404,7 @@ function SDCardItem({
         <div className="project-list-item">
           <div
             className="card card-active"
-            style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}
+            style={{ borderRadius: 'var(--radius-lg)', margin: '16px' }}
           >
             <div className="flex flex-col gap-md">
               <div>
@@ -428,8 +446,8 @@ function SDCardItem({
                     ref={dropdownRef}
                     className="project-dropdown-list project-dropdown-list-fixed"
                     style={{
-                      top: `${dropdownPosition.top}px`,
                       left: `${dropdownPosition.left}px`,
+                      top: `${dropdownPosition.top}px`,
                       width: `${dropdownPosition.width}px`,
                     }}
                   >
@@ -490,7 +508,7 @@ function SDCardItem({
               <div className="flex gap-sm" style={{ marginTop: 'var(--space-sm)' }}>
                 <button
                   className="btn btn-primary"
-                  onClick={handleStartImport}
+                  onClick={() => void handleStartImport()}
                   disabled={!selectedProject || selectedProject === '__new__'}
                 >
                   Start Import
@@ -532,7 +550,7 @@ function SDCardItem({
 
     return (
       <div className="project-list-item">
-        <div className="card" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+        <div className="card" style={{ borderRadius: 'var(--radius-lg)', margin: '16px' }}>
           <div className="flex flex-col gap-md">
             <div>
               <h3>{card.name}</h3>
@@ -554,7 +572,7 @@ function SDCardItem({
               </div>
             )}
 
-            <button className="btn" onClick={handleCancelImport}>
+            <button className="btn" onClick={() => void handleCancelImport()}>
               Cancel Import
             </button>
           </div>
@@ -568,7 +586,7 @@ function SDCardItem({
 
     return (
       <div className="project-list-item">
-        <div className="card" style={{ margin: '16px', borderRadius: 'var(--radius-lg)' }}>
+        <div className="card" style={{ borderRadius: 'var(--radius-lg)', margin: '16px' }}>
           <div className="flex flex-col gap-md">
             <div>
               <h3>{card.name}</h3>
@@ -607,7 +625,7 @@ function SDCardItem({
               </div>
             )}
 
-            <button className="btn" onClick={() => setImportResult(null)}>
+            <button className="btn" onClick={() => setImportResult(undefined)}>
               Done
             </button>
           </div>
@@ -617,5 +635,5 @@ function SDCardItem({
   }
 
   // This should never be reached, but just in case return null
-  return null
+  return
 }

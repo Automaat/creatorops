@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { userEvent } from '@testing-library/user-event'
 import { DatePicker } from './DatePicker'
 
-describe('DatePicker', () => {
+describe('datePicker', () => {
   const mockOnChange = vi.fn()
 
   beforeEach(() => {
@@ -126,8 +126,11 @@ describe('DatePicker', () => {
     await user.click(days[0])
 
     expect(mockOnChange).toHaveBeenCalled()
-    const callArg = mockOnChange.mock.calls[0][0]
-    expect(callArg).toMatch(/^\d{4}-\d{2}-15$/)
+    const firstCall = mockOnChange.mock.calls[0]
+    expect(firstCall).toBeDefined()
+    const callArg: unknown = firstCall?.[0]
+    expect(typeof callArg).toBe('string')
+    expect(String(callArg)).toMatch(/^\d{4}-\d{2}-15$/)
   })
 
   it('closes calendar after selecting date', async () => {
@@ -152,7 +155,7 @@ describe('DatePicker', () => {
     const input = screen.getByText('Nov 20, 2025')
     await user.click(input)
 
-    const days = Array.from(document.querySelectorAll('.date-picker-day'))
+    const days = [...document.querySelectorAll('.date-picker-day')]
     const selectedDay = days.find((day) => day.classList.contains('selected'))
 
     expect(selectedDay).toBeTruthy()
@@ -171,7 +174,7 @@ describe('DatePicker', () => {
     const input = screen.getByRole('button')
     await user.click(input)
 
-    const days = Array.from(document.querySelectorAll('.date-picker-day'))
+    const days = [...document.querySelectorAll('.date-picker-day')]
     const todayDay = days.find((d) => d.classList.contains('today'))
 
     expect(todayDay).toBeTruthy()
@@ -213,7 +216,10 @@ describe('DatePicker', () => {
     const days = screen.getAllByText('5')
     await user.click(days[0])
 
-    const callArg = mockOnChange.mock.calls[0][0]
-    expect(callArg).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const firstCall = mockOnChange.mock.calls[0]
+    expect(firstCall).toBeDefined()
+    const callArg: unknown = firstCall?.[0]
+    expect(typeof callArg).toBe('string')
+    expect(String(callArg)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
