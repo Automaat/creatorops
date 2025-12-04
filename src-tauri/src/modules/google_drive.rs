@@ -1,3 +1,5 @@
+#![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -17,12 +19,15 @@ pub struct GoogleDriveAccount {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OAuthState {
     pub auth_url: String,
     pub server_port: u16,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TokenData {
     access_token: String,
     refresh_token: String,
@@ -40,7 +45,7 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     // 4. Build auth URL
     // 5. Spawn localhost server to capture redirect
 
-    Err("Not implemented yet".to_string())
+    Err("Not implemented yet".to_owned())
 }
 
 #[tauri::command]
@@ -52,7 +57,7 @@ pub async fn complete_google_drive_auth() -> Result<GoogleDriveAccount, String> 
     // 4. Store tokens in keychain
     // 5. Save account to database
 
-    Err("Not implemented yet".to_string())
+    Err("Not implemented yet".to_owned())
 }
 
 #[tauri::command]
@@ -81,7 +86,7 @@ pub async fn get_google_drive_account(
 
         Ok(account)
     })
-    .map_err(|e: rusqlite::Error| format!("Failed to get account: {}", e))
+    .map_err(|e: rusqlite::Error| format!("Failed to get account: {e}"))
 }
 
 #[tauri::command]
@@ -89,15 +94,22 @@ pub async fn set_drive_parent_folder(
     db: tauri::State<'_, Database>,
     folder_id: Option<String>,
 ) -> Result<(), String> {
-    db.execute(|conn| {
-        conn.execute(
-            "UPDATE google_drive_accounts SET parent_folder_id = ?1",
-            [folder_id],
-        )?;
+    // Get the current account to ensure we only update one account
+    let account = get_google_drive_account(db.clone()).await?;
 
-        Ok(())
-    })
-    .map_err(|e: rusqlite::Error| format!("Failed to update parent folder: {}", e))
+    account.map_or_else(
+        || Err("No Google Drive account found to update parent folder".to_owned()),
+        |acc| {
+            db.execute(|conn| {
+                conn.execute(
+                    "UPDATE google_drive_accounts SET parent_folder_id = ?1 WHERE id = ?2",
+                    [&folder_id, &Some(acc.id)],
+                )?;
+                Ok(())
+            })
+            .map_err(|e: rusqlite::Error| format!("Failed to update parent folder: {e}"))
+        },
+    )
 }
 
 #[tauri::command]
@@ -108,7 +120,7 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
     if let Some(acc) = account {
         // Remove from keychain
         let entry = keyring::Entry::new("com.creatorops.google-drive", &acc.email)
-            .map_err(|e| format!("Failed to create keychain entry: {}", e))?;
+            .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
 
         // Ignore error if token doesn't exist in keychain
         let _ = entry.delete_credential();
@@ -118,7 +130,7 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
             conn.execute("DELETE FROM google_drive_accounts WHERE id = ?1", [&acc.id])?;
             Ok(())
         })
-        .map_err(|e: rusqlite::Error| format!("Failed to delete account: {}", e))?;
+        .map_err(|e: rusqlite::Error| format!("Failed to delete account: {e}"))?;
     }
 
     Ok(())
@@ -126,43 +138,49 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
 
 // Token Management Functions
 
+#[allow(dead_code)]
 fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), String> {
     let entry = keyring::Entry::new("com.creatorops.google-drive", email)
-        .map_err(|e| format!("Failed to create keychain entry: {}", e))?;
+        .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
 
-    let token_json = serde_json::to_string(&tokens)
-        .map_err(|e| format!("Failed to serialize tokens: {}", e))?;
+    let token_json =
+        serde_json::to_string(&tokens).map_err(|e| format!("Failed to serialize tokens: {e}"))?;
 
-    entry.set_password(&token_json)
-        .map_err(|e| format!("Failed to store tokens in keychain: {}", e))?;
+    entry
+        .set_password(&token_json)
+        .map_err(|e| format!("Failed to store tokens in keychain: {e}"))?;
 
     Ok(())
 }
 
+#[allow(dead_code)]
 fn get_tokens_from_keychain(email: &str) -> Result<TokenData, String> {
     let entry = keyring::Entry::new("com.creatorops.google-drive", email)
-        .map_err(|e| format!("Failed to create keychain entry: {}", e))?;
+        .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
 
-    let token_json = entry.get_password()
-        .map_err(|e| format!("Failed to get tokens from keychain: {}", e))?;
+    let token_json = entry
+        .get_password()
+        .map_err(|e| format!("Failed to get tokens from keychain: {e}"))?;
 
     let tokens: TokenData = serde_json::from_str(&token_json)
-        .map_err(|e| format!("Failed to deserialize tokens: {}", e))?;
+        .map_err(|e| format!("Failed to deserialize tokens: {e}"))?;
 
     Ok(tokens)
 }
 
-async fn refresh_access_token(_refresh_token: &str) -> Result<TokenData, String> {
-    // TODO: Implement token refresh
+#[allow(dead_code)]
+fn refresh_access_token(_refresh_token: &str) -> Result<TokenData, String> {
+    // TODO: Implement token refresh (will be async when implemented)
     // 1. Load client secret
     // 2. Make refresh token request to Google
     // 3. Return new TokenData
 
-    Err("Not implemented yet".to_string())
+    Err("Not implemented yet".to_owned())
 }
 
 // Helper Functions
 
+#[allow(dead_code)]
 fn get_current_timestamp() -> String {
     Utc::now().to_rfc3339()
 }
@@ -174,21 +192,21 @@ mod tests {
     #[test]
     fn test_timestamp_format() {
         let timestamp = get_current_timestamp();
-        assert!(timestamp.contains("T"));
-        assert!(timestamp.contains("Z") || timestamp.contains("+"));
+        assert!(timestamp.contains('T'));
+        assert!(timestamp.contains('Z') || timestamp.contains('+'));
         assert!(timestamp.len() > 20);
     }
 
     #[test]
     fn test_google_drive_account_serialization() {
         let account = GoogleDriveAccount {
-            id: "test-id".to_string(),
-            email: "test@example.com".to_string(),
-            display_name: "Test User".to_string(),
-            parent_folder_id: Some("folder-123".to_string()),
+            id: "test-id".to_owned(),
+            email: "test@example.com".to_owned(),
+            display_name: "Test User".to_owned(),
+            parent_folder_id: Some("folder-123".to_owned()),
             enabled: true,
-            created_at: "2025-01-01T00:00:00Z".to_string(),
-            last_authenticated: "2025-01-01T00:00:00Z".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_owned(),
+            last_authenticated: "2025-01-01T00:00:00Z".to_owned(),
         };
 
         let json = serde_json::to_string(&account).unwrap();
@@ -197,13 +215,13 @@ mod tests {
 
         let deserialized: GoogleDriveAccount = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.email, "test@example.com");
-        assert_eq!(deserialized.enabled, true);
+        assert!(deserialized.enabled);
     }
 
     #[test]
     fn test_oauth_state_serialization() {
         let state = OAuthState {
-            auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+            auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_owned(),
             server_port: 8080,
         };
 
@@ -218,8 +236,8 @@ mod tests {
     #[test]
     fn test_token_data_serialization() {
         let token_data = TokenData {
-            access_token: "access_token_123".to_string(),
-            refresh_token: "refresh_token_456".to_string(),
+            access_token: "access_token_123".to_owned(),
+            refresh_token: "refresh_token_456".to_owned(),
             expires_at: Utc::now() + chrono::Duration::hours(1),
         };
 
