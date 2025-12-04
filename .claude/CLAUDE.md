@@ -1,349 +1,363 @@
-# CreatorOps Design Guidelines
+# CreatorOps
 
-## Core Philosophy
+Photography workflow desktop app: import, backup, deliver, archive.
 
-**Spacious Minimalism** - Prioritize whitespace and clarity over density. Every element should breathe.
+**Stack**: React 19 + TypeScript 5.8 + Vite 7 (frontend) | Rust 1.91 + Tauri 2.9 + SQLite (backend) | Vanilla CSS (NO Tailwind/CSS-in-JS) | Vitest + cargo test | mise tooling
 
-- Clean, minimal UI inspired by Todoist + FileExplorer
-- Component-focused modular architecture
-- Functional simplicity with visual clarity
-- Desktop-first with mobile adaptation
+## Setup & Development
 
-## CSS Structure
-
-```text
-src/styles/
-  variables.css    - tokens (colors, spacing, typography)
-  global.css       - resets, base, utilities
-  modern.css       - glass effects, animations
-  theme.css        - theme switching
-  components.css   - component styles
-  layouts/         - layout styles
+```bash
+mise install && npm install  # Setup
+mise run dev                 # Start dev mode
+mise run check               # Verify all (fmt + lint + test)
 ```
 
-## Spacing System
-
-**8px Grid Base** - All spacing, padding, margins must be multiples of 8px (8, 16, 24, 32, 40, 48)
-
-**Generous Padding:**
-
-- Cards: 24px internal padding
-- Sections: 40px vertical separation
-- Page margins: 32px from edges
-- List items: 16px vertical padding
-
-**Line Height:**
-
-- Body text: 1.6
-- Headings: 1.3
-- Compact UI: 1.4
-
-## Color Palette
-
-**Neutrals:**
-
-- Background: `#FEFEFE`
-- Surface: `#FFFFFF`
-- Border: `#E5E5E5`
-- Text primary: `#202020`
-- Text secondary: `#666666`
-- Text tertiary: `#999999`
-
-**Accent:**
-
-- Primary action: `#D68406` (orange)
-- Hover: `#C07605`
-- Success: `#4CAF50`
-- Sidebar highlight: `#FFF9E6` (warm cream)
-
-**Principle:** Use one accent color consistently. Avoid multiple competing colors.
-
-**Semantic naming:** bg-primary/secondary/tertiary, text-primary/secondary/tertiary, accent-primary/secondary, hover, status. High contrast for readability.
-
-## Typography
-
-**Semantic Type Scale:**
-
-- **Title**: 32px / 700 bold / 1.3 line-height — Page/project titles
-- **Section Heading**: 18px / 500 medium / 1.4 line-height — Major sections (e.g., "Actions")
-- **Subheading**: 13px / 600 semibold / 1.4 line-height — Group labels (e.g., "Photos", "Videos")
-- **Body**: 16px / 600 semibold / 1.5 line-height — Primary content, action names
-- **Caption**: 14px / 400 normal / 1.6 line-height — Secondary descriptive text
-- **Meta**: 12px / 500 medium / 1.4 line-height — Field labels, small UI text
-
-**Font Family:** System font stack (-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)
-
-**Usage:** Use semantic type tokens from `variables.css`:
-
-- `var(--type-title-size)`, `var(--type-title-weight)`, `var(--type-title-height)`
-- `var(--type-section-size)`, `var(--type-section-weight)`, `var(--type-section-height)`
-- `var(--type-subheading-size)`, `var(--type-subheading-weight)`, `var(--type-subheading-height)`
-- `var(--type-body-size)`, `var(--type-body-weight)`, `var(--type-body-height)`
-- `var(--type-caption-size)`, `var(--type-caption-weight)`, `var(--type-caption-height)`
-- `var(--type-meta-size)`, `var(--type-meta-weight)`, `var(--type-meta-height)`
-
-**Principle:** Clear hierarchy through size and weight, not color variations. Apply consistently across all components.
-
-## Visual Weight
-
-**Borders:**
-
-- Prefer subtle shadows over borders
-- If borders needed: 1px solid `#E5E5E5`
-- Never use thick borders (>1px)
-
-**Shadows:**
-
-- Default card: `0 1px 3px rgba(0,0,0,0.08)`
-- Hover state: `0 4px 12px rgba(0,0,0,0.12)`
-- Modal/dropdown: `0 8px 24px rgba(0,0,0,0.15)`
-
-**Principle:** Depth through shadows, not borders or background changes.
-
-## Components
-
-**Border Radius:**
-
-- Cards: 8px
-- Buttons: 6px
-- Badges: 4px
-- Inputs: 6px
-
-**Buttons:**
-
-- Height: 40px minimum
-- Padding: 12px 24px
-- Primary: Orange background, white text
-- Secondary: White background, gray border
-- Ghost: No background, gray text
-
-**Cards:**
-
-- White background (`var(--color-bg-primary)`)
-- Subtle 1px border (`var(--color-border)`)
-- Default shadow: `var(--shadow-card)` - `0 1px 3px rgba(0,0,0,0.08)`
-- Hover shadow: `var(--shadow-card-hover)` - `0 4px 12px rgba(0,0,0,0.12)`
-- Border radius: 8px (`var(--radius-lg)`)
-
-**Layout:**
-
-- Flexbox-first
-- Multi-column layouts for content areas
-- Sidebar + main content structure
-
-**Lists/Cards:**
-
-- Nested lists with visual hierarchy
-- Task/item cards with hover states
-- Drag-and-drop support UI patterns
-
-**Views:**
-
-- Support multiple perspectives (list, board, calendar)
-- Quick-add input patterns with natural entry
-
-**Effects:**
-
-- Subtle glass (backdrop blur 8px, use sparingly)
-- Minimal hover states (bg color shift)
-- Avoid heavy shadows—prefer flat design with subtle borders
-
-## Interactions
-
-**Transitions:**
-
-- Duration: 200ms
-- Easing: ease-in-out
-- Properties: transform, box-shadow, background-color
-
-**Hover States:**
-
-- Cards: `translateY(-2px)` + shadow increase
-- Buttons: Darken background 10%
-- Links: Opacity 0.7
-
-**Animations:**
-
-- fadeIn, slideUp, slideDown (0.3s ease-out)
-- Smooth state transitions
-- Micro-interactions on actions
-
-**Principle:** All interactions should feel instant and responsive.
-
-## Layout
-
-**Sidebar:**
-- Width: 240px fixed
-- Background: `#FAFAFA`
-- No borders, use shadow for separation
-- Selected item: Warm cream background (`#FFF9E6`)
-
-**Content Area:**
-- Max width: 1000px for readability
-- Padding: 32px minimum
-- No edge-to-edge content
-
-**Principle:** Content should never feel cramped or touch edges.
-
-## Data Display
-
-**Dates:**
-- Format: "Nov 20, 2025" or "20 Nov 2025"
-- Never: "2025-11-20" in UI
-- Relative: "Today", "Tomorrow", "2 days ago"
-
-**Status Badges:**
-- Small: 12px text
-- Light backgrounds: Pastel tints
-- Minimal visual weight
-
-**Counts:**
-- Position: Right-aligned
-- Style: 13px, medium weight, secondary color
-
-## Iconography
-
-**Style:**
-- Outline/stroke icons only
-- 20px default size
-- 1.5-2px stroke width
-- Consistent visual weight
-
-**Usage:**
-- Always pair with labels in navigation
-- Use sparingly in content
-- Maintain 8px spacing from text
-
-## Empty States
-
-- Never leave blank space
-- Add illustrations or placeholder content
-- Use muted colors
-- Provide clear next action
-
-## Mobile Considerations
-
-**Responsive Breakpoints:**
-- Desktop: 1024px+
-- Tablet: 768px - 1023px
-- Mobile: < 768px
-
-**Touch Targets:**
-- Minimum: 44px height
-- Spacing: 8px minimum between targets
-
-## Accessibility
-
-- `.visually-hidden` for screen readers
-- `:focus-visible` for keyboard navigation
-- Accent color outlines
-- Keyboard shortcuts support
-- Semantic HTML
-
-## Tech Stack
-
-- React (hooks, no UI frameworks)
-- Vanilla CSS with CSS variables
-- Tauri 2 (Rust backend)
-- Vite + TypeScript
-
-## Code Style
-
-**React:** Functional components, custom hooks, provider pattern for state.
-
-**Styling:** Vanilla CSS only. NO CSS-in-JS, NO Tailwind. Design tokens in variables.css.
-
-**Naming:** Components PascalCase, hooks camelCase (use*), utils camelCase, styles kebab-case.
+## Project Structure
+
+```text
+src/              # React frontend (components/, hooks/, styles/, utils/, types/)
+src-tauri/src/    # Rust backend (lib.rs, modules/*.rs)
+.mise.toml        # Tool versions & tasks
+```
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Dev | `mise run dev` |
+| Test | `npm run test -- --run` (frontend), `mise run test:rust` (backend) |
+| Lint | `npm run lint` (ESLint), `mise run lint:rust` (clippy) |
+| Format | `npm run format` (Prettier), `cargo fmt` |
+| Build | `npm run build`, `mise run build` (Tauri .dmg) |
+| **Verify all** | `mise run check` |
+
+## TypeScript/React Patterns
+
+### Components
+
+```typescript
+// Functional only, props interface, co-located tests
+interface DashboardProps {
+  onProjectClick?: (projectId: string) => void
+}
+
+export function Dashboard({ onProjectClick }: DashboardProps) {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadData() }, [])
+
+  async function loadData() {
+    try {
+      setLoading(true)
+      const projectList = await invoke<Project[]>('list_projects')
+      setProjects(projectList)
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+}
+```
+
+**Naming**: Components `PascalCase`, props `ComponentNameProps`, callbacks `on*`, state setters `set*`
+
+### State
+
+- Local: `useState` for UI state
+- Context: Only cross-cutting (NotificationContext)
+- NO Redux/Zustand
+- Data: Tauri `invoke()` with try/catch/finally
+
+### Hooks
+
+```typescript
+// Prefix use*, return objects, cleanup in useEffect
+export function useTheme() {
+  const [theme, setTheme] = useState<Theme>(() =>
+    (localStorage.getItem('theme') as Theme) || 'system'
+  )
+
+  useEffect(() => {
+    // Apply theme + persist
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  return { theme, setTheme }
+}
+```
+
+### Styling (CRITICAL)
+
+**Vanilla CSS only. NO Tailwind, CSS-in-JS, inline styles.**
+
+```css
+/* Use design tokens from variables.css */
+.form-footer {
+  margin-top: var(--space-lg);      /* 8px grid: 8,16,24,32,40,48 */
+  padding: var(--space-md);
+  background: var(--color-bg-primary);
+  box-shadow: var(--shadow-card);
+}
+```
+
+**Bad**: `<div style={{ marginTop: '24px' }}>`
+**Good**: `<div className="form-footer">`
+
+### Types
+
+```typescript
+// src/types/index.ts - single file
+export enum ProjectStatus { New = 'New', Editing = 'Editing', ... }
+export interface Project { id: string; name: string; status: ProjectStatus; deadline?: string; ... }
+export type BackupStatus = 'pending' | 'inprogress' | 'completed' | 'failed' | 'cancelled'
+```
+
+### Error Handling (Frontend)
+
+```typescript
+const { success, error } = useNotification()  // NOT alert()
+try {
+  const result = await invoke<Project>('create_project', formData)
+  success('Project created')
+} catch (err) {
+  console.error('Failed:', err)
+  error('Failed to create project')
+} finally {
+  setLoading(false)
+}
+```
+
+### Imports
+
+```typescript
+// Grouped: React → Tauri → Types → Utils → Components → Hooks
+import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import type { Project } from '../types'
+import { sortProjects } from '../utils/project'
+import { CreateProject } from './CreateProject'
+import { useSDCardScanner } from '../hooks/useSDCardScanner'
+```
+
+## Rust Patterns
+
+### Module Structure
+
+```rust
+// Flat modules in src-tauri/src/modules/, snake_case naming
+pub mod backup;  // backup.rs
+pub mod db;      // db.rs
+```
+
+### Error Handling (Backend)
+
+```rust
+// Result<T, String> for Tauri commands, use log crate (not eprintln!)
+use log::{info, error};
+
+pub fn with_db<F, R>(f: F) -> Result<R, String>
+where F: FnOnce(&Connection) -> Result<R, String>
+{
+    let db = DB_CONNECTION.lock().map_err(|e| format!("Lock failed: {}", e))?;
+    let conn = db.as_ref().ok_or_else(|| "DB not initialized".to_string())?;
+    f(conn)
+}
+```
+
+### Async & Tauri
+
+```rust
+#[tauri::command]
+pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<BackupJob, String> {
+    let job = update_job_status(&job_id, BackupStatus::InProgress)?;
+
+    // Spawn background task, return immediately
+    tokio::spawn(async move {
+        if let Err(e) = perform_backup(&window, &job_id, &job).await {
+            error!("Backup failed: {}", e);
+        }
+    });
+    Ok(job)
+}
+
+// Serialization with camelCase for TypeScript
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupJob {
+    pub id: String,
+    pub project_id: String,  // → projectId in JSON
+    pub status: BackupStatus,
+}
+
+// Emit events
+let _ = window.emit("backup-progress", progress);
+```
+
+### Documentation
+
+```rust
+/// Opens project media folder in external app.
+///
+/// Assumes structure: ProjectFolder/RAW/Photos/ or RAW/Videos/
+/// Launches app in background (fire-and-forget).
+pub fn open_in_external_app(path: &str, subfolder: &str, app: &str) -> Result<(), String>
+```
 
 ## Testing
 
-**Always write tests for:**
-- New features
-- Bug fixes
-- New components
-- New hooks
-- New utilities
+### Frontend (Vitest + RTL)
 
-**Bug fix workflow:**
-1. Write test that reproduces bug
-2. Fix bug
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+
+describe('Dashboard', () => {
+  it('loads and displays projects', async () => {
+    vi.mocked(invoke).mockResolvedValue(mockProjects)
+    render(<Dashboard />)
+    await waitFor(() => expect(screen.getByText('Wedding Photos')).toBeTruthy())
+  })
+})
+```
+
+### Backend (Cargo)
+
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_backup_status_serialization() {
+        assert_eq!(serde_json::to_string(&BackupStatus::Pending).unwrap(), r#""pending""#);
+    }
+}
+```
+
+### Bug Fix Workflow
+
+1. Write failing test
+2. Fix root cause
 3. Verify test passes
 
-**Test location:** Co-located with code (`Component.test.tsx`, `hook.test.ts`)
+## Linting & Formatting
 
-**Test framework:** Vitest + React Testing Library
+| Frontend | Backend |
+|----------|---------|
+| Prettier: single quotes, no semicolons, width 100 | rustfmt: edition 2021, max_width 100 |
+| ESLint: max-warnings: 0 | clippy: -D warnings |
+| **NEVER** `eslint-disable`, `@ts-ignore` | **NEVER** `#[allow(clippy::*)]` except `too_many_arguments` |
 
-## UI Principles
+## Git Conventions
 
-1. **Spacious Minimalism** - every element breathes with whitespace
-2. **Content-first** - maximize space for actual content
-3. **Visual hierarchy** - size, spacing, color for organization
-4. **Whitespace-driven** - generous breathing room, avoid cramped layouts
-5. **Clarity** - high contrast text, readable typography
-6. **Consistency** - reuse patterns across components
-7. **Performance** - 60fps animations, optimize renders
-8. **Desktop-first** - mobile-adapt where needed
-9. **Accessible** - keyboard nav, focus states, semantic HTML
+**Commits** (conventional, signed):
 
-## Anti-Patterns
-
-- ❌ Inline styles
-- ❌ Magic numbers (use 8px grid multiples)
-- ❌ Tight coupling
-- ❌ Inconsistent spacing
-- ❌ Multiple competing accent colors
-- ❌ Heavy deps for simple UI
-- ❌ Non-semantic HTML
-- ❌ Thick borders (>1px)
-- ❌ Cramped layouts (always prioritize whitespace)
-- ❌ Over-decorated UI (avoid unnecessary visual noise)
-- ❌ Edge-to-edge content
-
-## Verification
-
-After adding functionality, verify using CI commands:
-
-**Frontend:**
 ```bash
-npm run format:check
-npm run lint
-npm run test -- --run
-npm run build
+git commit -s -S -m "feat: add backup queue"
+git commit -s -S -m "fix: checksum verification"
+git commit -s -S -m "refactor: extract project sorting"
 ```
 
-**Rust:**
-```bash
-cargo fmt --all --manifest-path src-tauri/Cargo.toml --check
-mise run lint:rust
-mise run test:rust
-cd src-tauri && cargo build --release
+**Types**: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
+
+**PRs**:
+
+```markdown
+## Motivation
+[Why]
+
+## Implementation information
+[How, alternatives]
+
+## Supporting documentation
+[Issues, PRs, docs]
 ```
 
-**All (via mise):**
-```bash
-mise run fmt
-mise run lint
-mise run test
+## Anti-Patterns (AVOID)
+
+1. Inline styles
+2. Linter disables (`eslint-disable`, `@ts-ignore`, `#[allow]`)
+3. Magic numbers (use 8px grid)
+4. Over-engineering
+5. Multiple accent colors (stick to orange `#D68406`)
+6. Generic errors
+
+## Good Patterns (FOLLOW)
+
+1. Spacious minimalism (8px grid)
+2. Design tokens (CSS variables)
+3. Try/catch/finally
+4. Event-driven progress (Tauri emitters)
+5. Type safety (strict TS, Rust)
+6. Co-located tests
+
+## Code Generation Rules
+
+**Adding features**: Read existing → Follow conventions → Write tests → Use tokens → Document APIs → Verify (`mise run check`)
+
+**Fixing bugs**: Failing test → Fix root cause → Verify → Add regression test
+
+**Refactoring**: Maintain tests → Minimal scope → Extract only if 3+ uses
+
+## API Integration
+
+OAuth tokens in system keyring, never commit credentials.
+
+```rust
+use keyring::Entry;
+
+pub async fn get_access_token() -> Result<String, String> {
+    Entry::new("CreatorOps", "google_drive_token")?.get_password().map_err(|e| e.to_string())
+}
 ```
 
-## Example Usage
+## Data Persistence
 
-```css
-/* Use 8px grid spacing tokens */
-padding: 24px;
-margin-bottom: 40px;
-gap: 16px;
+- **Projects/deliveries**: SQLite (`~/CreatorOps/creatorops.db`)
+- **Backup/import history**: JSON files (`~/CreatorOps/backup_history.json`)
+- **Settings**: localStorage (frontend)
 
-/* Use semantic color tokens */
-background: var(--color-bg-primary);
-color: var(--color-text-primary);
-border: 1px solid var(--color-border);
+## Performance
 
-/* Use shadow tokens for depth */
-box-shadow: var(--shadow-card);
+**Frontend**: `useMemo` for expensive calcs, `useCallback` for callbacks, code-split if grows
 
-/* Use typography scale */
-font-size: 14px;
-line-height: 1.6;
-font-weight: 400;
-```
+**Backend**: Semaphore (4 max concurrent), 4MB chunks, `tokio::spawn` for long ops, CancellationToken
+
+## Accessibility
+
+Semantic HTML (`<button>` not `<div onClick>`), `:focus-visible`, `.visually-hidden`, WCAG AA contrast, keyboard shortcuts
+
+## Known Technical Debt
+
+1. Frontend: `alert()` → NotificationContext
+2. Backend: `Result<T, String>` → custom errors with `thiserror`
+3. Backend: `eprintln!` → `log` crate
+4. No React error boundaries
+5. SQLite: no transactions
+6. `Settings.tsx:30`: fix `eslint-disable`
+7. `Projects.tsx:124-137`: extract inline styles
+
+## Questions for AI
+
+1. Use CSS variables from variables.css?
+2. Local state or context?
+3. Test cases to cover?
+4. NotificationContext or throw?
+5. Need useMemo/useCallback?
+6. Existing pattern for this?
+
+## Success Checklist
+
+- [ ] Tests pass (`mise run test`)
+- [ ] Lint passes (`mise run lint`)
+- [ ] Format passes (`npm run format:check`, `cargo fmt --check`)
+- [ ] Build succeeds
+- [ ] No linter disables added
+- [ ] No inline styles
+- [ ] Design tokens used
+- [ ] Tests written
+- [ ] Conventional commit
+- [ ] Docs updated (if public API changed)

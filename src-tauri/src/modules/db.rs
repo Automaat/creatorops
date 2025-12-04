@@ -62,6 +62,25 @@ impl Database {
             [],
         )?;
 
+        // Create google_drive_accounts table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS google_drive_accounts (
+                id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                display_name TEXT NOT NULL,
+                parent_folder_id TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                last_authenticated TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_drive_accounts_email ON google_drive_accounts(email)",
+            [],
+        )?;
+
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_date ON projects(date)",
             [],
