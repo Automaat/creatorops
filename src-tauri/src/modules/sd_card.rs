@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -77,12 +78,13 @@ pub async fn scan_sd_cards() -> Result<Vec<SDCard>, String> {
 fn count_files(path: &Path) -> usize {
     WalkDir::new(path)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.file_type().is_file())
         .count()
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
+#[allow(unsafe_code, clippy::unwrap_used, clippy::missing_const_for_fn)]
 fn get_disk_usage(path: &Path) -> (u64, u64) {
     #[cfg(target_os = "macos")]
     {
@@ -94,7 +96,7 @@ fn get_disk_usage(path: &Path) -> (u64, u64) {
             let mut stats: libc::statfs = mem::zeroed();
 
             if libc::statfs(path_cstr.as_ptr(), &mut stats) == 0 {
-                let block_size = stats.f_bsize as u64;
+                let block_size = u64::from(stats.f_bsize);
                 let total_blocks = stats.f_blocks;
                 let free_blocks = stats.f_bfree;
 
@@ -116,7 +118,7 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
     let path = Path::new(&card_path);
 
     if !path.exists() {
-        return Err("SD card path does not exist".to_string());
+        return Err("SD card path does not exist".to_owned());
     }
 
     let mut file_paths = Vec::new();
@@ -127,7 +129,7 @@ pub async fn list_sd_card_files(card_path: String) -> Result<Vec<String>, String
 
     for entry in WalkDir::new(path)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|e| e.file_type().is_file())
     {
         let file_path = entry.path();
@@ -151,19 +153,19 @@ pub async fn eject_sd_card(volume_path: String) -> Result<(), String> {
         let output = Command::new("diskutil")
             .args(["eject", &volume_path])
             .output()
-            .map_err(|e| format!("Failed to execute diskutil: {}", e))?;
+            .map_err(|e| format!("Failed to execute diskutil: {e}"))?;
 
         if output.status.success() {
             Ok(())
         } else {
             let error = String::from_utf8_lossy(&output.stderr);
-            Err(format!("Failed to eject SD card: {}", error))
+            Err(format!("Failed to eject SD card: {error}"))
         }
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        Err("SD card ejection is only supported on macOS".to_string())
+        Err("SD card ejection is only supported on macOS".to_owned())
     }
 }
 
@@ -182,17 +184,17 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
 
             // Parse device type
             let device_type = if info.contains("SD Card") || info.contains("SD_Card") {
-                "SD Card".to_string()
+                "SD Card".to_owned()
             } else if info.contains("USB") {
-                "USB Drive".to_string()
+                "USB Drive".to_owned()
             } else if info.contains("Disk Image") {
-                "Disk Image".to_string()
+                "Disk Image".to_owned()
             } else if info.contains("External") {
-                "External Drive".to_string()
+                "External Drive".to_owned()
             } else if info.contains("Internal") {
-                "Internal Drive".to_string()
+                "Internal Drive".to_owned()
             } else {
-                "Unknown".to_string()
+                "Unknown".to_owned()
             };
 
             // Check if removable
@@ -206,22 +208,24 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
     }
 
     // Fallback for non-macOS or if diskutil fails
-    ("Unknown".to_string(), true)
+    ("Unknown".to_owned(), true)
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_sd_card_serialization() {
         let card = SDCard {
-            name: "SD_CARD".to_string(),
-            path: "/Volumes/SD_CARD".to_string(),
-            size: 32000000000,
-            free_space: 16000000000,
+            name: "SD_CARD".to_owned(),
+            path: "/Volumes/SD_CARD".to_owned(),
+            size: 32_000_000_000,
+            free_space: 16_000_000_000,
             file_count: 150,
-            device_type: "SD Card".to_string(),
+            device_type: "SD Card".to_owned(),
             is_removable: true,
         };
 
@@ -245,7 +249,7 @@ mod tests {
 
         let card: SDCard = serde_json::from_str(json).unwrap();
         assert_eq!(card.name, "USB_DRIVE");
-        assert_eq!(card.size, 64000000000);
+        assert_eq!(card.size, 64_000_000_000);
         assert!(card.is_removable);
     }
 
@@ -267,5 +271,151 @@ mod tests {
     fn test_get_device_info_returns_tuple() {
         let (device_type, _) = get_device_info("TestVolume");
         assert!(!device_type.is_empty());
+    }
+
+    #[test]
+    fn test_count_files_with_subdirectories() {
+        let temp_dir = TempDir::new().unwrap();
+        let subdir = temp_dir.path().join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+
+        std::fs::write(temp_dir.path().join("file1.txt"), b"test").unwrap();
+        std::fs::write(subdir.join("file2.txt"), b"test").unwrap();
+        std::fs::write(subdir.join("file3.txt"), b"test").unwrap();
+
+        let count = count_files(temp_dir.path());
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_count_files_empty_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let count = count_files(temp_dir.path());
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("photo1.jpg"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("photo2.png"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("video1.mp4"), b"video").unwrap();
+        std::fs::write(temp_dir.path().join("ignored.txt"), b"text").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files.iter().any(|f| f.contains("photo1.jpg")));
+        assert!(files.iter().any(|f| f.contains("photo2.png")));
+        assert!(files.iter().any(|f| f.contains("video1.mp4")));
+        assert!(!files.iter().any(|f| f.contains("ignored.txt")));
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_with_raw_formats() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("raw1.cr2"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw2.nef"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw3.arw"), b"raw").unwrap();
+        std::fs::write(temp_dir.path().join("raw4.dng"), b"raw").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_nonexistent_path() {
+        let result = list_sd_card_files("/nonexistent/path".to_owned()).await;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "SD card path does not exist");
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_nested_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let dcim = temp_dir.path().join("DCIM");
+        let folder1 = dcim.join("100CANON");
+        std::fs::create_dir_all(&folder1).unwrap();
+
+        std::fs::write(folder1.join("IMG_0001.jpg"), b"photo").unwrap();
+        std::fs::write(folder1.join("IMG_0002.cr3"), b"raw").unwrap();
+        std::fs::write(folder1.join("VID_0001.mov"), b"video").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_list_sd_card_files_case_insensitive_extensions() {
+        let temp_dir = TempDir::new().unwrap();
+
+        std::fs::write(temp_dir.path().join("photo.JPG"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("photo.jpeg"), b"photo").unwrap();
+        std::fs::write(temp_dir.path().join("video.MOV"), b"video").unwrap();
+
+        let result = list_sd_card_files(temp_dir.path().to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+
+        let files = result.unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_get_disk_usage() {
+        let temp_dir = TempDir::new().unwrap();
+        let (size, free_space) = get_disk_usage(temp_dir.path());
+        assert!(size > 0);
+        assert!(free_space > 0);
+        assert!(free_space <= size);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn test_get_disk_usage_fallback() {
+        let temp_dir = TempDir::new().unwrap();
+        let (size, free_space) = get_disk_usage(temp_dir.path());
+        assert_eq!(size, 0);
+        assert_eq!(free_space, 0);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
+    async fn test_eject_sd_card_not_supported() {
+        let result = eject_sd_card("/test/path".to_owned()).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "SD card ejection is only supported on macOS"
+        );
+    }
+
+    #[test]
+    fn test_sd_card_complete_struct() {
+        let card = SDCard {
+            name: "TestCard".to_owned(),
+            path: "/Volumes/TestCard".to_owned(),
+            size: 64_000_000_000,
+            free_space: 32_000_000_000,
+            file_count: 250,
+            device_type: "SD Card".to_owned(),
+            is_removable: true,
+        };
+
+        assert_eq!(card.name, "TestCard");
+        assert_eq!(card.size, 64_000_000_000);
+        assert_eq!(card.free_space, 32_000_000_000);
+        assert_eq!(card.file_count, 250);
+        assert!(card.is_removable);
     }
 }

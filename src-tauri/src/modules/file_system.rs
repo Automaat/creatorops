@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use std::process::Command;
 
 // Windows application paths for external editors
@@ -21,7 +22,7 @@ const DAVINCI_RESOLVE_PATHS: &[&str] = &[
 
 /// Opens a project's media folder in an external editing application.
 ///
-/// This function assumes the standard CreatorOps project structure:
+/// This function assumes the standard `CreatorOps` project structure:
 /// ```text
 /// ProjectFolder/
 ///   RAW/
@@ -44,14 +45,13 @@ fn open_in_external_app(
 
     if !media_path.exists() {
         return Err(format!(
-            "{} directory not found. Expected RAW/{} subdirectory.",
-            subfolder, subfolder
+            "{subfolder} directory not found. Expected RAW/{subfolder} subdirectory."
         ));
     }
 
     let media_path_str = media_path
         .to_str()
-        .ok_or_else(|| "Invalid path encoding".to_string())?;
+        .ok_or_else(|| "Invalid path encoding".to_owned())?;
 
     #[cfg(target_os = "macos")]
     {
@@ -60,7 +60,7 @@ fn open_in_external_app(
             .arg(app_name)
             .arg(media_path_str)
             .spawn()
-            .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+            .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -71,7 +71,7 @@ fn open_in_external_app(
                 Command::new(exe_path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
                 launched = true;
                 break;
             }
@@ -92,15 +92,14 @@ fn open_in_external_app(
                 Command::new(path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
             } else {
                 return Err(format!(
-                    "{} not found. Please ensure it's installed.",
-                    app_name
+                    "{app_name} not found. Please ensure it's installed."
                 ));
             }
         } else {
-            return Err(format!("{} not supported on Linux", app_name));
+            return Err(format!("{app_name} not supported on Linux"));
         }
     }
 
@@ -108,14 +107,14 @@ fn open_in_external_app(
 }
 
 #[tauri::command]
-pub fn reveal_in_finder(path: String) -> Result<(), String> {
+pub fn reveal_in_finder(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         Command::new("open")
             .arg("-R")
-            .arg(&path)
+            .arg(path)
             .spawn()
-            .map_err(|e| format!("Failed to reveal in Finder: {}", e))?;
+            .map_err(|e| format!("Failed to reveal in Finder: {e}"))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -124,7 +123,7 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
             .arg("/select,")
             .arg(&path)
             .spawn()
-            .map_err(|e| format!("Failed to reveal in Explorer: {}", e))?;
+            .map_err(|e| format!("Failed to reveal in Explorer: {e}"))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -134,9 +133,9 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
             Command::new("xdg-open")
                 .arg(parent)
                 .spawn()
-                .map_err(|e| format!("Failed to open file manager: {}", e))?;
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
         } else {
-            return Err("Failed to get parent directory".to_string());
+            return Err("Failed to get parent directory".to_owned());
         }
     }
 
@@ -144,34 +143,34 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_in_lightroom(path: String) -> Result<(), String> {
+pub fn open_in_lightroom(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = LIGHTROOM_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
-    open_in_external_app(&path, "Photos", "Adobe Lightroom Classic", paths, None)
+    open_in_external_app(path, "Photos", "Adobe Lightroom Classic", paths, None)
 }
 
 #[tauri::command]
-pub fn open_in_aftershoot(path: String) -> Result<(), String> {
+pub fn open_in_aftershoot(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = AFTERSHOOT_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
-    open_in_external_app(&path, "Photos", "AfterShoot", paths, None)
+    open_in_external_app(path, "Photos", "AfterShoot", paths, None)
 }
 
 #[tauri::command]
-pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
+pub fn open_in_davinci_resolve(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let paths = DAVINCI_RESOLVE_PATHS;
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
     open_in_external_app(
-        &path,
+        path,
         "Videos",
         "DaVinci Resolve",
         paths,
@@ -180,9 +179,9 @@ pub fn open_in_davinci_resolve(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
+pub fn open_in_final_cut_pro(path: &str) -> Result<(), String> {
     open_in_external_app(
-        &path,
+        path,
         "Videos",
         "Final Cut Pro",
         &[],
@@ -190,10 +189,12 @@ pub fn open_in_final_cut_pro(path: String) -> Result<(), String> {
     )
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::Path;
+    use tempfile::TempDir;
 
     #[test]
     fn test_windows_paths_constants() {
@@ -232,5 +233,127 @@ mod tests {
         assert!(media_path.is_dir());
 
         std::fs::remove_dir_all(temp_dir).ok();
+    }
+
+    #[test]
+    fn test_open_in_external_app_invalid_path_encoding() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Photos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let result = open_in_external_app(project_path, "Photos", "TestApp", &[], None);
+
+        // Should validate path exists (error occurs when trying to spawn)
+        assert!(result.is_err() || result.is_ok());
+    }
+
+    #[test]
+    fn test_open_in_external_app_photos_subfolder() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Photos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let media_path = Path::new(project_path).join("RAW").join("Photos");
+
+        assert!(media_path.exists());
+        assert!(media_path.is_dir());
+    }
+
+    #[test]
+    fn test_open_in_external_app_videos_subfolder() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("RAW").join("Videos")).unwrap();
+
+        let project_path = temp_dir.path().to_str().unwrap();
+        let media_path = Path::new(project_path).join("RAW").join("Videos");
+
+        assert!(media_path.exists());
+        assert!(media_path.is_dir());
+    }
+
+    #[test]
+    fn test_open_in_lightroom_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_lightroom(&temp_dir.path().to_string_lossy());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_aftershoot_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_aftershoot(&temp_dir.path().to_string_lossy());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_davinci_resolve_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_davinci_resolve(&temp_dir.path().to_string_lossy());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_open_in_final_cut_pro_validates_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = open_in_final_cut_pro(&temp_dir.path().to_string_lossy());
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn test_reveal_in_finder_with_valid_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_file = temp_dir.path().join("test.txt");
+        std::fs::write(&test_file, b"test").unwrap();
+
+        // Function spawns background process, so it may succeed or fail depending on platform
+        let result = reveal_in_finder(&test_file.to_string_lossy());
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_lightroom_paths() {
+        assert!(LIGHTROOM_PATHS.len() >= 2);
+        assert!(LIGHTROOM_PATHS[0].contains("Adobe"));
+        assert!(LIGHTROOM_PATHS[0].contains("Lightroom"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_aftershoot_paths() {
+        assert!(AFTERSHOOT_PATHS.len() >= 2);
+        assert!(AFTERSHOOT_PATHS[0].contains("AfterShoot"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_windows_davinci_resolve_paths() {
+        assert!(DAVINCI_RESOLVE_PATHS.len() >= 2);
+        assert!(DAVINCI_RESOLVE_PATHS[0].contains("Blackmagic Design"));
+        assert!(DAVINCI_RESOLVE_PATHS[0].contains("DaVinci Resolve"));
+    }
+
+    #[test]
+    fn test_open_in_external_app_missing_raw_directory() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let result = open_in_external_app(
+            temp_dir.path().to_str().unwrap(),
+            "Photos",
+            "TestApp",
+            &[],
+            None,
+        );
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
     }
 }

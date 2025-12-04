@@ -1,7 +1,7 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+
+use crate::modules::db::Database;
 
 // Data Structures
 
@@ -56,11 +56,12 @@ pub async fn complete_google_drive_auth() -> Result<GoogleDriveAccount, String> 
 }
 
 #[tauri::command]
-pub async fn get_google_drive_account() -> Result<Option<GoogleDriveAccount>, String> {
-    use crate::modules::db::with_db;
+pub async fn get_google_drive_account(
+    db: tauri::State<'_, Database>,
+) -> Result<Option<GoogleDriveAccount>, String> {
     use rusqlite::OptionalExtension;
 
-    with_db(|conn| {
+    db.execute(|conn| {
         let mut stmt = conn
             .prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts LIMIT 1")?;
 
@@ -84,10 +85,11 @@ pub async fn get_google_drive_account() -> Result<Option<GoogleDriveAccount>, St
 }
 
 #[tauri::command]
-pub async fn set_drive_parent_folder(folder_id: Option<String>) -> Result<(), String> {
-    use crate::modules::db::with_db;
-
-    with_db(|conn| {
+pub async fn set_drive_parent_folder(
+    db: tauri::State<'_, Database>,
+    folder_id: Option<String>,
+) -> Result<(), String> {
+    db.execute(|conn| {
         conn.execute(
             "UPDATE google_drive_accounts SET parent_folder_id = ?1",
             [folder_id],
@@ -99,11 +101,9 @@ pub async fn set_drive_parent_folder(folder_id: Option<String>) -> Result<(), St
 }
 
 #[tauri::command]
-pub async fn remove_google_drive_account() -> Result<(), String> {
-    use crate::modules::db::with_db;
-
+pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Result<(), String> {
     // First get the email to remove from keychain
-    let account = get_google_drive_account().await?;
+    let account = get_google_drive_account(db.clone()).await?;
 
     if let Some(acc) = account {
         // Remove from keychain
@@ -114,7 +114,7 @@ pub async fn remove_google_drive_account() -> Result<(), String> {
         let _ = entry.delete_credential();
 
         // Remove from database
-        with_db(|conn| {
+        db.execute(|conn| {
             conn.execute("DELETE FROM google_drive_accounts WHERE id = ?1", [&acc.id])?;
             Ok(())
         })
@@ -232,27 +232,7 @@ mod tests {
         assert_eq!(deserialized.refresh_token, "refresh_token_456");
     }
 
-    #[tokio::test]
-    async fn test_get_account_when_none_exists() {
-        // This test assumes empty database - would need proper test database setup
-        // For now, just ensure it doesn't panic and returns Ok
-        let result = get_google_drive_account().await;
-        // Should return Ok(None) or Ok(Some(...)) depending on database state
-        assert!(result.is_ok() || result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_set_parent_folder() {
-        // Test that the function signature is correct and doesn't panic with valid input
-        let result = set_drive_parent_folder(Some("folder-id-123".to_string())).await;
-        // May fail if no account exists, but should not panic
-        assert!(result.is_ok() || result.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_set_parent_folder_none() {
-        // Test setting parent folder to None (clearing it)
-        let result = set_drive_parent_folder(None).await;
-        assert!(result.is_ok() || result.is_err());
-    }
+    // Note: Database-dependent tests (get_account, set_parent_folder, remove_account)
+    // are omitted because they require Database instance which is managed by Tauri.
+    // These should be tested as integration tests with a test database.
 }
