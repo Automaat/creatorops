@@ -84,7 +84,7 @@ fn count_files(path: &Path) -> usize {
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
-#[allow(unsafe_code, clippy::unwrap_used)]
+#[allow(unsafe_code, clippy::unwrap_used, clippy::missing_const_for_fn)]
 fn get_disk_usage(path: &Path) -> (u64, u64) {
     #[cfg(target_os = "macos")]
     {

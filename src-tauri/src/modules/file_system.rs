@@ -71,7 +71,7 @@ fn open_in_external_app(
                 Command::new(exe_path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
                 launched = true;
                 break;
             }
@@ -92,15 +92,14 @@ fn open_in_external_app(
                 Command::new(path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {}: {}", app_name, e))?;
+                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
             } else {
                 return Err(format!(
-                    "{} not found. Please ensure it's installed.",
-                    app_name
+                    "{app_name} not found. Please ensure it's installed."
                 ));
             }
         } else {
-            return Err(format!("{} not supported on Linux", app_name));
+            return Err(format!("{app_name} not supported on Linux"));
         }
     }
 
@@ -124,7 +123,7 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
             .arg("/select,")
             .arg(&path)
             .spawn()
-            .map_err(|e| format!("Failed to reveal in Explorer: {}", e))?;
+            .map_err(|e| format!("Failed to reveal in Explorer: {e}"))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -134,7 +133,7 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
             Command::new("xdg-open")
                 .arg(parent)
                 .spawn()
-                .map_err(|e| format!("Failed to open file manager: {}", e))?;
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
         } else {
             return Err("Failed to get parent directory".to_owned());
         }
