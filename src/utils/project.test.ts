@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { isOverdue } from './project'
 
 describe('isOverdue', () => {
   it('returns false when no deadline provided', () => {
-    expect(isOverdue(undefined)).toBe(false)
+    expect(isOverdue()).toBe(false)
     expect(isOverdue('')).toBe(false)
   })
 

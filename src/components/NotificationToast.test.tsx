@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { NotificationToast } from './NotificationToast'
-import { NotificationProvider, NotificationContext } from '../contexts/NotificationContext'
+import { NotificationContext, NotificationProvider } from '../contexts/NotificationContext'
 import { useContext } from 'react'
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
@@ -27,7 +27,7 @@ function NotificationTrigger() {
   )
 }
 
-describe('NotificationToast', () => {
+describe('notificationToast', () => {
   it('renders nothing when no notifications', () => {
     const { container } = render(
       <NotificationProvider>

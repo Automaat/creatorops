@@ -1,31 +1,23 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { useSDCardScanner } from './useSDCardScanner'
 import { NotificationProvider } from '../contexts/NotificationContext'
 import { invoke } from '@tauri-apps/api/core'
 import type { SDCard } from '../types'
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
-vi.mock('@tauri-apps/plugin-notification', () => ({
-  sendNotification: vi.fn(),
-  isPermissionGranted: vi.fn(),
-  requestPermission: vi.fn(),
+vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn(), requestPermission: vi.fn(), sendNotification: vi.fn(),
 }))
 
 const mockInvoke = vi.mocked(invoke)
 
 const createMockCard = (id: number, size: number = 1000): SDCard => ({
-  name: `Card ${id}`,
-  path: `/path/${id}`,
-  size,
-  freeSpace: size / 2,
-  fileCount: id * 10,
-  deviceType: 'SD',
-  isRemovable: true,
+  deviceType: 'SD', fileCount: id * 10, freeSpace: size / 2, isRemovable: true, name: `Card ${id}`, path: `/path/${id}`, size,
 })
 
 describe('useSDCardScanner', () => {
@@ -44,7 +36,7 @@ describe('useSDCardScanner', () => {
       wrapper: NotificationProvider,
     })
 
-    expect(result.current.sdCards).toEqual([])
+    expect(result.current.sdCards).toStrictEqual([])
 
     // Wait for initial scan to complete
     await waitFor(() => {
@@ -62,7 +54,7 @@ describe('useSDCardScanner', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.sdCards).toEqual(mockCards)
+      expect(result.current.sdCards).toStrictEqual(mockCards)
     })
   })
 
@@ -104,7 +96,7 @@ describe('useSDCardScanner', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.sdCards).toEqual([])
+      expect(result.current.sdCards).toStrictEqual([])
     })
 
     await act(async () => {
@@ -151,7 +143,7 @@ describe('useSDCardScanner', () => {
 
   it('handles scan errors gracefully', async () => {
     const consoleError = console.error
-    console.error = vi.fn()
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     mockInvoke.mockRejectedValue(new Error('Scan failed'))
 
@@ -165,6 +157,7 @@ describe('useSDCardScanner', () => {
 
     expect(console.error).toHaveBeenCalledWith('Failed to scan SD cards:', expect.any(Error))
 
+    spy.mockRestore()
     console.error = consoleError
   })
 
@@ -178,7 +171,7 @@ describe('useSDCardScanner', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.sdCards).toEqual(mockCards)
+      expect(result.current.sdCards).toStrictEqual(mockCards)
     })
 
     const mockCards2: SDCard[] = [createMockCard(2, 2000)]
@@ -190,7 +183,7 @@ describe('useSDCardScanner', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.sdCards).toEqual(mockCards2)
+      expect(result.current.sdCards).toStrictEqual(mockCards2)
     })
   })
 
@@ -216,7 +209,7 @@ describe('useSDCardScanner', () => {
     })
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(10000)
+      await vi.advanceTimersByTimeAsync(10_000)
     })
 
     // Should not have been called again after unmount

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project } from '../types'
-import { sortProjects, isOverdue } from '../utils/project'
+import { ProjectStatus } from '../types';
+import type { Project } from '../types';
+import { isOverdue, sortProjects } from '../utils/project'
 import { formatDisplayDate } from '../utils/formatting'
 import { CreateProject } from './CreateProject'
 
@@ -15,7 +16,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
   const [showCreateProject, setShowCreateProject] = useState(false)
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [])
 
   async function loadData() {
@@ -23,8 +24,8 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       setLoading(true)
       const projectList = await invoke<Project[]>('list_projects')
       setProjects(projectList)
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err)
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
     }
@@ -32,27 +33,32 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
 
   function getStatusColor(status: string): string {
     switch (status) {
-      case 'Importing':
+      case 'Importing': {
         return 'status-importing'
-      case 'Editing':
+      }
+      case 'Editing': {
         return 'status-editing'
-      case 'Delivered':
+      }
+      case 'Delivered': {
         return 'status-delivered'
-      case 'Archived':
+      }
+      case 'Archived': {
         return 'status-archived'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 
   const activeProjects = useMemo(
-    () => sortProjects(projects.filter((p) => p.status !== 'Archived')),
+    () => sortProjects(projects.filter((p) => p.status !== ProjectStatus.Archived)),
     [projects]
   )
 
   const handleProjectCreated = (project: Project) => {
     setShowCreateProject(false)
-    loadData() // Refresh the dashboard
+    void loadData() // Refresh the dashboard
     onProjectClick?.(project.id) // Navigate to the new project
   }
 

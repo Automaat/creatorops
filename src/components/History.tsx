@@ -55,28 +55,32 @@ export function History() {
           const history = await invoke<BackupHistory[]>('get_backup_history')
           setBackupHistory(history)
         }
-      } catch (err) {
-        console.error('Failed to load history:', err)
+      } catch (error) {
+        console.error('Failed to load history:', error)
         error('Failed to load history')
       } finally {
         setIsLoading(false)
       }
     }
-    loadHistory()
+    void loadHistory()
   }, [historyType, error])
 
   function getStatusClass(status: string): string {
     switch (status) {
       case 'success':
-      case 'completed':
+      case 'completed': {
         return 'status-success'
-      case 'partial':
+      }
+      case 'partial': {
         return 'status-warning'
+      }
       case 'failed':
-      case 'cancelled':
+      case 'cancelled': {
         return 'status-error'
-      default:
+      }
+      default: {
         return ''
+      }
     }
   }
 

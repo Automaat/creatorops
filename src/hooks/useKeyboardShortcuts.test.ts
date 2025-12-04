@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts'
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import type { KeyboardShortcut } from './useKeyboardShortcuts';
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
@@ -13,7 +14,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('triggers action on matching key', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'a', description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'a' }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -25,7 +26,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('triggers action with meta key', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'k', metaKey: true, description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'k', metaKey: true }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -37,11 +38,11 @@ describe('useKeyboardShortcuts', () => {
 
   it('triggers action with ctrl key', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'c', ctrlKey: true, description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, ctrlKey: true, description: 'Test', key: 'c' }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
-    const event = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true })
+    const event = new KeyboardEvent('keydown', { ctrlKey: true, key: 'c' })
     window.dispatchEvent(event)
 
     expect(action).toHaveBeenCalledTimes(1)
@@ -50,7 +51,7 @@ describe('useKeyboardShortcuts', () => {
   it('triggers action with shift key', () => {
     const action = vi.fn()
     const shortcuts: KeyboardShortcut[] = [
-      { key: 's', shiftKey: true, description: 'Test', action },
+      { action, description: 'Test', key: 's', shiftKey: true },
     ]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
@@ -63,11 +64,11 @@ describe('useKeyboardShortcuts', () => {
 
   it('triggers action with alt key', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'a', altKey: true, description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, altKey: true, description: 'Test', key: 'a' }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
-    const event = new KeyboardEvent('keydown', { key: 'a', altKey: true })
+    const event = new KeyboardEvent('keydown', { altKey: true, key: 'a' })
     window.dispatchEvent(event)
 
     expect(action).toHaveBeenCalledTimes(1)
@@ -75,7 +76,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('does not trigger without matching modifier keys', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'k', metaKey: true, description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'k', metaKey: true }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -89,8 +90,8 @@ describe('useKeyboardShortcuts', () => {
     const action1 = vi.fn()
     const action2 = vi.fn()
     const shortcuts: KeyboardShortcut[] = [
-      { key: 'a', description: 'Test 1', action: action1 },
-      { key: 'b', description: 'Test 2', action: action2 },
+      { action: action1, description: 'Test 1', key: 'a' },
+      { action: action2, description: 'Test 2', key: 'b' },
     ]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
@@ -109,7 +110,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('is case insensitive', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'A', description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'A' }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -121,7 +122,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('prevents default when shortcut matches', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'k', metaKey: true, description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'k', metaKey: true }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -135,7 +136,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('does not trigger when disabled', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'a', description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'a' }]
 
     renderHook(() => useKeyboardShortcuts(shortcuts, false))
 
@@ -147,7 +148,7 @@ describe('useKeyboardShortcuts', () => {
 
   it('cleans up event listeners on unmount', () => {
     const action = vi.fn()
-    const shortcuts: KeyboardShortcut[] = [{ key: 'a', description: 'Test', action }]
+    const shortcuts: KeyboardShortcut[] = [{ action, description: 'Test', key: 'a' }]
 
     const { unmount } = renderHook(() => useKeyboardShortcuts(shortcuts))
 
@@ -163,8 +164,8 @@ describe('useKeyboardShortcuts', () => {
     const action1 = vi.fn()
     const action2 = vi.fn()
     const shortcuts: KeyboardShortcut[] = [
-      { key: 'a', description: 'Test 1', action: action1 },
-      { key: 'a', description: 'Test 2', action: action2 },
+      { action: action1, description: 'Test 1', key: 'a' },
+      { action: action2, description: 'Test 2', key: 'a' },
     ]
 
     renderHook(() => useKeyboardShortcuts(shortcuts))

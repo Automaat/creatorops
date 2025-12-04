@@ -34,15 +34,20 @@ export function NotificationToast() {
 
 function getIcon(type: string): string {
   switch (type) {
-    case 'success':
+    case 'success': {
       return '✓'
-    case 'error':
+    }
+    case 'error': {
       return '✕'
-    case 'warning':
+    }
+    case 'warning': {
       return '⚠'
-    case 'info':
+    }
+    case 'info': {
       return 'ℹ'
-    default:
+    }
+    default: {
       return ''
+    }
   }
 }

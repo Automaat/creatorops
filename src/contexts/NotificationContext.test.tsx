@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act, renderHook } from '@testing-library/react'
-import { NotificationProvider, NotificationContext } from './NotificationContext'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, renderHook } from '@testing-library/react'
+import { NotificationContext, NotificationProvider } from './NotificationContext'
 import { useContext } from 'react'
 
-describe('NotificationContext', () => {
+describe('notificationContext', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -19,7 +19,7 @@ describe('NotificationContext', () => {
     })
 
     expect(result.current).toBeDefined()
-    expect(result.current?.notifications).toEqual([])
+    expect(result.current?.notifications).toStrictEqual([])
     expect(typeof result.current?.addNotification).toBe('function')
     expect(typeof result.current?.removeNotification).toBe('function')
   })

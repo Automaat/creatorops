@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { CommandPalette } from './CommandPalette'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
 const mockInvoke = vi.mocked(invoke)
 
-describe('CommandPalette', () => {
+describe('commandPalette', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockInvoke.mockResolvedValue([])
@@ -26,7 +26,7 @@ describe('CommandPalette', () => {
   })
 
   it('renders when open', () => {
-    render(<CommandPalette isOpen={true} onClose={vi.fn()} onSelectProject={vi.fn()} />)
+    render(<CommandPalette isOpen onClose={vi.fn()} onSelectProject={vi.fn()} />)
 
     expect(screen.getByPlaceholderText(/Search/)).toBeTruthy()
   })
@@ -35,7 +35,7 @@ describe('CommandPalette', () => {
     const onClose = vi.fn()
     const user = userEvent.setup()
 
-    render(<CommandPalette isOpen={true} onClose={onClose} onSelectProject={vi.fn()} />)
+    render(<CommandPalette isOpen onClose={onClose} onSelectProject={vi.fn()} />)
 
     const overlay = document.querySelector('.command-palette-overlay')
     await user.click(overlay!)

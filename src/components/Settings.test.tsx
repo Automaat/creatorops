@@ -1,18 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Settings } from './Settings'
 import { NotificationProvider } from '../contexts/NotificationContext'
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
+vi.mock<typeof import('@tauri-apps/plugin-dialog')>('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 
-describe('Settings', () => {
+describe('settings', () => {
   it('renders without crashing', () => {
     render(
       <NotificationProvider>

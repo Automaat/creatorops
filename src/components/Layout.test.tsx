@@ -1,20 +1,18 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Layout } from './Layout'
 import { NotificationProvider } from '../contexts/NotificationContext'
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@tauri-apps/plugin-notification', () => ({
-  sendNotification: vi.fn(),
-  isPermissionGranted: vi.fn().mockResolvedValue(true),
-  requestPermission: vi.fn().mockResolvedValue('granted'),
+vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn().mockResolvedValue(true), requestPermission: vi.fn().mockResolvedValue('granted'), sendNotification: vi.fn(),
 }))
 
-describe('Layout', () => {
+describe('layout', () => {
   it('renders without crashing', () => {
     render(
       <NotificationProvider>
@@ -45,9 +43,9 @@ describe('Layout', () => {
     expect(screen.getByText('Backup Queue')).toBeTruthy()
     expect(screen.getByText('Delivery')).toBeTruthy()
     // "History" appears twice: as section title and nav item
-    expect(screen.getAllByText('History').length).toBe(2)
+    expect(screen.getAllByText('History')).toHaveLength(2)
     // "Settings" appears twice: as section title and nav item
-    expect(screen.getAllByText('Settings').length).toBe(2)
+    expect(screen.getAllByText('Settings')).toHaveLength(2)
   })
 
   it('renders children content', () => {

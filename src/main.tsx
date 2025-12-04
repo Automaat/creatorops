@@ -14,8 +14,11 @@ const rootElement = document.querySelector('#root')
 if (!rootElement) {
   throw new Error('Root element not found')
 }
+if (!(rootElement instanceof HTMLElement)) {
+  throw new Error('Root element is not an HTMLElement')
+}
 
-ReactDOM.createRoot(rootElement as HTMLElement).render(
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <NotificationProvider>
       <App />

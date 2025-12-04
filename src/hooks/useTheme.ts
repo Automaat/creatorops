@@ -2,10 +2,14 @@ import { useEffect, useState } from 'react'
 
 type Theme = 'system' | 'light' | 'dark'
 
+function isValidTheme(value: string | null): value is Theme {
+  return value === 'system' || value === 'light' || value === 'dark'
+}
+
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme')
-    return (stored as Theme) || 'system'
+    return isValidTheme(stored) ? stored : 'system'
   })
 
   useEffect(() => {
@@ -22,5 +26,5 @@ export function useTheme() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
-  return { theme, setTheme }
+  return { setTheme, theme }
 }

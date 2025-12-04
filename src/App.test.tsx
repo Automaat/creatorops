@@ -1,24 +1,22 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import App from './App'
 import { NotificationProvider } from './contexts/NotificationContext'
 
 // Mock Tauri APIs
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@tauri-apps/api/event', () => ({
+vi.mock<typeof import('@tauri-apps/api/event')>('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))
 
-vi.mock('@tauri-apps/plugin-notification', () => ({
-  sendNotification: vi.fn(),
-  isPermissionGranted: vi.fn().mockResolvedValue(true),
-  requestPermission: vi.fn().mockResolvedValue('granted'),
+vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn().mockResolvedValue(true), requestPermission: vi.fn().mockResolvedValue('granted'), sendNotification: vi.fn(),
 }))
 
-describe('App', () => {
+describe('app', () => {
   it('renders without crashing', () => {
     const { container } = render(
       <NotificationProvider>

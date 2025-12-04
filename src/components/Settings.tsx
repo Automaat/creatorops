@@ -34,10 +34,13 @@ export function Settings() {
     try {
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
-        setDestinations(JSON.parse(stored))
+        const parsed: unknown = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          setDestinations(parsed as BackupDestination[])
+        }
       }
-    } catch (err) {
-      console.error('Failed to load destinations:', err)
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
     }
   }
 
@@ -60,18 +63,14 @@ export function Settings() {
 
       if (selected) {
         const newDest: BackupDestination = {
-          id: crypto.randomUUID(),
-          name: newDestName.trim(),
-          path: selected,
-          enabled: true,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(), enabled: true, id: crypto.randomUUID(), name: newDestName.trim(), path: selected,
         }
 
         saveDestinations([...destinations, newDest])
         setNewDestName('')
       }
-    } catch (err) {
-      console.error('Failed to add destination:', err)
+    } catch (error) {
+      console.error('Failed to add destination:', error)
     }
   }
 
@@ -88,10 +87,13 @@ export function Settings() {
     try {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
-        setDeliveryDestinations(JSON.parse(stored))
+        const parsed: unknown = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          setDeliveryDestinations(parsed as DeliveryDestination[])
+        }
       }
-    } catch (err) {
-      console.error('Failed to load delivery destinations:', err)
+    } catch (error) {
+      console.error('Failed to load delivery destinations:', error)
     }
   }
 
@@ -101,8 +103,8 @@ export function Settings() {
       if (stored) {
         setDefaultImportLocation(stored)
       }
-    } catch (err) {
-      console.error('Failed to load default import location:', err)
+    } catch (error) {
+      console.error('Failed to load default import location:', error)
     }
   }
 
@@ -112,8 +114,8 @@ export function Settings() {
       if (stored) {
         setArchiveLocation(stored)
       }
-    } catch (err) {
-      console.error('Failed to load archive location:', err)
+    } catch (error) {
+      console.error('Failed to load archive location:', error)
     }
   }
 
@@ -135,18 +137,14 @@ export function Settings() {
 
       if (selected) {
         const newDest: DeliveryDestination = {
-          id: crypto.randomUUID(),
-          name: newDeliveryDestName.trim(),
-          path: selected,
-          enabled: true,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(), enabled: true, id: crypto.randomUUID(), name: newDeliveryDestName.trim(), path: selected,
         }
 
         saveDeliveryDestinations([...deliveryDestinations, newDest])
         setNewDeliveryDestName('')
       }
-    } catch (err) {
-      console.error('Failed to add delivery destination:', err)
+    } catch (error) {
+      console.error('Failed to add delivery destination:', error)
     }
   }
 
@@ -172,8 +170,8 @@ export function Settings() {
         localStorage.setItem(storageKey, selected)
         setter(selected)
       }
-    } catch (err) {
-      console.error(`Failed to select ${storageKey}:`, err)
+    } catch (error) {
+      console.error(`Failed to select ${storageKey}:`, error)
     }
   }
 
@@ -189,10 +187,10 @@ export function Settings() {
     try {
       const storedFolderTemplate = localStorage.getItem('folder_template')
       const storedFileTemplate = localStorage.getItem('file_rename_template')
-      if (storedFolderTemplate) setFolderTemplate(storedFolderTemplate)
-      if (storedFileTemplate) setFileRenameTemplate(storedFileTemplate)
-    } catch (err) {
-      console.error('Failed to load templates:', err)
+      if (storedFolderTemplate) {setFolderTemplate(storedFolderTemplate)}
+      if (storedFileTemplate) {setFileRenameTemplate(storedFileTemplate)}
+    } catch (error) {
+      console.error('Failed to load templates:', error)
       showError('Failed to load template settings')
     }
   }
@@ -200,9 +198,9 @@ export function Settings() {
   function loadAutoEject() {
     try {
       const stored = localStorage.getItem('auto_eject')
-      if (stored) setAutoEject(stored === 'true')
-    } catch (err) {
-      console.error('Failed to load auto-eject setting:', err)
+      if (stored) {setAutoEject(stored === 'true')}
+    } catch (error) {
+      console.error('Failed to load auto-eject setting:', error)
       showError('Failed to load auto-eject setting')
     }
   }
@@ -311,9 +309,9 @@ export function Settings() {
                     value={newDestName}
                     onChange={(e) => setNewDestName(e.target.value)}
                     className="input"
-                    onKeyDown={(e) => e.key === 'Enter' && addDestination()}
+                    onKeyDown={(e) => { if (e.key === 'Enter') {void addDestination();} }}
                   />
-                  <button onClick={addDestination} className="btn btn-primary">
+                  <button onClick={() => void addDestination()} className="btn btn-primary">
                     Add Destination
                   </button>
                 </div>
@@ -362,9 +360,9 @@ export function Settings() {
                     value={newDeliveryDestName}
                     onChange={(e) => setNewDeliveryDestName(e.target.value)}
                     className="input"
-                    onKeyDown={(e) => e.key === 'Enter' && addDeliveryDestination()}
+                    onKeyDown={(e) => { if (e.key === 'Enter') {void addDeliveryDestination();} }}
                   />
-                  <button onClick={addDeliveryDestination} className="btn btn-primary">
+                  <button onClick={() => void addDeliveryDestination()} className="btn btn-primary">
                     Add Destination
                   </button>
                 </div>
@@ -383,7 +381,7 @@ export function Settings() {
                       {defaultImportLocation || '~/CreatorOps/Projects'}
                     </p>
                     <button
-                      onClick={selectDefaultImportLocation}
+                      onClick={() => void selectDefaultImportLocation()}
                       className="btn btn-primary"
                       style={{ marginLeft: 'auto' }}
                     >
@@ -399,7 +397,7 @@ export function Settings() {
                       {archiveLocation || 'Not configured'}
                     </p>
                     <button
-                      onClick={selectArchiveLocation}
+                      onClick={() => void selectArchiveLocation()}
                       className="btn btn-primary"
                       style={{ marginLeft: 'auto' }}
                     >
