@@ -6,37 +6,99 @@ import { NotificationProvider } from '../contexts/NotificationContext'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
 // Mock formatting utils
-vi.mock<typeof import('../utils/formatting')>('../utils/formatting', () => ({
+vi.mock('../utils/formatting', () => ({
   formatBytes: (bytes: number) => `${bytes} bytes`,
   formatDate: (date: string) => date,
 }))
 
 const mockImportHistory = [
   {
-    completedAt: '2024-01-01T10:05:00Z', destinationPath: '/dest/path1', filesCopied: 10, filesSkipped: 2, id: '1', projectId: 'project-1', projectName: 'Test Project 1', sourcePath: '/source/path1', startedAt: '2024-01-01T10:00:00Z', status: 'success' as const, totalBytes: 1024,
+    completedAt: '2024-01-01T10:05:00Z',
+    destinationPath: '/dest/path1',
+    filesCopied: 10,
+    filesSkipped: 2,
+    id: '1',
+    projectId: 'project-1',
+    projectName: 'Test Project 1',
+    sourcePath: '/source/path1',
+    startedAt: '2024-01-01T10:00:00Z',
+    status: 'success' as const,
+    totalBytes: 1024,
   },
   {
-    completedAt: '2024-01-02T10:10:00Z', destinationPath: '/dest/path2', filesCopied: 5, filesSkipped: 0, id: '2', projectId: 'project-2', projectName: 'Test Project 2', sourcePath: '/source/path2', startedAt: '2024-01-02T10:00:00Z', status: 'partial' as const, totalBytes: 2048,
+    completedAt: '2024-01-02T10:10:00Z',
+    destinationPath: '/dest/path2',
+    filesCopied: 5,
+    filesSkipped: 0,
+    id: '2',
+    projectId: 'project-2',
+    projectName: 'Test Project 2',
+    sourcePath: '/source/path2',
+    startedAt: '2024-01-02T10:00:00Z',
+    status: 'partial' as const,
+    totalBytes: 2048,
   },
   {
-    completedAt: '2024-01-03T10:15:00Z', destinationPath: '/dest/path3', errorMessage: 'Import failed due to permission error', filesCopied: 0, filesSkipped: 5, id: '3', projectId: 'project-3', projectName: 'Test Project 3', sourcePath: '/source/path3', startedAt: '2024-01-03T10:00:00Z', status: 'failed' as const, totalBytes: 0,
+    completedAt: '2024-01-03T10:15:00Z',
+    destinationPath: '/dest/path3',
+    errorMessage: 'Import failed due to permission error',
+    filesCopied: 0,
+    filesSkipped: 5,
+    id: '3',
+    projectId: 'project-3',
+    projectName: 'Test Project 3',
+    sourcePath: '/source/path3',
+    startedAt: '2024-01-03T10:00:00Z',
+    status: 'failed' as const,
+    totalBytes: 0,
   },
 ]
 
 const mockBackupHistory = [
   {
-    completedAt: '2024-01-01T11:30:00Z', destinationName: 'External Drive', destinationPath: '/backup/drive1', filesCopied: 20, filesSkipped: 1, id: '1', projectId: 'project-1', projectName: 'Backup Project 1', startedAt: '2024-01-01T11:00:00Z', status: 'completed' as const, totalBytes: 4096,
+    completedAt: '2024-01-01T11:30:00Z',
+    destinationName: 'External Drive',
+    destinationPath: '/backup/drive1',
+    filesCopied: 20,
+    filesSkipped: 1,
+    id: '1',
+    projectId: 'project-1',
+    projectName: 'Backup Project 1',
+    startedAt: '2024-01-01T11:00:00Z',
+    status: 'completed' as const,
+    totalBytes: 4096,
   },
   {
-    completedAt: '2024-01-02T11:45:00Z', destinationName: 'Cloud Storage', destinationPath: '/backup/cloud', errorMessage: 'Network connection lost', filesCopied: 15, filesSkipped: 0, id: '2', projectId: 'project-2', projectName: 'Backup Project 2', startedAt: '2024-01-02T11:00:00Z', status: 'failed' as const, totalBytes: 8192,
+    completedAt: '2024-01-02T11:45:00Z',
+    destinationName: 'Cloud Storage',
+    destinationPath: '/backup/cloud',
+    errorMessage: 'Network connection lost',
+    filesCopied: 15,
+    filesSkipped: 0,
+    id: '2',
+    projectId: 'project-2',
+    projectName: 'Backup Project 2',
+    startedAt: '2024-01-02T11:00:00Z',
+    status: 'failed' as const,
+    totalBytes: 8192,
   },
   {
-    completedAt: '2024-01-03T11:20:00Z', destinationName: 'NAS', destinationPath: '/backup/nas', filesCopied: 8, filesSkipped: 2, id: '3', projectId: 'project-3', projectName: 'Backup Project 3', startedAt: '2024-01-03T11:00:00Z', status: 'cancelled' as const, totalBytes: 3072,
+    completedAt: '2024-01-03T11:20:00Z',
+    destinationName: 'NAS',
+    destinationPath: '/backup/nas',
+    filesCopied: 8,
+    filesSkipped: 2,
+    id: '3',
+    projectId: 'project-3',
+    projectName: 'Backup Project 3',
+    startedAt: '2024-01-03T11:00:00Z',
+    status: 'cancelled' as const,
+    totalBytes: 3072,
   },
 ]
 

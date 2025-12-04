@@ -4,16 +4,18 @@ import App from './App'
 import { NotificationProvider } from './contexts/NotificationContext'
 
 // Mock Tauri APIs
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock<typeof import('@tauri-apps/api/event')>('@tauri-apps/api/event', () => ({
+vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
-  isPermissionGranted: vi.fn().mockResolvedValue(true), requestPermission: vi.fn().mockResolvedValue('granted'), sendNotification: vi.fn(),
+vi.mock('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn().mockResolvedValue(true),
+  requestPermission: vi.fn().mockResolvedValue('granted'),
+  sendNotification: vi.fn(),
 }))
 
 describe('app', () => {

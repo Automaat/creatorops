@@ -11,13 +11,21 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 vi.mock('@tauri-apps/plugin-notification', () => ({
-  isPermissionGranted: vi.fn(), requestPermission: vi.fn(), sendNotification: vi.fn(),
+  isPermissionGranted: vi.fn(),
+  requestPermission: vi.fn(),
+  sendNotification: vi.fn(),
 }))
 
 const mockInvoke = vi.mocked(invoke)
 
 const createMockCard = (id: number, size: number = 1000): SDCard => ({
-  deviceType: 'SD', fileCount: id * 10, freeSpace: size / 2, isRemovable: true, name: `Card ${id}`, path: `/path/${id}`, size,
+  deviceType: 'SD',
+  fileCount: id * 10,
+  freeSpace: size / 2,
+  isRemovable: true,
+  name: `Card ${id}`,
+  path: `/path/${id}`,
+  size,
 })
 
 describe('useSDCardScanner', () => {

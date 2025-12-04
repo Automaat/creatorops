@@ -147,7 +147,9 @@ function SDCardItem({
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setDropdownPosition({
-        left: rect.left, top: rect.bottom + 8, width: rect.width,
+        left: rect.left,
+        top: rect.bottom + 8,
+        width: rect.width,
       })
     }
   }
@@ -218,10 +220,14 @@ function SDCardItem({
   }
 
   const handleStartImport = async () => {
-    if (!selectedProject) {return}
+    if (!selectedProject) {
+      return
+    }
 
     const project = projects.find((p) => p.id === selectedProject)
-    if (!project) {return}
+    if (!project) {
+      return
+    }
 
     // Generate unique import ID
     const currentImportId = `import-${Date.now()}-${Math.random().toString(36).slice(7)}`
@@ -236,7 +242,8 @@ function SDCardItem({
     // Note: If this fails, we still proceed with import - status update is non-critical
     try {
       await invoke('update_project_status', {
-        newStatus: ProjectStatus.Importing, projectId: project.id,
+        newStatus: ProjectStatus.Importing,
+        projectId: project.id,
       })
     } catch (error) {
       console.error('Failed to update project status:', error)
@@ -251,7 +258,14 @@ function SDCardItem({
 
       if (sourcePaths.length === 0) {
         const result = {
-          error: 'No photo or video files found on SD card', filesCopied: 0, filesSkipped: 0, photosCopied: 0, skippedFiles: [], success: false, totalBytes: 0, videosCopied: 0,
+          error: 'No photo or video files found on SD card',
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
+          skippedFiles: [],
+          success: false,
+          totalBytes: 0,
+          videosCopied: 0,
         }
         setImportResult(result)
         setIsImporting(false)
@@ -259,7 +273,17 @@ function SDCardItem({
 
         // Save to history
         await invoke('save_import_history', {
-          destinationPath: `${project.folderPath}/RAW`, errorMessage: result.error, filesCopied: 0, filesSkipped: 0, photosCopied: 0, projectId: project.id, projectName: project.name, sourcePath: card.path, startedAt, totalBytes: 0, videosCopied: 0,
+          destinationPath: `${project.folderPath}/RAW`,
+          errorMessage: result.error,
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
+          projectId: project.id,
+          projectName: project.name,
+          sourcePath: card.path,
+          startedAt,
+          totalBytes: 0,
+          videosCopied: 0,
         })
 
         return
@@ -268,7 +292,9 @@ function SDCardItem({
       const destination = `${project.folderPath}/RAW`
 
       const result = await invoke<CopyResult>('copy_files', {
-        destination, importId: currentImportId, sourcePaths,
+        destination,
+        importId: currentImportId,
+        sourcePaths,
       })
 
       setImportResult(result)
@@ -279,7 +305,17 @@ function SDCardItem({
       // Save to history (unless cancelled)
       if (!wasCancelled) {
         await invoke('save_import_history', {
-          destinationPath: destination, errorMessage: result.error || undefined, filesCopied: result.filesCopied, filesSkipped: result.filesSkipped, photosCopied: result.photosCopied, projectId: project.id, projectName: project.name, sourcePath: card.path, startedAt, totalBytes: result.totalBytes, videosCopied: result.videosCopied,
+          destinationPath: destination,
+          errorMessage: result.error || undefined,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          photosCopied: result.photosCopied,
+          projectId: project.id,
+          projectName: project.name,
+          sourcePath: card.path,
+          startedAt,
+          totalBytes: result.totalBytes,
+          videosCopied: result.videosCopied,
         })
       }
 
@@ -299,13 +335,30 @@ function SDCardItem({
     } catch (error) {
       console.error('Import failed:', error)
       setImportResult({
-        error: String(error), filesCopied: 0, filesSkipped: 0, photosCopied: 0, skippedFiles: [], success: false, totalBytes: 0, videosCopied: 0,
+        error: String(error),
+        filesCopied: 0,
+        filesSkipped: 0,
+        photosCopied: 0,
+        skippedFiles: [],
+        success: false,
+        totalBytes: 0,
+        videosCopied: 0,
       })
 
       // Save failed import to history
       try {
         await invoke('save_import_history', {
-          destinationPath: `${project.folderPath}/RAW`, errorMessage: String(error), filesCopied: 0, filesSkipped: 0, photosCopied: 0, projectId: project.id, projectName: project.name, sourcePath: card.path, startedAt, totalBytes: 0, videosCopied: 0,
+          destinationPath: `${project.folderPath}/RAW`,
+          errorMessage: String(error),
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
+          projectId: project.id,
+          projectName: project.name,
+          sourcePath: card.path,
+          startedAt,
+          totalBytes: 0,
+          videosCopied: 0,
         })
       } catch (error) {
         console.error('Failed to save import history:', error)
@@ -317,7 +370,9 @@ function SDCardItem({
   }
 
   const handleCancelImport = async () => {
-    if (!importId) {return}
+    if (!importId) {
+      return
+    }
 
     try {
       await invoke('cancel_import', { importId })
@@ -391,7 +446,9 @@ function SDCardItem({
                     ref={dropdownRef}
                     className="project-dropdown-list project-dropdown-list-fixed"
                     style={{
-                      left: `${dropdownPosition.left}px`, top: `${dropdownPosition.top}px`, width: `${dropdownPosition.width}px`,
+                      left: `${dropdownPosition.left}px`,
+                      top: `${dropdownPosition.top}px`,
+                      width: `${dropdownPosition.width}px`,
                     }}
                   >
                     {projects.length > 0 ? (
@@ -534,13 +591,13 @@ function SDCardItem({
             <div>
               <h3>{card.name}</h3>
               <p
-                className={`text-sm ${wasCancelled ? 'text-warning' : (importResult.success ? 'text-success' : 'text-error')}`}
+                className={`text-sm ${wasCancelled ? 'text-warning' : importResult.success ? 'text-success' : 'text-error'}`}
               >
                 {wasCancelled
                   ? `Import cancelled (${importResult.filesCopied} files copied)`
-                  : (importResult.success
+                  : importResult.success
                     ? 'Import completed'
-                    : 'Import failed')}
+                    : 'Import failed'}
               </p>
             </div>
 
@@ -578,5 +635,5 @@ function SDCardItem({
   }
 
   // This should never be reached, but just in case return null
-  return 
+  return
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useKeyboardShortcuts } from './useKeyboardShortcuts';
-import type { KeyboardShortcut } from './useKeyboardShortcuts';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import type { KeyboardShortcut } from './useKeyboardShortcuts'
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {

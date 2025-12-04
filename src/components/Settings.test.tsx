@@ -4,11 +4,11 @@ import { Settings } from './Settings'
 import { NotificationProvider } from '../contexts/NotificationContext'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-dialog')>('@tauri-apps/plugin-dialog', () => ({
+vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 

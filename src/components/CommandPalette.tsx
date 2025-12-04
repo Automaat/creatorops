@@ -61,7 +61,9 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   )
 
   useEffect(() => {
-    if (!isOpen) {return}
+    if (!isOpen) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -105,7 +107,9 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
     }
   }
 
-  if (!isOpen) {return }
+  if (!isOpen) {
+    return
+  }
 
   return (
     <div className="command-palette-overlay" onClick={onClose}>

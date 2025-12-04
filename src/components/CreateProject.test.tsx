@@ -7,7 +7,7 @@ import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
@@ -76,7 +76,15 @@ describe('createProject', () => {
 
   it('calls onProjectCreated with created project on submit', async () => {
     const mockProject: Project = {
-      clientName: 'Test Client', createdAt: '2025-11-20', date: '2025-11-20', folderPath: '/test/path', id: '123', name: 'Test Project', shootType: '', status: ProjectStatus.Editing, updatedAt: '2025-11-20',
+      clientName: 'Test Client',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
+      id: '123',
+      name: 'Test Project',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      updatedAt: '2025-11-20',
     }
 
     mockInvoke.mockResolvedValue(mockProject)
@@ -137,7 +145,15 @@ describe('createProject', () => {
     })
 
     resolveInvoke!({
-      clientName: 'Test', createdAt: '2025-11-20', date: '2025-11-20', folderPath: '/test/path', id: '1', name: 'Test', shootType: '', status: ProjectStatus.Editing, updatedAt: '2025-11-20',
+      clientName: 'Test',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
+      id: '1',
+      name: 'Test',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      updatedAt: '2025-11-20',
     })
   })
 
@@ -187,7 +203,15 @@ describe('createProject', () => {
   it('clears error on new submit attempt', async () => {
     mockInvoke.mockRejectedValueOnce(new Error('First error'))
     mockInvoke.mockResolvedValueOnce({
-      clientName: 'Test', createdAt: '2025-11-20', date: '2025-11-20', folderPath: '/test/path', id: '1', name: 'Test', shootType: '', status: ProjectStatus.Editing, updatedAt: '2025-11-20',
+      clientName: 'Test',
+      createdAt: '2025-11-20',
+      date: '2025-11-20',
+      folderPath: '/test/path',
+      id: '1',
+      name: 'Test',
+      shootType: '',
+      status: ProjectStatus.Editing,
+      updatedAt: '2025-11-20',
     })
 
     const user = userEvent.setup()

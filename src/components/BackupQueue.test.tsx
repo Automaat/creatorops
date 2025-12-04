@@ -9,12 +9,12 @@ const mockInvoke = vi.fn()
 const mockListen = vi.fn()
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]): ReturnType<typeof mockInvoke> => mockInvoke(...args),
 }))
 
 // Mock Tauri events
-vi.mock<typeof import('@tauri-apps/api/event')>('@tauri-apps/api/event', () => ({
+vi.mock('@tauri-apps/api/event', () => ({
   listen: (...args: unknown[]): ReturnType<typeof mockListen> => mockListen(...args),
 }))
 
@@ -90,7 +90,9 @@ describe('backupQueue', () => {
 
     it('displays job metadata for pending jobs', async () => {
       const pendingJob = createMockJob({
-        status: 'pending', totalBytes: 2_000_000, totalFiles: 150,
+        status: 'pending',
+        totalBytes: 2_000_000,
+        totalFiles: 150,
       })
       mockInvoke.mockResolvedValue([pendingJob])
       renderComponent()
@@ -148,7 +150,9 @@ describe('backupQueue', () => {
 
     it('displays progress bar for active jobs without progress data', async () => {
       const activeJob = createMockJob({
-        bytesTransferred: 500_000, status: 'inprogress', totalBytes: 1_000_000,
+        bytesTransferred: 500_000,
+        status: 'inprogress',
+        totalBytes: 1_000_000,
       })
       mockInvoke.mockResolvedValue([activeJob])
       renderComponent()
@@ -160,11 +164,13 @@ describe('backupQueue', () => {
 
     it('displays progress information when progress data available', async () => {
       const activeJob = createMockJob({
-        bytesTransferred: 500_000, status: 'inprogress', totalBytes: 1_000_000,
+        bytesTransferred: 500_000,
+        status: 'inprogress',
+        totalBytes: 1_000_000,
       })
       mockInvoke.mockResolvedValue([activeJob])
 
-      let progressCallback: ((event: { payload: BackupProgress }) => void) | null
+      let progressCallback: ((event: { payload: BackupProgress }) => void) | null = null
       mockListen.mockImplementation((event: string, callback: (e: unknown) => void) => {
         if (event === 'backup-progress') {
           progressCallback = callback as (event: { payload: BackupProgress }) => void
@@ -196,11 +202,13 @@ describe('backupQueue', () => {
 
     it('calculates progress percentage correctly', async () => {
       const activeJob = createMockJob({
-        bytesTransferred: 500, status: 'inprogress', totalBytes: 1000,
+        bytesTransferred: 500,
+        status: 'inprogress',
+        totalBytes: 1000,
       })
       mockInvoke.mockResolvedValue([activeJob])
 
-      let progressCallback: ((event: { payload: BackupProgress }) => void) | null
+      let progressCallback: ((event: { payload: BackupProgress }) => void) | null = null
       mockListen.mockImplementation((event: string, callback: (e: unknown) => void) => {
         if (event === 'backup-progress') {
           progressCallback = callback as (event: { payload: BackupProgress }) => void
@@ -234,7 +242,9 @@ describe('backupQueue', () => {
   describe('completed jobs', () => {
     it('displays completed jobs section', async () => {
       const completedJob = createMockJob({
-        bytesTransferred: 1_000_000, filesCopied: 100, status: 'completed',
+        bytesTransferred: 1_000_000,
+        filesCopied: 100,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -258,7 +268,8 @@ describe('backupQueue', () => {
 
     it('displays failed status', async () => {
       const failedJob = createMockJob({
-        errorMessage: 'Disk full', status: 'failed',
+        errorMessage: 'Disk full',
+        status: 'failed',
       })
       mockInvoke.mockResolvedValue([failedJob])
       renderComponent()
@@ -281,7 +292,9 @@ describe('backupQueue', () => {
 
     it('displays skipped files warning', async () => {
       const completedJob = createMockJob({
-        filesCopied: 90, filesSkipped: 10, status: 'completed',
+        filesCopied: 90,
+        filesSkipped: 10,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -303,7 +316,9 @@ describe('backupQueue', () => {
 
     it('does not show skipped files when zero', async () => {
       const completedJob = createMockJob({
-        filesCopied: 100, filesSkipped: 0, status: 'completed',
+        filesCopied: 100,
+        filesSkipped: 0,
+        status: 'completed',
       })
       mockInvoke.mockResolvedValue([completedJob])
       renderComponent()
@@ -463,7 +478,7 @@ describe('backupQueue', () => {
       const pendingJob = createMockJob({ id: 'job-1', status: 'pending' })
       mockInvoke.mockResolvedValue([pendingJob])
 
-      let jobUpdateCallback: ((event: { payload: BackupJob }) => void) | null
+      let jobUpdateCallback: ((event: { payload: BackupJob }) => void) | null = null
       mockListen.mockImplementation((event: string, callback: (e: unknown) => void) => {
         if (event === 'backup-job-updated') {
           jobUpdateCallback = callback as (event: { payload: BackupJob }) => void
@@ -494,8 +509,12 @@ describe('backupQueue', () => {
       const mockUnlisten2 = vi.fn()
 
       mockListen.mockImplementation((event: string) => {
-        if (event === 'backup-progress') {return Promise.resolve(mockUnlisten1)}
-        if (event === 'backup-job-updated') {return Promise.resolve(mockUnlisten2)}
+        if (event === 'backup-progress') {
+          return Promise.resolve(mockUnlisten1)
+        }
+        if (event === 'backup-job-updated') {
+          return Promise.resolve(mockUnlisten2)
+        }
         return Promise.resolve(() => {})
       })
 

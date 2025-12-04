@@ -8,21 +8,22 @@ import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-dialog')>('@tauri-apps/plugin-dialog', () => ({
+vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-opener')>('@tauri-apps/plugin-opener', () => ({
+vi.mock('@tauri-apps/plugin-opener', () => ({
   open: vi.fn(),
 }))
 
-vi.mock<typeof import('../hooks/useSDCardScanner')>('../hooks/useSDCardScanner', () => ({
+vi.mock('../hooks/useSDCardScanner', () => ({
   useSDCardScanner: () => ({
-    isScanning: false, sdCards: [],
+    isScanning: false,
+    sdCards: [],
   }),
 }))
 
@@ -125,7 +126,10 @@ describe('projects', () => {
 
     it('displays project metadata in cards', async () => {
       const project = createMockProject({
-        clientName: 'John Doe', date: '2024-01-15', name: 'Wedding Shoot', shootType: 'Wedding',
+        clientName: 'John Doe',
+        date: '2024-01-15',
+        name: 'Wedding Shoot',
+        shootType: 'Wedding',
       })
 
       mockInvoke.mockResolvedValue([project])
@@ -243,9 +247,15 @@ describe('projects', () => {
     it('shows project detail when card is clicked', async () => {
       const project = createMockProject({ name: 'Test Project' })
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -275,9 +285,15 @@ describe('projects', () => {
     it('returns to list view when back button clicked', async () => {
       const project = createMockProject({ name: 'Test Project' })
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -311,9 +327,15 @@ describe('projects', () => {
     it('loads project from initialSelectedProjectId prop', async () => {
       const project = createMockProject({ id: 'proj-123', name: 'Initial Project' })
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -335,9 +357,15 @@ describe('projects', () => {
       const onBackFromProject = vi.fn()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -362,13 +390,23 @@ describe('projects', () => {
   describe('project Detail View', () => {
     it('displays project metadata in detail view', async () => {
       const project = createMockProject({
-        clientName: 'John Doe', date: '2024-01-15', name: 'Wedding Shoot', shootType: 'Wedding', status: ProjectStatus.Editing,
+        clientName: 'John Doe',
+        date: '2024-01-15',
+        name: 'Wedding Shoot',
+        shootType: 'Wedding',
+        status: ProjectStatus.Editing,
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -391,9 +429,15 @@ describe('projects', () => {
       const project = createMockProject({ folderPath: '/Users/test/projects/test-project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -412,9 +456,15 @@ describe('projects', () => {
       const project = createMockProject({ folderPath: '/path/to/project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -439,9 +489,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -462,9 +518,15 @@ describe('projects', () => {
       const project = createMockProject({ status: ProjectStatus.Editing })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -483,9 +545,15 @@ describe('projects', () => {
       const project = createMockProject({ status: ProjectStatus.Archived })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -509,9 +577,15 @@ describe('projects', () => {
       localStorage.setItem('archive_location', '/path/to/archives')
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -541,9 +615,15 @@ describe('projects', () => {
       localStorage.setItem('archive_location', '/path/to/archives')
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -578,9 +658,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -600,9 +686,15 @@ describe('projects', () => {
       const project = createMockProject({ name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -633,9 +725,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -675,11 +773,21 @@ describe('projects', () => {
       const project = createMockProject({ id: 'proj-123', name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
-        if (cmd === 'delete_project') {return Promise.resolve()}
-        if (cmd === 'list_projects') {return Promise.resolve([])}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
+        if (cmd === 'delete_project') {
+          return Promise.resolve()
+        }
+        if (cmd === 'list_projects') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -721,9 +829,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -745,10 +859,18 @@ describe('projects', () => {
       const project = createMockProject({ folderPath: '/path/to/project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
-        if (cmd === 'open_in_lightroom') {return Promise.resolve()}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
+        if (cmd === 'open_in_lightroom') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -774,11 +896,21 @@ describe('projects', () => {
       const updatedProject = { ...project, status: ProjectStatus.Editing }
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
-        if (cmd === 'open_in_lightroom') {return Promise.resolve()}
-        if (cmd === 'update_project_status') {return Promise.resolve(updatedProject)}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
+        if (cmd === 'open_in_lightroom') {
+          return Promise.resolve()
+        }
+        if (cmd === 'update_project_status') {
+          return Promise.resolve(updatedProject)
+        }
         return Promise.resolve([])
       })
 
@@ -798,7 +930,8 @@ describe('projects', () => {
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith('update_project_status', {
-          newStatus: ProjectStatus.Editing, projectId: '1',
+          newStatus: ProjectStatus.Editing,
+          projectId: '1',
         })
       })
     })
@@ -815,9 +948,15 @@ describe('projects', () => {
       localStorage.setItem('backup_destinations', JSON.stringify(destinations))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -837,9 +976,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -861,10 +1006,18 @@ describe('projects', () => {
       localStorage.setItem('backup_destinations', JSON.stringify([destination]))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
-        if (cmd === 'queue_backup') {return Promise.resolve()}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
+        if (cmd === 'queue_backup') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -883,7 +1036,12 @@ describe('projects', () => {
       await user.click(screen.getByText('External Drive'))
 
       expect(mockInvoke).toHaveBeenCalledWith('queue_backup', {
-        destinationId: 'dest-1', destinationName: 'External Drive', destinationPath: '/Volumes/Backup', projectId: 'proj-1', projectName: 'Test Project', sourcePath: '/path/to/project',
+        destinationId: 'dest-1',
+        destinationName: 'External Drive',
+        destinationPath: '/Volumes/Backup',
+        projectId: 'proj-1',
+        projectName: 'Test Project',
+        sourcePath: '/path/to/project',
       })
     })
 
@@ -892,16 +1050,24 @@ describe('projects', () => {
       const destinations = [
         createMockBackupDestination({ enabled: true, name: 'Enabled Drive' }),
         createMockBackupDestination({
-          enabled: false, id: 'dest-2', name: 'Disabled Drive',
+          enabled: false,
+          id: 'dest-2',
+          name: 'Disabled Drive',
         }),
       ]
 
       localStorage.setItem('backup_destinations', JSON.stringify(destinations))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -923,9 +1089,15 @@ describe('projects', () => {
       const project = createMockProject({ deadline: '2024-12-25' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -944,9 +1116,15 @@ describe('projects', () => {
       const project = createMockProject({ deadline: undefined })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -965,9 +1143,15 @@ describe('projects', () => {
       const project = createMockProject({ deadline: '2020-01-01' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -991,14 +1175,33 @@ describe('projects', () => {
       const project = createMockProject()
       const history: ImportHistory[] = [
         {
-          completedAt: '2024-01-15T10:30:00Z', destinationPath: '/path/to/project/RAW', errorMessage: undefined, filesCopied: 100, filesSkipped: 5, id: 'import-1', photosCopied: 80, projectId: '1', projectName: 'Test Project', sourcePath: '/Volumes/SD1', startedAt: '2024-01-15T10:00:00Z', status: 'success', totalBytes: 1_073_741_824, videosCopied: 20,
+          completedAt: '2024-01-15T10:30:00Z',
+          destinationPath: '/path/to/project/RAW',
+          errorMessage: undefined,
+          filesCopied: 100,
+          filesSkipped: 5,
+          id: 'import-1',
+          photosCopied: 80,
+          projectId: '1',
+          projectName: 'Test Project',
+          sourcePath: '/Volumes/SD1',
+          startedAt: '2024-01-15T10:00:00Z',
+          status: 'success',
+          totalBytes: 1_073_741_824,
+          videosCopied: 20,
         },
       ]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve(history)}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve(history)
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 
@@ -1022,9 +1225,15 @@ describe('projects', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') {return Promise.resolve(project)}
-        if (cmd === 'get_project_import_history') {return Promise.resolve([])}
-        if (cmd === 'get_home_directory') {return Promise.resolve('/Users/test')}
+        if (cmd === 'get_project') {
+          return Promise.resolve(project)
+        }
+        if (cmd === 'get_project_import_history') {
+          return Promise.resolve([])
+        }
+        if (cmd === 'get_home_directory') {
+          return Promise.resolve('/Users/test')
+        }
         return Promise.resolve([])
       })
 

@@ -8,15 +8,15 @@ import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock<typeof import('@tauri-apps/api/event')>('@tauri-apps/api/event', () => ({
+vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-dialog')>('@tauri-apps/plugin-dialog', () => ({
+vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 
@@ -171,7 +171,11 @@ describe('delivery', () => {
 
     it('displays project metadata in dropdown', async () => {
       const project = createMockProject({
-        clientName: 'John Doe', date: '2024-01-15', name: 'Wedding Shoot', shootType: 'Photography', status: ProjectStatus.Editing,
+        clientName: 'John Doe',
+        date: '2024-01-15',
+        name: 'Wedding Shoot',
+        shootType: 'Photography',
+        status: ProjectStatus.Editing,
       })
 
       mockInvoke.mockResolvedValue([project])
@@ -202,8 +206,12 @@ describe('delivery', () => {
       const project = createMockProject({ name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve([])}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -238,8 +246,12 @@ describe('delivery', () => {
       const project = createMockProject({ name: 'Test Project' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve([])}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -301,8 +313,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -351,8 +367,12 @@ describe('delivery', () => {
       ]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -385,8 +405,12 @@ describe('delivery', () => {
       const project = createMockProject()
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve([])}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve([])
+        }
         return Promise.resolve([])
       })
 
@@ -418,8 +442,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile({ name: 'photo1.jpg' })]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -462,8 +490,12 @@ describe('delivery', () => {
       ]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -501,8 +533,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile({ name: 'photo1.jpg' })]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -548,8 +584,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -587,8 +627,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -638,8 +682,12 @@ describe('delivery', () => {
       localStorage.setItem('delivery_destinations', JSON.stringify([destination]))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -678,8 +726,12 @@ describe('delivery', () => {
       const files = [createMockProjectFile()]
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -718,15 +770,21 @@ describe('delivery', () => {
       const destinations = [
         createMockDeliveryDestination({ enabled: true, name: 'Enabled Dest' }),
         createMockDeliveryDestination({
-          enabled: false, id: 'dest-2', name: 'Disabled Dest',
+          enabled: false,
+          id: 'dest-2',
+          name: 'Disabled Dest',
         }),
       ]
 
       localStorage.setItem('delivery_destinations', JSON.stringify(destinations))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
         return Promise.resolve([])
       })
 
@@ -769,10 +827,18 @@ describe('delivery', () => {
       localStorage.setItem('delivery_destinations', JSON.stringify([destination]))
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'list_projects') {return Promise.resolve([project])}
-        if (cmd === 'list_project_files') {return Promise.resolve(files)}
-        if (cmd === 'create_delivery') {return Promise.resolve(job)}
-        if (cmd === 'start_delivery') {return Promise.resolve()}
+        if (cmd === 'list_projects') {
+          return Promise.resolve([project])
+        }
+        if (cmd === 'list_project_files') {
+          return Promise.resolve(files)
+        }
+        if (cmd === 'create_delivery') {
+          return Promise.resolve(job)
+        }
+        if (cmd === 'start_delivery') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -818,7 +884,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ projectName: 'Wedding Shoot' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -837,7 +905,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'inprogress' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -854,11 +924,16 @@ describe('delivery', () => {
 
     it('displays job progress', async () => {
       const job = createMockDeliveryJob({
-        bytesTransferred: 5_120_000, filesCopied: 5, totalBytes: 10_240_000, totalFiles: 10,
+        bytesTransferred: 5_120_000,
+        filesCopied: 5,
+        totalBytes: 10_240_000,
+        totalFiles: 10,
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -875,11 +950,15 @@ describe('delivery', () => {
 
     it('shows progress bar for in-progress jobs', async () => {
       const job = createMockDeliveryJob({
-        bytesTransferred: 5_120_000, status: 'inprogress', totalBytes: 10_240_000,
+        bytesTransferred: 5_120_000,
+        status: 'inprogress',
+        totalBytes: 10_240_000,
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -899,7 +978,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -918,7 +999,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'failed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -937,8 +1020,12 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ id: 'job-1', status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
-        if (cmd === 'remove_delivery_job') {return Promise.resolve()}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
+        if (cmd === 'remove_delivery_job') {
+          return Promise.resolve()
+        }
         return Promise.resolve([])
       })
 
@@ -963,11 +1050,14 @@ describe('delivery', () => {
 
     it('displays error message for failed jobs', async () => {
       const job = createMockDeliveryJob({
-        errorMessage: 'Disk full', status: 'failed',
+        errorMessage: 'Disk full',
+        status: 'failed',
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -988,7 +1078,9 @@ describe('delivery', () => {
       })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1010,7 +1102,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'pending' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1030,7 +1124,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'completed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 
@@ -1050,7 +1146,9 @@ describe('delivery', () => {
       const job = createMockDeliveryJob({ status: 'failed' })
 
       mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_delivery_queue') {return Promise.resolve([job])}
+        if (cmd === 'get_delivery_queue') {
+          return Promise.resolve([job])
+        }
         return Promise.resolve([])
       })
 

@@ -7,7 +7,9 @@ interface KeyboardShortcutsHelpProps {
 }
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
-  if (!isOpen) {return }
+  if (!isOpen) {
+    return
+  }
 
   return (
     <div className="shortcuts-overlay" onClick={onClose}>

@@ -5,7 +5,7 @@ import { CommandPalette } from './CommandPalette'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 

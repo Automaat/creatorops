@@ -55,8 +55,8 @@ export function History() {
           const history = await invoke<BackupHistory[]>('get_backup_history')
           setBackupHistory(history)
         }
-      } catch (error) {
-        console.error('Failed to load history:', error)
+      } catch (err) {
+        console.error('Failed to load history:', err)
         error('Failed to load history')
       } finally {
         setIsLoading(false)

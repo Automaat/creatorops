@@ -94,7 +94,9 @@ export function Delivery() {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect()
       setDropdownPosition({
-        left: rect.left, top: rect.bottom + 8, width: rect.width,
+        left: rect.left,
+        top: rect.bottom + 8,
+        width: rect.width,
       })
     }
   }
@@ -166,11 +168,17 @@ export function Delivery() {
   }
 
   async function createDelivery(destination: DeliveryDestination) {
-    if (!selectedProject || selectedFiles.size === 0) {return}
+    if (!selectedProject || selectedFiles.size === 0) {
+      return
+    }
 
     try {
       const job = await invoke<DeliveryJob>('create_delivery', {
-        deliveryPath: destination.path, namingTemplate: namingTemplate || undefined, projectId: selectedProject.id, projectName: selectedProject.name, selectedFiles: [...selectedFiles],
+        deliveryPath: destination.path,
+        namingTemplate: namingTemplate || undefined,
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        selectedFiles: [...selectedFiles],
       })
 
       setDeliveryJobs((prev) => [...prev, job])
@@ -281,7 +289,9 @@ export function Delivery() {
                 ref={dropdownRef}
                 className="project-dropdown-list project-dropdown-list-fixed"
                 style={{
-                  left: `${dropdownPosition.left}px`, top: `${dropdownPosition.top}px`, width: `${dropdownPosition.width}px`,
+                  left: `${dropdownPosition.left}px`,
+                  top: `${dropdownPosition.top}px`,
+                  width: `${dropdownPosition.width}px`,
                 }}
               >
                 {projects.length > 0 ? (

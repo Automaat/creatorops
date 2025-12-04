@@ -63,7 +63,11 @@ export function Settings() {
 
       if (selected) {
         const newDest: BackupDestination = {
-          createdAt: new Date().toISOString(), enabled: true, id: crypto.randomUUID(), name: newDestName.trim(), path: selected,
+          createdAt: new Date().toISOString(),
+          enabled: true,
+          id: crypto.randomUUID(),
+          name: newDestName.trim(),
+          path: selected,
         }
 
         saveDestinations([...destinations, newDest])
@@ -137,7 +141,11 @@ export function Settings() {
 
       if (selected) {
         const newDest: DeliveryDestination = {
-          createdAt: new Date().toISOString(), enabled: true, id: crypto.randomUUID(), name: newDeliveryDestName.trim(), path: selected,
+          createdAt: new Date().toISOString(),
+          enabled: true,
+          id: crypto.randomUUID(),
+          name: newDeliveryDestName.trim(),
+          path: selected,
         }
 
         saveDeliveryDestinations([...deliveryDestinations, newDest])
@@ -187,8 +195,12 @@ export function Settings() {
     try {
       const storedFolderTemplate = localStorage.getItem('folder_template')
       const storedFileTemplate = localStorage.getItem('file_rename_template')
-      if (storedFolderTemplate) {setFolderTemplate(storedFolderTemplate)}
-      if (storedFileTemplate) {setFileRenameTemplate(storedFileTemplate)}
+      if (storedFolderTemplate) {
+        setFolderTemplate(storedFolderTemplate)
+      }
+      if (storedFileTemplate) {
+        setFileRenameTemplate(storedFileTemplate)
+      }
     } catch (error) {
       console.error('Failed to load templates:', error)
       showError('Failed to load template settings')
@@ -198,7 +210,9 @@ export function Settings() {
   function loadAutoEject() {
     try {
       const stored = localStorage.getItem('auto_eject')
-      if (stored) {setAutoEject(stored === 'true')}
+      if (stored) {
+        setAutoEject(stored === 'true')
+      }
     } catch (error) {
       console.error('Failed to load auto-eject setting:', error)
       showError('Failed to load auto-eject setting')
@@ -309,7 +323,11 @@ export function Settings() {
                     value={newDestName}
                     onChange={(e) => setNewDestName(e.target.value)}
                     className="input"
-                    onKeyDown={(e) => { if (e.key === 'Enter') {void addDestination();} }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void addDestination()
+                      }
+                    }}
                   />
                   <button onClick={() => void addDestination()} className="btn btn-primary">
                     Add Destination
@@ -360,7 +378,11 @@ export function Settings() {
                     value={newDeliveryDestName}
                     onChange={(e) => setNewDeliveryDestName(e.target.value)}
                     className="input"
-                    onKeyDown={(e) => { if (e.key === 'Enter') {void addDeliveryDestination();} }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void addDeliveryDestination()
+                      }
+                    }}
                   />
                   <button onClick={() => void addDeliveryDestination()} className="btn btn-primary">
                     Add Destination

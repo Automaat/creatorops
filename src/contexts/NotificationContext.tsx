@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactNode } from 'react';
+import type { ReactNode } from 'react'
 import { createContext, useCallback, useState } from 'react'
 
 const DEFAULT_NOTIFICATION_DURATION = 5000
@@ -71,7 +71,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   return (
     <NotificationContext.Provider
       value={{
-        addNotification, error, info, notifications, removeNotification, success, warning,
+        addNotification,
+        error,
+        info,
+        notifications,
+        removeNotification,
+        success,
+        warning,
       }}
     >
       {children}

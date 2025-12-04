@@ -44,7 +44,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const { sdCards, isScanning } = useSDCardScanner()
 
   const replaceHomeWithTilde = (path: string): string => {
-    if (!homeDir) {return path}
+    if (!homeDir) {
+      return path
+    }
     const normalizedHome = homeDir.replace(/\/$/, '')
     const normalizedPath = path.replace(/\/$/, '')
     return normalizedPath.startsWith(normalizedHome)
@@ -137,7 +139,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   // ESC key to return to previous view
   useEffect(() => {
-    if (!selectedProject) {return}
+    if (!selectedProject) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -151,7 +155,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   // Cmd+N to create new project in list view
   useEffect(() => {
-    if (selectedProject) {return}
+    if (selectedProject) {
+      return
+    }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
@@ -201,7 +207,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   async function queueBackup(project: Project, destination: BackupDestination) {
     try {
       await invoke('queue_backup', {
-        destinationId: destination.id, destinationName: destination.name, destinationPath: destination.path, projectId: project.id, projectName: project.name, sourcePath: project.folderPath,
+        destinationId: destination.id,
+        destinationName: destination.name,
+        destinationPath: destination.path,
+        projectId: project.id,
+        projectName: project.name,
+        sourcePath: project.folderPath,
       })
     } catch (error) {
       console.error('Failed to queue backup:', error)
@@ -216,7 +227,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
     try {
       const job = await invoke<ArchiveJob>('create_archive', {
-        archiveLocation, compress: false, compressionFormat: undefined, projectId: project.id, projectName: project.name, sourcePath: project.folderPath,
+        archiveLocation,
+        compress: false,
+        compressionFormat: undefined,
+        projectId: project.id,
+        projectName: project.name,
+        sourcePath: project.folderPath,
       })
 
       // Auto-start the archive job
@@ -239,7 +255,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function deleteProject() {
-    if (!selectedProject) {return}
+    if (!selectedProject) {
+      return
+    }
 
     setIsDeleting(true)
 
@@ -282,7 +300,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function handleOpenInApp(command: string, appName: string) {
-    if (!selectedProject) {return}
+    if (!selectedProject) {
+      return
+    }
 
     try {
       await invoke(command, { path: selectedProject.folderPath })
@@ -294,7 +314,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         selectedProject.status !== ProjectStatus.Archived
       ) {
         const updatedProject = await invoke<Project>('update_project_status', {
-          newStatus: ProjectStatus.Editing, projectId: selectedProject.id,
+          newStatus: ProjectStatus.Editing,
+          projectId: selectedProject.id,
         })
         setSelectedProject(updatedProject)
       }
@@ -305,11 +326,20 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   const createEmptyResult = (error?: string): CopyResult => ({
-    error, filesCopied: 0, filesSkipped: 0, photosCopied: 0, skippedFiles: [], success: false, totalBytes: 0, videosCopied: 0,
+    error,
+    filesCopied: 0,
+    filesSkipped: 0,
+    photosCopied: 0,
+    skippedFiles: [],
+    success: false,
+    totalBytes: 0,
+    videosCopied: 0,
   })
 
   async function handleStartImport() {
-    if (!selectedProject || !selectedSDCard) {return}
+    if (!selectedProject || !selectedSDCard) {
+      return
+    }
 
     const currentImportId = `import-${Date.now()}-${Math.random().toString(36).slice(7)}`
     setImportId(currentImportId)
@@ -320,7 +350,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
     try {
       await invoke('update_project_status', {
-        newStatus: ProjectStatus.Importing, projectId: selectedProject.id,
+        newStatus: ProjectStatus.Importing,
+        projectId: selectedProject.id,
       })
     } catch (error) {
       console.error('Failed to update project status:', error)
@@ -338,7 +369,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         setImportId(undefined)
 
         await invoke('save_import_history', {
-          destinationPath: `${selectedProject.folderPath}/RAW`, errorMessage: result.error, filesCopied: 0, filesSkipped: 0, photosCopied: 0, projectId: selectedProject.id, projectName: selectedProject.name, sourcePath: selectedSDCard.path, startedAt, totalBytes: 0, videosCopied: 0,
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          errorMessage: result.error,
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          startedAt,
+          totalBytes: 0,
+          videosCopied: 0,
         })
 
         return
@@ -347,7 +388,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       const destination = `${selectedProject.folderPath}/RAW`
 
       const result = await invoke<CopyResult>('copy_files', {
-        destination, importId: currentImportId, sourcePaths,
+        destination,
+        importId: currentImportId,
+        sourcePaths,
       })
 
       setImportResult(result)
@@ -356,7 +399,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
       if (!wasCancelled) {
         await invoke('save_import_history', {
-          destinationPath: destination, errorMessage: result.error || undefined, filesCopied: result.filesCopied, filesSkipped: result.filesSkipped, photosCopied: result.photosCopied, projectId: selectedProject.id, projectName: selectedProject.name, sourcePath: selectedSDCard.path, startedAt, totalBytes: result.totalBytes, videosCopied: result.videosCopied,
+          destinationPath: destination,
+          errorMessage: result.error || undefined,
+          filesCopied: result.filesCopied,
+          filesSkipped: result.filesSkipped,
+          photosCopied: result.photosCopied,
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          startedAt,
+          totalBytes: result.totalBytes,
+          videosCopied: result.videosCopied,
         })
       }
 
@@ -366,7 +419,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         // Update project status to Editing after successful import
         try {
           const updatedProject = await invoke<Project>('update_project_status', {
-            newStatus: ProjectStatus.Editing, projectId: selectedProject.id,
+            newStatus: ProjectStatus.Editing,
+            projectId: selectedProject.id,
           })
           setSelectedProject(updatedProject)
         } catch (error) {
@@ -379,7 +433,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
       try {
         await invoke('save_import_history', {
-          destinationPath: `${selectedProject.folderPath}/RAW`, errorMessage: String(error), filesCopied: 0, filesSkipped: 0, photosCopied: 0, projectId: selectedProject.id, projectName: selectedProject.name, sourcePath: selectedSDCard.path, startedAt, totalBytes: 0, videosCopied: 0,
+          destinationPath: `${selectedProject.folderPath}/RAW`,
+          errorMessage: String(error),
+          filesCopied: 0,
+          filesSkipped: 0,
+          photosCopied: 0,
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          sourcePath: selectedSDCard.path,
+          startedAt,
+          totalBytes: 0,
+          videosCopied: 0,
         })
       } catch (error) {
         console.error('Failed to save import history:', error)
@@ -391,7 +455,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function handleCancelImport() {
-    if (!importId) {return}
+    if (!importId) {
+      return
+    }
 
     try {
       await invoke('cancel_import', { importId })
@@ -401,11 +467,14 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }
 
   async function handleDeadlineChange(newDeadline: string) {
-    if (!selectedProject) {return}
+    if (!selectedProject) {
+      return
+    }
 
     try {
       const updatedProject = await invoke<Project>('update_project_deadline', {
-        deadline: newDeadline || undefined, projectId: selectedProject.id,
+        deadline: newDeadline || undefined,
+        projectId: selectedProject.id,
       })
       setSelectedProject(updatedProject)
       setIsEditingDeadline(false)
@@ -691,7 +760,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
                       <p className="text-secondary">Scanning for SD cards...</p>
                     </div>
-                  ) : (sdCards.length === 0 ? (
+                  ) : sdCards.length === 0 ? (
                     <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
                       <p className="text-secondary">
                         No SD cards detected. Insert an SD card to continue.
@@ -714,7 +783,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                         </div>
                       ))}
                     </div>
-                  ))}
+                  )}
 
                   <div className="dialog-actions">
                     <button

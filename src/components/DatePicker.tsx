@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import calendarIcon from '../assets/icons/calendar.png'
 import { MONTH_NAMES_FULL, formatDisplayDate } from '../utils/formatting'
 
@@ -15,7 +15,7 @@ interface DatePickerProps {
 export function DatePicker({ value, onChange, label, required, id, autoOpen }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(autoOpen ?? false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(
-    value && value.trim() ? new Date(value) : undefined
+    value && value.trim() ? new Date(value) : null
   )
   const [viewDate, setViewDate] = useState(value && value.trim() ? new Date(value) : new Date())
   const containerRef = useRef<HTMLDivElement>(null)
@@ -28,7 +28,7 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
         setViewDate(date)
       }
     } else {
-      setSelectedDate(undefined)
+      setSelectedDate(null)
     }
   }, [value])
 
@@ -82,7 +82,7 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
 
     // Add empty cells for days before the first day
     for (let i = 0; i < firstDay; i++) {
-      days.push(undefined)
+      days.push(null)
     }
 
     // Add all days in month
@@ -103,7 +103,9 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
   }
 
   const isSelected = (day: number) => {
-    if (!selectedDate) {return false}
+    if (!selectedDate) {
+      return false
+    }
     return (
       day === selectedDate.getDate() &&
       viewDate.getMonth() === selectedDate.getMonth() &&

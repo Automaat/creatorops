@@ -14,7 +14,9 @@ export function formatProjectInfo(project: Project): string {
  * Check if a project deadline is overdue
  */
 export function isOverdue(deadline?: string): boolean {
-  if (!deadline) {return false}
+  if (!deadline) {
+    return false
+  }
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const deadlineDate = new Date(deadline)
@@ -63,7 +65,9 @@ export function sortProjectsByStatus(projects: Project[]): Project[] {
 }
 
 const STATUS_ORDER_FOR_ACTIVE: Record<string, number> = {
-  Delivered: 2, Editing: 1, Importing: 0,
+  Delivered: 2,
+  Editing: 1,
+  Importing: 0,
 }
 
 /**
@@ -75,15 +79,23 @@ export function sortProjects(projects: Project[]): Project[] {
     // 1. Sort by deadline (earliest first)
     if (a.deadline && b.deadline) {
       const deadlineDiff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-      if (deadlineDiff) {return deadlineDiff}
+      if (deadlineDiff) {
+        return deadlineDiff
+      }
     }
-    if (a.deadline) {return -1}
-    if (b.deadline) {return 1}
+    if (a.deadline) {
+      return -1
+    }
+    if (b.deadline) {
+      return 1
+    }
 
     // 2. Sort by status
     const statusA = STATUS_ORDER_FOR_ACTIVE[a.status] ?? 999
     const statusB = STATUS_ORDER_FOR_ACTIVE[b.status] ?? 999
-    if (statusA !== statusB) {return statusA - statusB}
+    if (statusA !== statusB) {
+      return statusA - statusB
+    }
 
     // 3. Sort alphabetically by name
     return a.name.localeCompare(b.name)

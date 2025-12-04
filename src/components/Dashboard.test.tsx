@@ -2,18 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { Dashboard } from './Dashboard'
-import type { Project} from '../types';
+import type { Project } from '../types'
 import { ProjectStatus } from '../types'
 import { invoke } from '@tauri-apps/api/core'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
 const mockInvoke = vi.mocked(invoke)
 // Mock CreateProject component
-vi.mock<typeof import('./CreateProject')>('./CreateProject', () => ({
+vi.mock('./CreateProject', () => ({
   CreateProject: ({
     onProjectCreated,
     onCancel,
@@ -46,10 +46,27 @@ describe('dashboard', () => {
 
   const mockProjects: Project[] = [
     {
-      clientName: 'John Doe', createdAt: '2025-11-01', date: '2025-11-15', deadline: '2025-12-01', folderPath: '/path/to/wedding', id: '1', name: 'Wedding Photos', shootType: 'Wedding', status: ProjectStatus.Editing, updatedAt: '2025-11-01',
+      clientName: 'John Doe',
+      createdAt: '2025-11-01',
+      date: '2025-11-15',
+      deadline: '2025-12-01',
+      folderPath: '/path/to/wedding',
+      id: '1',
+      name: 'Wedding Photos',
+      shootType: 'Wedding',
+      status: ProjectStatus.Editing,
+      updatedAt: '2025-11-01',
     },
     {
-      clientName: 'Acme Corp', createdAt: '2025-11-02', date: '2025-11-20', folderPath: '/path/to/event', id: '2', name: 'Corporate Event', shootType: 'Event', status: ProjectStatus.Importing, updatedAt: '2025-11-02',
+      clientName: 'Acme Corp',
+      createdAt: '2025-11-02',
+      date: '2025-11-20',
+      folderPath: '/path/to/event',
+      id: '2',
+      name: 'Corporate Event',
+      shootType: 'Event',
+      status: ProjectStatus.Importing,
+      updatedAt: '2025-11-02',
     },
   ]
 
@@ -96,7 +113,15 @@ describe('dashboard', () => {
     const projectsWithArchived: Project[] = [
       ...mockProjects,
       {
-        clientName: 'Old Client', createdAt: '2025-10-01', date: '2025-10-01', folderPath: '/path/to/archived', id: '3', name: 'Archived Project', shootType: 'Portrait', status: ProjectStatus.Archived, updatedAt: '2025-10-01',
+        clientName: 'Old Client',
+        createdAt: '2025-10-01',
+        date: '2025-10-01',
+        folderPath: '/path/to/archived',
+        id: '3',
+        name: 'Archived Project',
+        shootType: 'Portrait',
+        status: ProjectStatus.Archived,
+        updatedAt: '2025-10-01',
       },
     ]
 

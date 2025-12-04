@@ -54,10 +54,9 @@ export function useSDCardScanner(options?: UseSDCardScannerOptions) {
 
           if (permissionGranted.current) {
             try {
-              sendNotification({
-                body: `${card.name} has been mounted`, title: 'SD Card Detected',
-              }).catch((error: unknown) => {
-                console.error('Failed to send system notification:', error)
+              await sendNotification({
+                body: `${card.name} has been mounted`,
+                title: 'SD Card Detected',
               })
             } catch (error) {
               console.error('Failed to send system notification:', error)

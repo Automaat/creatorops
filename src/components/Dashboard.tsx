@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { ProjectStatus } from '../types';
-import type { Project } from '../types';
+import { ProjectStatus } from '../types'
+import type { Project } from '../types'
 import { isOverdue, sortProjects } from '../utils/project'
 import { formatDisplayDate } from '../utils/formatting'
 import { CreateProject } from './CreateProject'

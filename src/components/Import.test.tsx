@@ -7,16 +7,18 @@ import type { CopyResult, Project, SDCard } from '../types'
 import { ProjectStatus } from '../types'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
-vi.mock<typeof import('@tauri-apps/api/event')>('@tauri-apps/api/event', () => ({
+vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
-  isPermissionGranted: vi.fn().mockResolvedValue(true), requestPermission: vi.fn().mockResolvedValue('granted'), sendNotification: vi.fn(),
+vi.mock('@tauri-apps/plugin-notification', () => ({
+  isPermissionGranted: vi.fn().mockResolvedValue(true),
+  requestPermission: vi.fn().mockResolvedValue('granted'),
+  sendNotification: vi.fn(),
 }))
 
 // Import the mocked modules to get references to the mock functions
@@ -28,19 +30,47 @@ const mockListen = vi.mocked(tauriEvent.listen)
 describe('import', () => {
   const mockSDCards: SDCard[] = [
     {
-      deviceType: 'SD', fileCount: 100, freeSpace: 16_000_000_000, isRemovable: true, name: 'SD Card 1', path: '/Volumes/SDCARD1', size: 32_000_000_000,
+      deviceType: 'SD',
+      fileCount: 100,
+      freeSpace: 16_000_000_000,
+      isRemovable: true,
+      name: 'SD Card 1',
+      path: '/Volumes/SDCARD1',
+      size: 32_000_000_000,
     },
     {
-      deviceType: 'SD', fileCount: 200, freeSpace: 32_000_000_000, isRemovable: true, name: 'SD Card 2', path: '/Volumes/SDCARD2', size: 64_000_000_000,
+      deviceType: 'SD',
+      fileCount: 200,
+      freeSpace: 32_000_000_000,
+      isRemovable: true,
+      name: 'SD Card 2',
+      path: '/Volumes/SDCARD2',
+      size: 64_000_000_000,
     },
   ]
 
   const mockProjects: Project[] = [
     {
-      clientName: 'John & Jane', createdAt: '2024-01-15T10:00:00Z', date: '2024-01-15', folderPath: '/path/to/project1', id: 'project-1', name: 'Wedding Shoot', shootType: 'Wedding', status: ProjectStatus.New, updatedAt: '2024-01-15T10:00:00Z',
+      clientName: 'John & Jane',
+      createdAt: '2024-01-15T10:00:00Z',
+      date: '2024-01-15',
+      folderPath: '/path/to/project1',
+      id: 'project-1',
+      name: 'Wedding Shoot',
+      shootType: 'Wedding',
+      status: ProjectStatus.New,
+      updatedAt: '2024-01-15T10:00:00Z',
     },
     {
-      clientName: 'Alice', createdAt: '2024-01-16T10:00:00Z', date: '2024-01-16', folderPath: '/path/to/project2', id: 'project-2', name: 'Portrait Session', shootType: 'Portrait', status: ProjectStatus.Editing, updatedAt: '2024-01-16T10:00:00Z',
+      clientName: 'Alice',
+      createdAt: '2024-01-16T10:00:00Z',
+      date: '2024-01-16',
+      folderPath: '/path/to/project2',
+      id: 'project-2',
+      name: 'Portrait Session',
+      shootType: 'Portrait',
+      status: ProjectStatus.Editing,
+      updatedAt: '2024-01-16T10:00:00Z',
     },
   ]
 
@@ -52,7 +82,9 @@ describe('import', () => {
   })
 
   const mockProps = {
-    isScanning: false, onImportComplete: vi.fn(), sdCards: [],
+    isScanning: false,
+    onImportComplete: vi.fn(),
+    sdCards: [],
   }
 
   it('renders without crashing', async () => {
@@ -133,7 +165,9 @@ describe('import', () => {
     })
 
     const card = screen.getAllByText('Click to import')[0].closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Select a project to import into')).toBeTruthy()
@@ -153,14 +187,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Wedding Shoot')).toBeTruthy()
@@ -179,14 +217,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Wedding Shoot')).toBeTruthy()
@@ -210,14 +252,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('+ Create New Project')).toBeTruthy()
@@ -235,14 +281,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('+ Create New Project')).toBeTruthy()
@@ -266,7 +316,9 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       const startButton = screen.getByText('Start Import')
@@ -288,14 +340,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Wedding Shoot')).toBeTruthy()
@@ -313,15 +369,21 @@ describe('import', () => {
 
   it('shows success result after import completes', async () => {
     const mockCopyResult: CopyResult = {
-      filesCopied: 10, filesSkipped: 0, photosCopied: 8, skippedFiles: [], success: true, totalBytes: 1_000_000, videosCopied: 2,
+      filesCopied: 10,
+      filesSkipped: 0,
+      photosCopied: 8,
+      skippedFiles: [],
+      success: true,
+      totalBytes: 1_000_000,
+      videosCopied: 2,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg', 'file2.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -332,14 +394,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -354,10 +420,10 @@ describe('import', () => {
   it('shows failure result when import fails', async () => {
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg'])
       .mockRejectedValueOnce(new Error('Import failed'))
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -368,14 +434,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -386,15 +456,21 @@ describe('import', () => {
 
   it('shows skipped files when some files are skipped', async () => {
     const mockCopyResult: CopyResult = {
-      filesCopied: 8, filesSkipped: 2, photosCopied: 6, skippedFiles: ['duplicate1.jpg', 'duplicate2.jpg'], success: true, totalBytes: 800_000, videosCopied: 2,
+      filesCopied: 8,
+      filesSkipped: 2,
+      photosCopied: 6,
+      skippedFiles: ['duplicate1.jpg', 'duplicate2.jpg'],
+      success: true,
+      totalBytes: 800_000,
+      videosCopied: 2,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg', 'file2.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -405,14 +481,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -426,9 +506,9 @@ describe('import', () => {
   it('handles no files found on SD card', async () => {
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -439,14 +519,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -466,14 +550,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Wedding Shoot')).toBeTruthy()
@@ -520,14 +608,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('No projects available')).toBeTruthy()
@@ -537,12 +629,19 @@ describe('import', () => {
 
   it('shows cancelled message when import is cancelled', async () => {
     const mockCopyResult: CopyResult = {
-      error: 'Import cancelled by user', filesCopied: 5, filesSkipped: 0, photosCopied: 4, skippedFiles: [], success: false, totalBytes: 500_000, videosCopied: 1,
+      error: 'Import cancelled by user',
+      filesCopied: 5,
+      filesSkipped: 0,
+      photosCopied: 4,
+      skippedFiles: [],
+      success: false,
+      totalBytes: 500_000,
+      videosCopied: 1,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
 
@@ -555,14 +654,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -573,15 +676,21 @@ describe('import', () => {
 
   it('closes result view when done button is clicked', async () => {
     const mockCopyResult: CopyResult = {
-      filesCopied: 10, filesSkipped: 0, photosCopied: 8, skippedFiles: [], success: true, totalBytes: 1_000_000, videosCopied: 2,
+      filesCopied: 10,
+      filesSkipped: 0,
+      photosCopied: 8,
+      skippedFiles: [],
+      success: true,
+      totalBytes: 1_000_000,
+      videosCopied: 2,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -592,14 +701,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -616,15 +729,21 @@ describe('import', () => {
 
   it('calls updateProjectStatus when import starts', async () => {
     const mockCopyResult: CopyResult = {
-      filesCopied: 10, filesSkipped: 0, photosCopied: 8, skippedFiles: [], success: true, totalBytes: 1_000_000, videosCopied: 2,
+      filesCopied: 10,
+      filesSkipped: 0,
+      photosCopied: 8,
+      skippedFiles: [],
+      success: true,
+      totalBytes: 1_000_000,
+      videosCopied: 2,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -635,35 +754,46 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('update_project_status', {
-        newStatus: ProjectStatus.Importing, projectId: 'project-1',
+        newStatus: ProjectStatus.Importing,
+        projectId: 'project-1',
       })
     })
   })
 
   it('calls save_import_history after import completes', async () => {
     const mockCopyResult: CopyResult = {
-      filesCopied: 10, filesSkipped: 0, photosCopied: 8, skippedFiles: [], success: true, totalBytes: 1_000_000, videosCopied: 2,
+      filesCopied: 10,
+      filesSkipped: 0,
+      photosCopied: 8,
+      skippedFiles: [],
+      success: true,
+      totalBytes: 1_000_000,
+      videosCopied: 2,
     }
 
     mockInvoke
       .mockResolvedValueOnce(mockProjects)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(['file1.jpg'])
       .mockResolvedValueOnce(mockCopyResult)
-      .mockResolvedValueOnce()
+      .mockResolvedValueOnce(undefined)
 
     const user = userEvent.setup()
 
@@ -674,14 +804,18 @@ describe('import', () => {
     )
 
     const card = screen.getByText('Click to import').closest('.project-list-item')
-    if (card) {await user.click(card)}
+    if (card) {
+      await user.click(card)
+    }
 
     await waitFor(() => {
       expect(screen.getByText('Choose a project...')).toBeTruthy()
     })
 
     const dropdownButton = screen.getByText('Choose a project...').closest('button')
-    if (dropdownButton) {await user.click(dropdownButton)}
+    if (dropdownButton) {
+      await user.click(dropdownButton)
+    }
     await user.click(screen.getByText('Wedding Shoot'))
     await user.click(screen.getByText('Start Import'))
 
@@ -689,7 +823,8 @@ describe('import', () => {
       expect(mockInvoke).toHaveBeenCalledWith(
         'save_import_history',
         expect.objectContaining({
-          filesCopied: 10, projectId: 'project-1',
+          filesCopied: 10,
+          projectId: 'project-1',
         })
       )
     })
