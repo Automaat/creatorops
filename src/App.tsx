@@ -175,7 +175,7 @@ function App() {
         </div>
         <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
           <Projects
-            key={`${selectedProjectId || 'projects-list'}-${projectsResetKey}`}
+            key={`${selectedProjectId ?? 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
             onBackFromProject={handleBackFromProject}
           />
@@ -194,10 +194,17 @@ function App() {
         </div>
       </Layout>
       <NotificationToast />
-      <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <KeyboardShortcutsHelp
+        isOpen={showShortcuts}
+        onClose={() => {
+          setShowShortcuts(false)
+        }}
+      />
       <CommandPalette
         isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
+        onClose={() => {
+          setShowCommandPalette(false)
+        }}
         onSelectProject={handleNavigateToProject}
       />
     </>

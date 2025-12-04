@@ -225,7 +225,7 @@ describe('useSDCardScanner', () => {
     expect(invoke).toHaveBeenCalledTimes(1)
 
     // Unmount the hook - this should clear the interval
-    await act(async () => {
+    act(() => {
       unmount()
     })
 

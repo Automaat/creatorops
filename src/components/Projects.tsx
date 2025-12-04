@@ -782,7 +782,9 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                         <div
                           key={card.path}
                           className={`destination-button ${selectedSDCard?.path === card.path ? 'selected' : ''}`}
-                          onClick={() => setSelectedSDCard(card)}
+                          onClick={() => {
+                            setSelectedSDCard(card)
+                          }}
                           style={{ cursor: 'pointer' }}
                         >
                           <span className="destination-name">{card.name}</span>
@@ -852,7 +854,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     ) : (
                       <>
                         <p className="text-error">Import failed</p>
-                        {importResult.error && (
+                        {importResult.error != null && importResult.error !== '' && (
                           <p className="text-secondary">{importResult.error}</p>
                         )}
                       </>
@@ -885,7 +887,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         <div className="projects-header">
           <div className="flex flex-between">
             <h1>Projects</h1>
-            <button className="btn btn-primary" onClick={() => setShowCreateProject(true)}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setShowCreateProject(true)
+              }}
+            >
               Create Project
             </button>
           </div>
@@ -929,7 +936,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <span className="info-label">Date:</span>
                     <span>{project.date}</span>
                   </div>
-                  {project.deadline &&
+                  {project.deadline != null &&
+                    project.deadline !== '' &&
                     (() => {
                       const overdueFlag = isOverdue(project.deadline)
                       return (
@@ -950,12 +958,24 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       </div>
 
       {showCreateProject && (
-        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dialog-overlay"
+          onClick={() => {
+            setShowCreateProject(false)
+          }}
+        >
+          <div
+            className="dialog"
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+          >
             <h2>Create New Project</h2>
             <CreateProject
               onProjectCreated={handleProjectCreated}
-              onCancel={() => setShowCreateProject(false)}
+              onCancel={() => {
+                setShowCreateProject(false)
+              }}
             />
           </div>
         </div>
