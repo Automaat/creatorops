@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes } from '../utils/formatting'
 import { sortProjectsByStatus } from '../utils/project'
+import { migrateDeliveryDestinations } from '../utils/deliveryDestinations'
+import { useNotification } from '../hooks/useNotification'
 import type {
   DeliveryDestination,
   DeliveryJob,
@@ -12,6 +14,7 @@ import type {
 } from '../types'
 
 export function Delivery() {
+  const { error: showError, success: showSuccess } = useNotification()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>()
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
@@ -144,28 +147,9 @@ export function Delivery() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const migrated = parsed.map((item): DeliveryDestination => {
-            if (typeof item === 'object' && item !== null) {
-              if ('type' in item) {
-                return item as DeliveryDestination
-              }
-              if ('path' in item && 'id' in item && 'name' in item) {
-                return {
-                  type: 'local',
-                  id: item.id as string,
-                  name: item.name as string,
-                  path: item.path as string,
-                  enabled: (item.enabled as boolean) ?? true,
-                  createdAt: (item.createdAt as string) ?? new Date().toISOString(),
-                }
-              }
-            }
-            throw new Error('Invalid destination format')
-          })
-          localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
-          setDestinations(migrated)
-        }
+        const migrated = migrateDeliveryDestinations(parsed)
+        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+        setDestinations(migrated)
       }
     } catch (error) {
       console.error('Failed to load destinations:', error)
@@ -246,8 +230,10 @@ export function Delivery() {
   async function copyShareableLink(link: string) {
     try {
       await navigator.clipboard.writeText(link)
+      showSuccess('Link copied to clipboard')
     } catch (error) {
       console.error('Failed to copy link:', error)
+      showError('Failed to copy link')
     }
   }
 

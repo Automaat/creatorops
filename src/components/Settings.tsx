@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { open as openUrl } from '@tauri-apps/plugin-opener'
 import { useTheme } from '../hooks/useTheme'
 import { useNotification } from '../hooks/useNotification'
+import { migrateDeliveryDestinations } from '../utils/deliveryDestinations'
 import type { BackupDestination, DeliveryDestination, GoogleDriveAccount } from '../types'
 
 const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
@@ -111,28 +112,9 @@ export function Settings() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const migrated = parsed.map((item): DeliveryDestination => {
-            if (typeof item === 'object' && item !== null) {
-              if ('type' in item) {
-                return item as DeliveryDestination
-              }
-              if ('path' in item && 'id' in item && 'name' in item) {
-                return {
-                  type: 'local',
-                  id: item.id as string,
-                  name: item.name as string,
-                  path: item.path as string,
-                  enabled: (item.enabled as boolean) ?? true,
-                  createdAt: (item.createdAt as string) ?? new Date().toISOString(),
-                }
-              }
-            }
-            throw new Error('Invalid destination format')
-          })
-          localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
-          setDeliveryDestinations(migrated)
-        }
+        const migrated = migrateDeliveryDestinations(parsed)
+        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+        setDeliveryDestinations(migrated)
       }
     } catch (error) {
       console.error('Failed to load delivery destinations:', error)
@@ -308,13 +290,32 @@ export function Settings() {
     try {
       setConnectingDrive(true)
       const { authUrl } = await invoke<{ authUrl: string }>('start_google_drive_auth')
-      await openUrl(authUrl)
-      const account = await invoke<GoogleDriveAccount>('complete_google_drive_auth')
-      setDriveAccount(account)
-      showSuccess('Google Drive connected successfully')
+      await openUrl(authUrl).catch((err) => {
+        console.error('Failed to open auth URL:', err)
+      })
+
+      // Poll for authentication completion
+      const maxAttempts = 150 // 5 minutes (150 * 2 seconds)
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          const account = await invoke<GoogleDriveAccount>('complete_google_drive_auth')
+          setDriveAccount(account)
+          showSuccess('Google Drive connected successfully')
+          return
+        } catch {
+          // Authentication not complete yet, wait and retry
+          if (attempt < maxAttempts - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+          } else {
+            throw new Error('Authentication timeout - please try again')
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to connect Google Drive:', error)
-      showError('Failed to connect Google Drive')
+      showError(
+        error instanceof Error ? error.message : 'Failed to connect Google Drive'
+      )
     } finally {
       setConnectingDrive(false)
     }
@@ -334,8 +335,9 @@ export function Settings() {
   async function handleConfigureParentFolder() {
     try {
       const folderId = prompt('Enter Google Drive parent folder ID (or leave empty for root):')
+      if (folderId === null) return // User cancelled
       await invoke('set_drive_parent_folder', {
-        folderId: folderId?.trim() || null,
+        folderId: folderId.trim() || null,
       })
       await loadDriveAccount()
       showSuccess('Parent folder configured')
@@ -369,7 +371,7 @@ export function Settings() {
               <div className="flex flex-col gap-md">
                 <div>
                   <div className="font-medium">Theme</div>
-                  <p className="text-secondary text-sm" style={{ marginBottom: 'var(--space-sm)' }}>
+                  <p className="text-secondary text-sm card-section-description">
                     Choose how CreatorOps looks
                   </p>
                 </div>
@@ -556,10 +558,7 @@ export function Settings() {
 
                     <div className="drive-conflict-mode">
                       <h4 className="card-section-label">File Conflict Handling</h4>
-                      <p
-                        className="text-secondary text-sm"
-                        style={{ marginBottom: 'var(--space-sm)' }}
-                      >
+                      <p className="text-secondary text-sm drive-conflict-description">
                         What to do when a file already exists in Google Drive
                       </p>
                       <div className="flex flex-col gap-sm">
@@ -628,13 +627,12 @@ export function Settings() {
                 <div className="card-section">
                   <h4 className="card-section-label">Default Import Location</h4>
                   <div className="flex gap-md align-center">
-                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                    <p className="text-secondary text-sm card-section-value">
                       {defaultImportLocation || '~/CreatorOps/Projects'}
                     </p>
                     <button
                       onClick={() => void selectDefaultImportLocation()}
-                      className="btn btn-primary"
-                      style={{ marginLeft: 'auto' }}
+                      className="btn btn-primary ml-auto"
                     >
                       {defaultImportLocation ? 'Change Location' : 'Select Location'}
                     </button>
@@ -644,13 +642,12 @@ export function Settings() {
                 <div className="card-section">
                   <h4 className="card-section-label">Archive Location</h4>
                   <div className="flex gap-md align-center">
-                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                    <p className="text-secondary text-sm card-section-value">
                       {archiveLocation || 'Not configured'}
                     </p>
                     <button
                       onClick={() => void selectArchiveLocation()}
-                      className="btn btn-primary"
-                      style={{ marginLeft: 'auto' }}
+                      className="btn btn-primary ml-auto"
                     >
                       Select Location
                     </button>

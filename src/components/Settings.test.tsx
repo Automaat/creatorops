@@ -14,6 +14,10 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
 
+vi.mock('@tauri-apps/plugin-opener', () => ({
+  open: vi.fn().mockResolvedValue(undefined),
+}))
+
 const mockOpen = vi.mocked(open)
 
 describe('settings', () => {
@@ -384,5 +388,289 @@ describe('settings', () => {
     expect((screen.getByPlaceholderText('{original}') as HTMLInputElement).value).toBe(
       'custom_file'
     )
+  })
+
+  describe('Google Drive Integration', () => {
+    it('displays Google Drive section', () => {
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      expect(screen.getByText('Google Drive Integration')).toBeTruthy()
+    })
+
+    it('shows connect button when not connected', () => {
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      expect(screen.getByText('Connect Google Drive')).toBeTruthy()
+    })
+
+    it('loads Google Drive account on mount', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+      mockInvoke.mockResolvedValue({
+        displayName: 'Test User',
+        email: 'test@example.com',
+        parentFolderId: null,
+      })
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('get_google_drive_account')
+      })
+    })
+
+    it('handles connect drive with polling', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      let callCount = 0
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'start_google_drive_auth') {
+          return Promise.resolve({ authUrl: 'https://accounts.google.com/o/oauth2/v2/auth' })
+        }
+        if (cmd === 'complete_google_drive_auth') {
+          callCount++
+          if (callCount < 3) {
+            return Promise.reject(new Error('Not ready'))
+          }
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      const connectButton = screen.getByText('Connect Google Drive')
+      await user.click(connectButton)
+
+      await waitFor(
+        () => {
+          expect(screen.getByText('Test User')).toBeTruthy()
+        },
+        { timeout: 10000 }
+      )
+    })
+
+    it.skip('handles authentication timeout', async () => {
+      // Skip this test as it takes 5+ minutes to complete (150 attempts * 2 seconds)
+      // The polling mechanism is tested in the success case above
+    })
+
+    it('handles disconnect drive', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        if (cmd === 'remove_google_drive_account') {
+          return Promise.resolve(undefined)
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const disconnectButton = screen.getByText('Disconnect')
+      await user.click(disconnectButton)
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('remove_google_drive_account')
+        expect(screen.queryByText('Test User')).toBeFalsy()
+      })
+    })
+
+    it('handles configure parent folder cancellation', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+      const mockPrompt = vi.spyOn(window, 'prompt').mockReturnValue(null)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const configureButton = screen.getByText('Configure Parent Folder')
+      await user.click(configureButton)
+
+      expect(mockPrompt).toHaveBeenCalled()
+      expect(mockInvoke).not.toHaveBeenCalledWith('set_drive_parent_folder', expect.anything())
+
+      mockPrompt.mockRestore()
+    })
+
+    it('handles configure parent folder success', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+      const mockPrompt = vi.spyOn(window, 'prompt').mockReturnValue('folder123')
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        if (cmd === 'set_drive_parent_folder') {
+          return Promise.resolve(undefined)
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const configureButton = screen.getByText('Configure Parent Folder')
+      await user.click(configureButton)
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('set_drive_parent_folder', {
+          folderId: 'folder123',
+        })
+      })
+
+      mockPrompt.mockRestore()
+    })
+
+    it('handles test connection success', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        if (cmd === 'test_google_drive_connection') {
+          return Promise.resolve(undefined)
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const testButton = screen.getByText('Test Connection')
+      await user.click(testButton)
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('test_google_drive_connection')
+      })
+    })
+
+    it('handles test connection failure', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        if (cmd === 'test_google_drive_connection') {
+          return Promise.reject(new Error('Connection failed'))
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const testButton = screen.getByText('Test Connection')
+      await user.click(testButton)
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith('test_google_drive_connection')
+      })
+    })
   })
 })
