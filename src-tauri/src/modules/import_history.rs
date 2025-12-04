@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -58,8 +59,8 @@ pub async fn save_import_history(
     };
 
     let history = ImportHistory {
-        id: id.clone(),
-        project_id: project_id.clone(),
+        id,
+        project_id,
         project_name,
         source_path,
         destination_path,
@@ -76,7 +77,7 @@ pub async fn save_import_history(
 
     // Save to history file
     let history_path = get_history_file_path()?;
-    let mut histories = load_all_histories().await.unwrap_or_default();
+    let mut histories = load_all_histories().unwrap_or_default();
     histories.insert(0, history.clone());
 
     // Keep only last 100 imports
@@ -92,21 +93,21 @@ pub async fn save_import_history(
 
 #[tauri::command]
 pub async fn get_import_history(limit: Option<usize>) -> Result<Vec<ImportHistory>, String> {
-    let histories = load_all_histories().await?;
+    let histories = load_all_histories()?;
     let limit = limit.unwrap_or(50);
     Ok(histories.into_iter().take(limit).collect())
 }
 
 #[tauri::command]
 pub async fn get_project_import_history(project_id: String) -> Result<Vec<ImportHistory>, String> {
-    let histories = load_all_histories().await?;
+    let histories = load_all_histories()?;
     Ok(histories
         .into_iter()
         .filter(|h| h.project_id == project_id)
         .collect())
 }
 
-async fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
+fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
     let history_path = get_history_file_path()?;
 
     if !history_path.exists() {
@@ -124,6 +125,7 @@ fn get_history_file_path() -> Result<PathBuf, String> {
     Ok(base_path.join("import_history.json"))
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,18 +172,18 @@ mod tests {
     #[test]
     fn test_import_history_serialization() {
         let history = ImportHistory {
-            id: "test-id".to_string(),
-            project_id: "proj-123".to_string(),
-            project_name: "Test Project".to_string(),
-            source_path: "/source".to_string(),
-            destination_path: "/dest".to_string(),
+            id: "test-id".to_owned(),
+            project_id: "proj-123".to_owned(),
+            project_name: "Test Project".to_owned(),
+            source_path: "/source".to_owned(),
+            destination_path: "/dest".to_owned(),
             files_copied: 10,
             files_skipped: 2,
             total_bytes: 1024,
             photos_copied: 8,
             videos_copied: 2,
-            started_at: "2024-01-01".to_string(),
-            completed_at: "2024-01-01".to_string(),
+            started_at: "2024-01-01".to_owned(),
+            completed_at: "2024-01-01".to_owned(),
             status: ImportStatus::Success,
             error_message: None,
         };
@@ -195,20 +197,20 @@ mod tests {
     #[test]
     fn test_import_history_with_error() {
         let history = ImportHistory {
-            id: "test-id".to_string(),
-            project_id: "proj-123".to_string(),
-            project_name: "Test Project".to_string(),
-            source_path: "/source".to_string(),
-            destination_path: "/dest".to_string(),
+            id: "test-id".to_owned(),
+            project_id: "proj-123".to_owned(),
+            project_name: "Test Project".to_owned(),
+            source_path: "/source".to_owned(),
+            destination_path: "/dest".to_owned(),
             files_copied: 5,
             files_skipped: 5,
             total_bytes: 512,
             photos_copied: 5,
             videos_copied: 0,
-            started_at: "2024-01-01".to_string(),
-            completed_at: "2024-01-01".to_string(),
+            started_at: "2024-01-01".to_owned(),
+            completed_at: "2024-01-01".to_owned(),
             status: ImportStatus::Partial,
-            error_message: Some("Some files failed".to_string()),
+            error_message: Some("Some files failed".to_owned()),
         };
 
         let json = serde_json::to_string(&history).unwrap();
@@ -218,23 +220,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_success() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-123".to_string(),
-            "Test Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-123".to_owned(),
+            "Test Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await;
@@ -250,24 +252,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_partial() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-456".to_string(),
-            "Partial Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-456".to_owned(),
+            "Partial Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             5,
             3,
             512,
             4,
             1,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("3 files failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("3 files failed".to_owned()),
         )
         .await;
 
@@ -276,29 +278,29 @@ mod tests {
         assert_eq!(history.files_copied, 5);
         assert_eq!(history.files_skipped, 3);
         assert!(matches!(history.status, ImportStatus::Partial));
-        assert_eq!(history.error_message, Some("3 files failed".to_string()));
+        assert_eq!(history.error_message, Some("3 files failed".to_owned()));
     }
 
     #[tokio::test]
     async fn test_save_import_history_failed() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = save_import_history(
-            "proj-789".to_string(),
-            "Failed Project".to_string(),
-            "/source".to_string(),
-            "/dest".to_string(),
+            "proj-789".to_owned(),
+            "Failed Project".to_owned(),
+            "/source".to_owned(),
+            "/dest".to_owned(),
             0,
             10,
             0,
             0,
             0,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("All files failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("All files failed".to_owned()),
         )
         .await;
 
@@ -310,23 +312,23 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Skip due to parallel test HOME env var conflicts
+    #[ignore = "Skip due to parallel test HOME env var conflicts"]
     async fn test_save_and_retrieve_import_history() {
         let temp_dir = TempDir::new().unwrap();
         let home_path = temp_dir.path().to_string_lossy().to_string();
         std::env::set_var("HOME", &home_path);
 
         let history1 = save_import_history(
-            "proj-1".to_string(),
-            "Project 1".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-1".to_owned(),
+            "Project 1".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await;
@@ -338,31 +340,31 @@ mod tests {
     #[tokio::test]
     async fn test_load_all_histories_empty() {
         // Test loading when file doesn't exist
-        let result = load_all_histories().await;
+        let result = load_all_histories();
         assert!(result.is_ok() || result.is_err()); // May succeed with empty vec or fail
     }
 
     #[tokio::test]
     async fn test_status_determination_logic() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         // Test Failed status (0 files copied)
         let failed = save_import_history(
-            "proj-fail".to_string(),
-            "Failed".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-fail".to_owned(),
+            "Failed".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             0,
             10,
             0,
             0,
             0,
-            "2024-01-01T00:00:00Z".to_string(),
-            Some("All failed".to_string()),
+            "2024-01-01T00:00:00Z".to_owned(),
+            Some("All failed".to_owned()),
         )
         .await
         .unwrap();
@@ -371,16 +373,16 @@ mod tests {
 
         // Test Partial status (some files copied, some skipped)
         let partial = save_import_history(
-            "proj-partial".to_string(),
-            "Partial".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-partial".to_owned(),
+            "Partial".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             5,
             3,
             512,
             4,
             1,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await
@@ -390,16 +392,16 @@ mod tests {
 
         // Test Success status (all files copied, none skipped)
         let success = save_import_history(
-            "proj-success".to_string(),
-            "Success".to_string(),
-            "/src".to_string(),
-            "/dst".to_string(),
+            "proj-success".to_owned(),
+            "Success".to_owned(),
+            "/src".to_owned(),
+            "/dst".to_owned(),
             10,
             0,
             1024,
             8,
             2,
-            "2024-01-01T00:00:00Z".to_string(),
+            "2024-01-01T00:00:00Z".to_owned(),
             None,
         )
         .await
@@ -412,10 +414,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_import_history_empty() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", _temp_dir.path());
+            std::env::set_var("HOME", temp_dir.path());
         } // Lock dropped here
 
         let result = get_import_history(None).await;
@@ -426,9 +428,9 @@ mod tests {
 
     #[test]
     fn test_get_history_file_path() {
-        let _temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().unwrap();
         let _lock = HOME_TEST_MUTEX.lock().unwrap();
-        std::env::set_var("HOME", _temp_dir.path());
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = get_history_file_path();
         assert!(result.is_ok());

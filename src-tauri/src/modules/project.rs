@@ -1,3 +1,5 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+#![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -22,7 +24,7 @@ pub struct Project {
     pub deadline: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub enum ProjectStatus {
     New,
@@ -35,13 +37,13 @@ pub enum ProjectStatus {
 impl std::fmt::Display for ProjectStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ProjectStatus::New => "New",
-            ProjectStatus::Importing => "Importing",
-            ProjectStatus::Editing => "Editing",
-            ProjectStatus::Delivered => "Delivered",
-            ProjectStatus::Archived => "Archived",
+            Self::New => "New",
+            Self::Importing => "Importing",
+            Self::Editing => "Editing",
+            Self::Delivered => "Delivered",
+            Self::Archived => "Archived",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -50,12 +52,12 @@ impl std::str::FromStr for ProjectStatus {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "New" => Ok(ProjectStatus::New),
-            "Importing" => Ok(ProjectStatus::Importing),
-            "Editing" => Ok(ProjectStatus::Editing),
-            "Delivered" => Ok(ProjectStatus::Delivered),
-            "Archived" => Ok(ProjectStatus::Archived),
-            _ => Err(format!("Invalid project status: {}", s)),
+            "New" => Ok(Self::New),
+            "Importing" => Ok(Self::Importing),
+            "Editing" => Ok(Self::Editing),
+            "Delivered" => Ok(Self::Delivered),
+            "Archived" => Ok(Self::Archived),
+            _ => Err(format!("Invalid project status: {s}")),
         }
     }
 }
@@ -108,10 +110,10 @@ pub async fn create_project(
     // Create folder structure: YYYY-MM-DD_ClientName[_ProjectType]/[RAW, Selects, Delivery]
     let sanitized_client = sanitize_path_component(&client_name);
     let folder_name = if shoot_type.is_empty() {
-        format!("{}_{}", date, sanitized_client)
+        format!("{date}_{sanitized_client}")
     } else {
         let sanitized_type = sanitize_path_component(&shoot_type);
-        format!("{}_{}_{}", date, sanitized_client, sanitized_type)
+        format!("{date}_{sanitized_client}_{sanitized_type}")
     };
 
     // Default location (should be configurable in settings)
@@ -161,7 +163,7 @@ pub async fn create_project(
         )?;
         Ok(())
     })
-    .map_err(|e| format!("Failed to insert project: {}", e))?;
+    .map_err(|e| format!("Failed to insert project: {e}"))?;
 
     Ok(project)
 }
@@ -178,7 +180,7 @@ pub async fn list_projects(db: tauri::State<'_, Database>) -> Result<Vec<Project
 
         Ok(projects)
     })
-    .map_err(|e| format!("Database error: {}", e))
+    .map_err(|e| format!("Database error: {e}"))
 }
 
 /// Force refresh project cache (now just returns list)
@@ -201,18 +203,18 @@ pub async fn delete_project(
 
             Ok(path)
         })
-        .map_err(|e| format!("Database error: {}", e))?;
+        .map_err(|e| format!("Database error: {e}"))?;
 
     // Delete project folder first (if this fails, DB remains consistent)
     fs::remove_dir_all(&folder_path)
-        .map_err(|e| format!("Failed to delete project folder: {}", e))?;
+        .map_err(|e| format!("Failed to delete project folder: {e}"))?;
 
     // Delete from database (only after filesystem deletion succeeds)
     db.execute(|conn| {
         conn.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
         Ok(())
     })
-    .map_err(|e| format!("Failed to delete project from database: {}", e))?;
+    .map_err(|e| format!("Failed to delete project from database: {e}"))?;
 
     Ok(())
 }
@@ -233,7 +235,7 @@ pub async fn update_project_status(
         )?;
         Ok(())
     })
-    .map_err(|e| format!("Failed to update project status: {}", e))?;
+    .map_err(|e| format!("Failed to update project status: {e}"))?;
 
     // Fetch and return updated project
     get_project_by_id(&db, &project_id)
@@ -256,7 +258,7 @@ pub async fn update_project_deadline(
         )?;
         Ok(())
     })
-    .map_err(|e| format!("Failed to update project deadline: {}", e))?;
+    .map_err(|e| format!("Failed to update project deadline: {e}"))?;
 
     // Fetch and return updated project
     get_project_by_id(&db, &project_id)
@@ -272,7 +274,7 @@ fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, String>
 
         Ok(project)
     })
-    .map_err(|e| format!("Database error: {}", e))
+    .map_err(|e| format!("Database error: {e}"))
 }
 
 #[tauri::command]
@@ -283,6 +285,7 @@ pub async fn get_project(
     get_project_by_id(&db, &project_id)
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,7 +295,7 @@ mod tests {
     fn setup_test_db() -> (TempDir, Database) {
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
         (temp_dir, db)
     }
 
@@ -386,16 +389,16 @@ mod tests {
     #[test]
     fn test_project_serialization() {
         let project = Project {
-            id: "test-123".to_string(),
-            name: "Test Project".to_string(),
-            client_name: "Test Client".to_string(),
-            date: "2024-01-15".to_string(),
-            shoot_type: "Wedding".to_string(),
+            id: "test-123".to_owned(),
+            name: "Test Project".to_owned(),
+            client_name: "Test Client".to_owned(),
+            date: "2024-01-15".to_owned(),
+            shoot_type: "Wedding".to_owned(),
             status: ProjectStatus::New,
-            folder_path: "/path/to/project".to_string(),
-            created_at: "2024-01-15T10:00:00Z".to_string(),
-            updated_at: "2024-01-15T10:00:00Z".to_string(),
-            deadline: Some("2024-02-01".to_string()),
+            folder_path: "/path/to/project".to_owned(),
+            created_at: "2024-01-15T10:00:00Z".to_owned(),
+            updated_at: "2024-01-15T10:00:00Z".to_owned(),
+            deadline: Some("2024-02-01".to_owned()),
         };
 
         let json = serde_json::to_string(&project).unwrap();
@@ -458,7 +461,7 @@ mod tests {
         assert_eq!(project.name, "Wedding Shoot");
         assert_eq!(project.client_name, "John Doe");
         assert_eq!(project.status, ProjectStatus::New);
-        assert_eq!(project.deadline, Some("2024-07-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-07-01".to_owned()));
     }
 
     #[test]
@@ -621,7 +624,7 @@ mod tests {
 
         // Verify update
         let project = get_project_by_id(&db, "proj-1").unwrap();
-        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-02-01".to_owned()));
     }
 
     #[test]
@@ -675,37 +678,37 @@ mod tests {
     #[test]
     fn test_project_struct_fields() {
         let project = Project {
-            id: "test-123".to_string(),
-            name: "Wedding Shoot".to_string(),
-            client_name: "John Doe".to_string(),
-            date: "2024-06-15".to_string(),
-            shoot_type: "Wedding".to_string(),
+            id: "test-123".to_owned(),
+            name: "Wedding Shoot".to_owned(),
+            client_name: "John Doe".to_owned(),
+            date: "2024-06-15".to_owned(),
+            shoot_type: "Wedding".to_owned(),
             status: ProjectStatus::New,
-            folder_path: "/path/to/project".to_string(),
-            created_at: "2024-01-15T10:00:00Z".to_string(),
-            updated_at: "2024-01-15T10:00:00Z".to_string(),
-            deadline: Some("2024-07-01".to_string()),
+            folder_path: "/path/to/project".to_owned(),
+            created_at: "2024-01-15T10:00:00Z".to_owned(),
+            updated_at: "2024-01-15T10:00:00Z".to_owned(),
+            deadline: Some("2024-07-01".to_owned()),
         };
 
         assert_eq!(project.id, "test-123");
         assert_eq!(project.name, "Wedding Shoot");
         assert_eq!(project.client_name, "John Doe");
         assert_eq!(project.status, ProjectStatus::New);
-        assert_eq!(project.deadline, Some("2024-07-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-07-01".to_owned()));
     }
 
     #[test]
     fn test_project_without_deadline() {
         let project = Project {
-            id: "test-456".to_string(),
-            name: "Portrait".to_string(),
-            client_name: "Jane Smith".to_string(),
-            date: "2024-05-20".to_string(),
-            shoot_type: "Portrait".to_string(),
+            id: "test-456".to_owned(),
+            name: "Portrait".to_owned(),
+            client_name: "Jane Smith".to_owned(),
+            date: "2024-05-20".to_owned(),
+            shoot_type: "Portrait".to_owned(),
             status: ProjectStatus::Editing,
-            folder_path: "/path".to_string(),
-            created_at: "2024-01-15T10:00:00Z".to_string(),
-            updated_at: "2024-01-15T10:00:00Z".to_string(),
+            folder_path: "/path".to_owned(),
+            created_at: "2024-01-15T10:00:00Z".to_owned(),
+            updated_at: "2024-01-15T10:00:00Z".to_owned(),
             deadline: None,
         };
 
@@ -725,15 +728,15 @@ mod tests {
 
         for status in statuses {
             let project = Project {
-                id: "test".to_string(),
-                name: "Test".to_string(),
-                client_name: "Client".to_string(),
-                date: "2024-01-01".to_string(),
-                shoot_type: "Event".to_string(),
+                id: "test".to_owned(),
+                name: "Test".to_owned(),
+                client_name: "Client".to_owned(),
+                date: "2024-01-01".to_owned(),
+                shoot_type: "Event".to_owned(),
                 status: status.clone(),
-                folder_path: "/path".to_string(),
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-01T00:00:00Z".to_string(),
+                folder_path: "/path".to_owned(),
+                created_at: "2024-01-01T00:00:00Z".to_owned(),
+                updated_at: "2024-01-01T00:00:00Z".to_owned(),
                 deadline: None,
             };
 
@@ -747,7 +750,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let project_base = temp_dir.path().join("CreatorOps").join("Projects");
 
@@ -788,7 +791,7 @@ mod tests {
         assert_eq!(project.name, "Wedding Shoot");
         assert_eq!(project.client_name, "John Doe");
         assert_eq!(project.status, ProjectStatus::New);
-        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-02-01".to_owned()));
 
         // Verify folders were created
         let folder_path = std::path::PathBuf::from(&project.folder_path);
@@ -838,7 +841,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         let project_folder = temp_dir.path().join("test_project");
         std::fs::create_dir_all(&project_folder).unwrap();
@@ -942,7 +945,7 @@ mod tests {
         .unwrap();
 
         let project = get_project_by_id(&db, "upd-2").unwrap();
-        assert_eq!(project.deadline, Some("2024-03-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-03-01".to_owned()));
     }
 
     #[tokio::test]
@@ -961,7 +964,7 @@ mod tests {
         let project = get_project_by_id(&db, "get-1").unwrap();
         assert_eq!(project.id, "get-1");
         assert_eq!(project.name, "Get Test");
-        assert_eq!(project.deadline, Some("2024-02-01".to_string()));
+        assert_eq!(project.deadline, Some("2024-02-01".to_owned()));
     }
 
     #[test]
@@ -970,7 +973,7 @@ mod tests {
 
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("test.db");
-        let db = Database::new_with_path(db_path).unwrap();
+        let db = Database::new_with_path(&db_path).unwrap();
 
         // Insert project with invalid status
         db.execute(|conn| {
@@ -1007,12 +1010,12 @@ mod tests {
     #[test]
     fn test_deadline_filtering() {
         // Test that empty string deadline is converted to None
-        let deadline = Some("".to_string());
+        let deadline = Some(String::new());
         let filtered = deadline.filter(|d| !d.is_empty());
         assert_eq!(filtered, None);
 
-        let deadline = Some("2024-03-01".to_string());
+        let deadline = Some("2024-03-01".to_owned());
         let filtered = deadline.filter(|d| !d.is_empty());
-        assert_eq!(filtered, Some("2024-03-01".to_string()));
+        assert_eq!(filtered, Some("2024-03-01".to_owned()));
     }
 }

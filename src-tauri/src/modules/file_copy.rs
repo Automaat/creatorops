@@ -1,3 +1,4 @@
+#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -37,8 +38,10 @@ fn get_file_type(path: &Path) -> Option<&'static str> {
 }
 
 // Global map of active import cancellation tokens
+type ImportTokensMap = Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>>;
+
 lazy_static::lazy_static! {
-    static ref IMPORT_TOKENS: Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>> =
+    static ref IMPORT_TOKENS: ImportTokensMap =
         Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 }
 
@@ -64,6 +67,7 @@ pub struct ImportProgress {
 }
 
 /// Copy files from source to destination with parallel processing
+#[allow(clippy::too_many_lines)] // Complex import logic requires detailed handling
 #[tauri::command]
 pub async fn copy_files(
     app: AppHandle,
@@ -96,7 +100,7 @@ pub async fn copy_files(
 
     let mut tasks = Vec::new();
 
-    for src_path in source_paths.iter() {
+    for src_path in &source_paths {
         let src = PathBuf::from(src_path);
         let file_name = src
             .file_name()
@@ -123,16 +127,18 @@ pub async fn copy_files(
         let app_clone = app.clone();
 
         let task = tokio::spawn(async move {
-            let _permit = semaphore_clone.acquire().await.unwrap();
+            let _permit = semaphore_clone.acquire().await.map_err(|e| e.to_string())?;
 
             // Check if cancelled before starting work
             if cancel_token_clone.is_cancelled() {
-                return Err("Import cancelled".to_string());
+                return Err("Import cancelled".to_owned());
             }
 
             match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
                 Ok(size) => {
                     let copied = files_copied_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                    // Safe cast: file sizes fit in usize on target platform
+                    #[allow(clippy::cast_possible_truncation)]
                     total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
 
                     // Track photo/video counts
@@ -160,9 +166,9 @@ pub async fn copy_files(
                 }
                 Err(e) => {
                     if cancel_token_clone.is_cancelled() {
-                        return Err("Import cancelled".to_string());
+                        return Err("Import cancelled".to_owned());
                     }
-                    eprintln!("Failed to copy {} after retries: {}", file_name, e);
+                    // Copy failed after retries - track as skipped
                     files_skipped_clone.fetch_add(1, Ordering::SeqCst);
                     skipped_files_clone.lock().await.push(file_name);
                     Err(e)
@@ -176,13 +182,14 @@ pub async fn copy_files(
     // Wait for all tasks and handle errors
     let mut cancelled = false;
     for result in futures::future::join_all(tasks).await {
+        #[allow(clippy::match_same_arms)] // Different semantics: success vs failure
         match result {
-            Ok(Ok(())) => {}
+            Ok(Ok(())) => {} // Success
             Ok(Err(e)) if e == "Import cancelled" => {
                 cancelled = true;
             }
             Ok(Err(_)) => {} // File copy failed, already counted as skipped
-            Err(e) => return Err(format!("Task failed: {}", e)),
+            Err(e) => return Err(format!("Task failed: {e}")),
         }
     }
 
@@ -202,9 +209,9 @@ pub async fn copy_files(
     Ok(CopyResult {
         success: !cancelled && files_copied > 0,
         error: if cancelled {
-            Some(format!("Import cancelled ({} files copied)", files_copied))
+            Some(format!("Import cancelled ({files_copied} files copied)"))
         } else if files_skipped > 0 {
-            Some(format!("{} file(s) skipped due to errors", files_skipped))
+            Some(format!("{files_skipped} file(s) skipped due to errors"))
         } else {
             None
         },
@@ -229,7 +236,7 @@ async fn copy_file_with_retry(
 
     Retry::spawn(retry_strategy, || async {
         if cancel_token.is_cancelled() {
-            return Err("Import cancelled".to_string());
+            return Err("Import cancelled".to_owned());
         }
         // Use fast native copy instead of manual chunking
         tokio::fs::copy(src, dest).await.map_err(|e| e.to_string())
@@ -241,14 +248,16 @@ async fn copy_file_with_retry(
 #[tauri::command]
 pub async fn cancel_import(import_id: String) -> Result<(), String> {
     let tokens = IMPORT_TOKENS.lock().await;
-    if let Some(token) = tokens.get(&import_id) {
-        token.cancel();
-        Ok(())
-    } else {
-        Err("Import not found or already completed".to_string())
-    }
+    tokens.get(&import_id).map_or_else(
+        || Err("Import not found or already completed".to_owned()),
+        |token| {
+            token.cancel();
+            Ok(())
+        },
+    )
 }
 
+#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,7 +299,7 @@ mod tests {
             error: None,
             files_copied: 10,
             files_skipped: 2,
-            skipped_files: vec!["file1.jpg".to_string()],
+            skipped_files: vec!["file1.jpg".to_owned()],
             total_bytes: 1024,
             photos_copied: 8,
             videos_copied: 2,
@@ -307,11 +316,11 @@ mod tests {
         let progress = ImportProgress {
             files_copied: 5,
             total_files: 10,
-            current_file: "test.jpg".to_string(),
+            current_file: "test.jpg".to_owned(),
         };
 
         let json = serde_json::to_string(&progress).unwrap();
-        assert!(json.contains("5"));
+        assert!(json.contains('5'));
         assert!(json.contains("10"));
         assert!(json.contains("test.jpg"));
     }
@@ -380,7 +389,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancel_import() {
-        let import_id = "test-import-123".to_string();
+        let import_id = "test-import-123".to_owned();
         let cancel_token = CancellationToken::new();
 
         {
@@ -395,7 +404,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancel_import_not_found() {
-        let result = cancel_import("nonexistent-import".to_string()).await;
+        let result = cancel_import("nonexistent-import".to_owned()).await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Import not found or already completed");
     }
@@ -404,13 +413,13 @@ mod tests {
     fn test_copy_result_with_errors() {
         let result = CopyResult {
             success: false,
-            error: Some("3 file(s) skipped due to errors".to_string()),
+            error: Some("3 file(s) skipped due to errors".to_owned()),
             files_copied: 5,
             files_skipped: 3,
             skipped_files: vec![
-                "file1.jpg".to_string(),
-                "file2.mp4".to_string(),
-                "file3.png".to_string(),
+                "file1.jpg".to_owned(),
+                "file2.mp4".to_owned(),
+                "file3.png".to_owned(),
             ],
             total_bytes: 2048,
             photos_copied: 4,
@@ -427,7 +436,7 @@ mod tests {
     fn test_copy_result_cancelled() {
         let result = CopyResult {
             success: false,
-            error: Some("Import cancelled (10 files copied)".to_string()),
+            error: Some("Import cancelled (10 files copied)".to_owned()),
             files_copied: 10,
             files_skipped: 0,
             skipped_files: vec![],
@@ -443,16 +452,16 @@ mod tests {
 
     #[test]
     fn test_all_photo_extensions() {
-        for ext in PHOTO_EXTENSIONS.iter() {
-            let path = format!("test.{}", ext);
+        for ext in PHOTO_EXTENSIONS {
+            let path = format!("test.{ext}");
             assert_eq!(get_file_type(Path::new(&path)), Some("photo"));
         }
     }
 
     #[test]
     fn test_all_video_extensions() {
-        for ext in VIDEO_EXTENSIONS.iter() {
-            let path = format!("test.{}", ext);
+        for ext in VIDEO_EXTENSIONS {
+            let path = format!("test.{ext}");
             assert_eq!(get_file_type(Path::new(&path)), Some("video"));
         }
     }
@@ -489,7 +498,7 @@ mod tests {
         let progress = ImportProgress {
             files_copied: 10,
             total_files: 10,
-            current_file: "last.jpg".to_string(),
+            current_file: "last.jpg".to_owned(),
         };
 
         assert_eq!(progress.files_copied, progress.total_files);
@@ -627,8 +636,7 @@ mod tests {
             assert_eq!(
                 get_file_type(Path::new(file)),
                 Some("photo"),
-                "Failed for {}",
-                file
+                "Failed for {file}"
             );
         }
 
@@ -642,15 +650,14 @@ mod tests {
             assert_eq!(
                 get_file_type(Path::new(file)),
                 Some("video"),
-                "Failed for {}",
-                file
+                "Failed for {file}"
             );
         }
     }
 
     #[tokio::test]
     async fn test_cancel_import_cancels_token() {
-        let import_id = "import-to-cancel".to_string();
+        let import_id = "import-to-cancel".to_owned();
         let token = CancellationToken::new();
 
         {
@@ -669,10 +676,10 @@ mod tests {
     fn test_copy_result_with_partial_success() {
         let result = CopyResult {
             success: true,
-            error: Some("2 file(s) skipped due to errors".to_string()),
+            error: Some("2 file(s) skipped due to errors".to_owned()),
             files_copied: 8,
             files_skipped: 2,
-            skipped_files: vec!["bad1.jpg".to_string(), "bad2.mp4".to_string()],
+            skipped_files: vec!["bad1.jpg".to_owned(), "bad2.mp4".to_owned()],
             total_bytes: 8192,
             photos_copied: 6,
             videos_copied: 2,
@@ -759,7 +766,7 @@ mod tests {
         let progress = ImportProgress {
             files_copied: 0,
             total_files: 100,
-            current_file: "".to_string(),
+            current_file: String::new(),
         };
 
         assert_eq!(progress.files_copied, 0);
@@ -771,11 +778,13 @@ mod tests {
         let progress = ImportProgress {
             files_copied: 50,
             total_files: 100,
-            current_file: "photo_50.jpg".to_string(),
+            current_file: "photo_50.jpg".to_owned(),
         };
 
+        // Safe cast: small test values well within f64 mantissa precision
+        #[allow(clippy::cast_precision_loss)]
         let percent = (progress.files_copied as f64 / progress.total_files as f64) * 100.0;
-        assert_eq!(percent, 50.0);
+        assert!((percent - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -802,7 +811,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancel_import_idempotent() {
-        let import_id = "double-cancel-test".to_string();
+        let import_id = "double-cancel-test".to_owned();
         let token = CancellationToken::new();
 
         {
@@ -843,10 +852,10 @@ mod tests {
     fn test_copy_result_all_skipped() {
         let result = CopyResult {
             success: false,
-            error: Some("10 file(s) skipped due to errors".to_string()),
+            error: Some("10 file(s) skipped due to errors".to_owned()),
             files_copied: 0,
             files_skipped: 10,
-            skipped_files: vec!["f1.jpg".to_string(), "f2.jpg".to_string()],
+            skipped_files: vec!["f1.jpg".to_owned(), "f2.jpg".to_owned()],
             total_bytes: 0,
             photos_copied: 0,
             videos_copied: 0,
