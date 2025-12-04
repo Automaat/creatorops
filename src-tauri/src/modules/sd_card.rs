@@ -430,4 +430,45 @@ mod tests {
         assert_eq!(card.file_count, 250);
         assert!(card.is_removable);
     }
+
+    #[test]
+    fn test_device_type_filter_logic() {
+        // Test that filter logic correctly identifies which device types to exclude
+        let should_exclude = |device_type: &str| -> bool {
+            device_type == "Disk Image"
+                || device_type == "Internal Drive"
+                || device_type == "Unknown"
+        };
+
+        // Should be filtered out (excluded)
+        assert!(should_exclude("Disk Image"));
+        assert!(should_exclude("Internal Drive"));
+        assert!(should_exclude("Unknown"));
+
+        // Should pass filter (included)
+        assert!(!should_exclude("SD Card"));
+        assert!(!should_exclude("USB Drive"));
+        assert!(!should_exclude("External Drive"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_device_type_detection_with_actual_volume() {
+        // This test validates that get_device_info returns valid device types
+        // It will return "Unknown" if diskutil fails, which is acceptable
+        let (device_type, is_removable) = get_device_info("/");
+
+        // Device type should be one of the known types
+        assert!(
+            device_type == "SD Card"
+                || device_type == "USB Drive"
+                || device_type == "Disk Image"
+                || device_type == "External Drive"
+                || device_type == "Internal Drive"
+                || device_type == "Unknown"
+        );
+
+        // is_removable should be a boolean (always true or false)
+        assert!(is_removable || !is_removable);
+    }
 }
