@@ -6,11 +6,11 @@ import { invoke } from '@tauri-apps/api/core'
 import type { SDCard } from '../types'
 
 // Mock Tauri API
-vi.mock<typeof import('@tauri-apps/api/core')>('@tauri-apps/api/core', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
-vi.mock<typeof import('@tauri-apps/plugin-notification')>('@tauri-apps/plugin-notification', () => ({
+vi.mock('@tauri-apps/plugin-notification', () => ({
   isPermissionGranted: vi.fn(), requestPermission: vi.fn(), sendNotification: vi.fn(),
 }))
 
@@ -32,7 +32,7 @@ describe('useSDCardScanner', () => {
   it('initializes with empty sdCards array', async () => {
     mockInvoke.mockResolvedValue([])
 
-    const { result } = renderHook(() => useSDCardScanner(), {
+    const { result, unmount } = renderHook(() => useSDCardScanner(), {
       wrapper: NotificationProvider,
     })
 
@@ -42,6 +42,8 @@ describe('useSDCardScanner', () => {
     await waitFor(() => {
       expect(result.current.isScanning).toBe(false)
     })
+
+    unmount()
   })
 
   it('scans for SD cards on mount', async () => {
@@ -49,13 +51,15 @@ describe('useSDCardScanner', () => {
 
     mockInvoke.mockResolvedValue(mockCards)
 
-    const { result } = renderHook(() => useSDCardScanner(), {
+    const { result, unmount } = renderHook(() => useSDCardScanner(), {
       wrapper: NotificationProvider,
     })
 
     await waitFor(() => {
       expect(result.current.sdCards).toStrictEqual(mockCards)
     })
+
+    unmount()
   })
 
   it('sets isScanning state during scan', async () => {
@@ -66,7 +70,7 @@ describe('useSDCardScanner', () => {
       })
     )
 
-    const { result } = renderHook(() => useSDCardScanner(), {
+    const { result, unmount } = renderHook(() => useSDCardScanner(), {
       wrapper: NotificationProvider,
     })
 
@@ -82,6 +86,8 @@ describe('useSDCardScanner', () => {
     await waitFor(() => {
       expect(result.current.isScanning).toBe(false)
     })
+
+    unmount()
   })
 
   it('triggers onCardDetected callback for new cards', async () => {
@@ -112,67 +118,74 @@ describe('useSDCardScanner', () => {
     vi.useFakeTimers()
     mockInvoke.mockResolvedValue([])
 
+    const { unmount } = renderHook(() => useSDCardScanner(), {
+      wrapper: NotificationProvider,
+    })
+
+    // Wait for initial scan (flush promises without advancing timers)
     await act(async () => {
-      renderHook(() => useSDCardScanner(), {
-        wrapper: NotificationProvider,
-      })
+      await Promise.resolve()
     })
 
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledTimes(1)
-    })
+    expect(invoke).toHaveBeenCalledTimes(1)
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000)
-    })
-
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledTimes(2)
-    })
-
+    // First interval scan
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
 
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledTimes(3)
+    expect(invoke).toHaveBeenCalledTimes(2)
+
+    // Second interval scan
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
     })
 
+    expect(invoke).toHaveBeenCalledTimes(3)
+
+    unmount()
     vi.useRealTimers()
   })
 
   it('handles scan errors gracefully', async () => {
+    vi.useFakeTimers()
     const consoleError = console.error
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     mockInvoke.mockRejectedValue(new Error('Scan failed'))
 
-    const { result } = renderHook(() => useSDCardScanner(), {
+    const { result, unmount } = renderHook(() => useSDCardScanner(), {
       wrapper: NotificationProvider,
     })
 
-    await waitFor(() => {
-      expect(result.current.isScanning).toBe(false)
+    await act(async () => {
+      await Promise.resolve()
     })
 
+    expect(result.current.isScanning).toBe(false)
     expect(console.error).toHaveBeenCalledWith('Failed to scan SD cards:', expect.any(Error))
 
+    unmount()
     spy.mockRestore()
     console.error = consoleError
+    vi.useRealTimers()
   })
 
   it('provides manual scanForSDCards function', async () => {
+    vi.useFakeTimers()
     const mockCards: SDCard[] = [createMockCard(1)]
 
     mockInvoke.mockResolvedValue(mockCards)
 
-    const { result } = renderHook(() => useSDCardScanner(), {
+    const { result, unmount } = renderHook(() => useSDCardScanner(), {
       wrapper: NotificationProvider,
     })
 
-    await waitFor(() => {
-      expect(result.current.sdCards).toStrictEqual(mockCards)
+    await act(async () => {
+      await Promise.resolve()
     })
+
+    expect(result.current.sdCards).toStrictEqual(mockCards)
 
     const mockCards2: SDCard[] = [createMockCard(2, 2000)]
 
@@ -182,32 +195,33 @@ describe('useSDCardScanner', () => {
       await result.current.scanForSDCards()
     })
 
-    await waitFor(() => {
-      expect(result.current.sdCards).toStrictEqual(mockCards2)
-    })
+    expect(result.current.sdCards).toStrictEqual(mockCards2)
+
+    unmount()
+    vi.useRealTimers()
   })
 
   it('cleans up interval on unmount', async () => {
     vi.useFakeTimers()
     mockInvoke.mockResolvedValue([])
 
-    let unmount: () => void
+    const { unmount } = renderHook(() => useSDCardScanner(), {
+      wrapper: NotificationProvider,
+    })
 
+    // Wait for initial scan (flush promises without advancing timers)
     await act(async () => {
-      const result = renderHook(() => useSDCardScanner(), {
-        wrapper: NotificationProvider,
-      })
-      unmount = result.unmount
+      await Promise.resolve()
     })
 
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledTimes(1)
-    })
+    expect(invoke).toHaveBeenCalledTimes(1)
 
+    // Unmount the hook - this should clear the interval
     await act(async () => {
-      unmount!()
+      unmount()
     })
 
+    // Advance timers - should not trigger any more scans
     await act(async () => {
       await vi.advanceTimersByTimeAsync(10_000)
     })
