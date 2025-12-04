@@ -33,7 +33,6 @@
     "eslint/func-style": "off",
     "eslint/no-console": "off",
     "eslint/no-extend-native": "off",
-    "eslint/prefer-destructuring": "off",
     "eslint/sort-imports": "off",
     "eslint/no-empty-function": "off",
     "eslint/arrow-body-style": "off",
@@ -53,6 +52,7 @@
     "typescript/promise-function-async": "off",
     "typescript/no-unnecessary-type-assertion": "off",
     "typescript/no-unsafe-type-assertion": "off",
+    "react/jsx-filename-extension": ["warn", { "allow": "as-needed", "extensions": [".jsx", ".tsx"] }],
 
     // === Reasonable Limits (Override impossible defaults) ===
     "eslint/max-lines-per-function": ["warn", { "max": 100, "skipBlankLines": true, "skipComments": true }],

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type {
-  ArchiveJob,
-  BackupDestination,
-  CopyResult,
-  ImportHistory,
-  Project,
-  SDCard,
+import {
+  ProjectStatus,
+  type ArchiveJob,
+  type BackupDestination,
+  type CopyResult,
+  type ImportHistory,
+  type Project,
+  type SDCard,
 } from '../types'
-import { ProjectStatus } from '../types'
 import { CreateProject } from './CreateProject'
 import { useSDCardScanner } from '../hooks/useSDCardScanner'
+import { useNotification } from '../hooks/useNotification'
 import { DatePicker } from './DatePicker'
 import { formatDisplayDate } from '../utils/formatting'
 import { isOverdue, sortProjects } from '../utils/project'
@@ -42,6 +43,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const [homeDir, setHomeDir] = useState<string>('')
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
+  const { error: showError } = useNotification()
 
   const replaceHomeWithTilde = (path: string): string => {
     if (!homeDir) {
@@ -85,10 +87,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }, [])
 
   useEffect(() => {
-    void loadProjects()
-    void loadDestinations()
-    void loadArchiveLocation()
-    void loadHomeDirectory()
+    loadProjects().catch(console.error)
+    loadDestinations()
+    loadArchiveLocation()
+    loadHomeDirectory().catch(console.error)
   }, [loadProjects])
 
   async function loadHomeDirectory() {
@@ -110,7 +112,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         .then((project) => {
           setSelectedProject(project)
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           console.error('Failed to load project:', error)
         })
     } else {
@@ -170,7 +172,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedProject])
 
-  async function loadDestinations() {
+  function loadDestinations() {
     try {
       const stored = localStorage.getItem('backup_destinations')
       if (stored) {
@@ -194,7 +196,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     }
   }
 
-  async function loadArchiveLocation() {
+  function loadArchiveLocation() {
     try {
       const stored = localStorage.getItem('archive_location')
       if (stored) {
@@ -231,7 +233,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
 
   async function archiveProject(project: Project) {
     if (!archiveLocation) {
-      alert('Please configure archive location in Settings')
+      showError('Please configure archive location in Settings')
       return
     }
 
@@ -254,7 +256,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     } catch (error) {
       console.error('Failed to archive project:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
-      alert(`Failed to archive project: ${errorMessage}`)
+      showError(`Failed to archive project: ${errorMessage}`)
     }
   }
 
@@ -280,7 +282,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     } catch (error) {
       console.error('Failed to delete project:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
-      alert(`Failed to delete project: ${errorMessage}`)
+      showError(`Failed to delete project: ${errorMessage}`)
     } finally {
       setIsDeleting(false)
     }
@@ -331,7 +333,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      alert(`Failed to open ${appName}: ${errorMessage}`)
+      showError(`Failed to open ${appName}: ${errorMessage}`)
     }
   }
 
@@ -491,7 +493,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     } catch (error) {
       console.error('Failed to update deadline:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
-      alert(`Failed to update deadline: ${errorMessage}`)
+      showError(`Failed to update deadline: ${errorMessage}`)
     }
   }
 
@@ -854,7 +856,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     ) : (
                       <>
                         <p className="text-error">Import failed</p>
-                        {importResult.error != null && importResult.error !== '' && (
+                        {importResult.error !== null && importResult.error !== '' && (
                           <p className="text-secondary">{importResult.error}</p>
                         )}
                       </>
@@ -936,7 +938,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                     <span className="info-label">Date:</span>
                     <span>{project.date}</span>
                   </div>
-                  {project.deadline != null &&
+                  {project.deadline !== null &&
                     project.deadline !== '' &&
                     (() => {
                       const overdueFlag = isOverdue(project.deadline)

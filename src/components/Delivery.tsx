@@ -30,9 +30,9 @@ export function Delivery() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    void loadProjects()
-    void loadDestinations()
-    void loadDeliveryQueue()
+    loadProjects().catch(console.error)
+    loadDestinations()
+    loadDeliveryQueue().catch(console.error)
 
     // Listen for delivery progress events
     const unlisten = listen<DeliveryProgress>('delivery-progress', (event) => {
@@ -124,7 +124,7 @@ export function Delivery() {
     }
   }
 
-  async function loadDestinations() {
+  function loadDestinations() {
     try {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {

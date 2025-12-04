@@ -1,6 +1,6 @@
 // Type definitions
 
-export interface SDCard {
+interface SDCard {
   name: string
   path: string
   size: number
@@ -10,7 +10,7 @@ export interface SDCard {
   isRemovable: boolean
 }
 
-export interface Project {
+interface Project {
   id: string
   name: string
   clientName: string
@@ -23,7 +23,7 @@ export interface Project {
   deadline?: string
 }
 
-export enum ProjectStatus {
+enum ProjectStatus {
   New = 'New',
   Importing = 'Importing',
   Editing = 'Editing',
@@ -31,13 +31,13 @@ export enum ProjectStatus {
   Archived = 'Archived',
 }
 
-export interface ImportProgress {
+interface ImportProgress {
   filesCopied: number
   totalFiles: number
   currentFile: string
 }
 
-export interface FileInfo {
+interface FileInfo {
   name: string
   path: string
   size: number
@@ -45,7 +45,7 @@ export interface FileInfo {
   type: string
 }
 
-export interface ImportHistory {
+interface ImportHistory {
   id: string
   projectId: string
   projectName: string
@@ -62,7 +62,7 @@ export interface ImportHistory {
   errorMessage?: string
 }
 
-export interface CopyResult {
+interface CopyResult {
   success: boolean
   error?: string
   filesCopied: number
@@ -73,7 +73,7 @@ export interface CopyResult {
   videosCopied: number
 }
 
-export interface BackupDestination {
+interface BackupDestination {
   id: string
   name: string
   path: string
@@ -82,9 +82,9 @@ export interface BackupDestination {
 }
 
 // Note: Rust enum uses PascalCase (InProgress) but serde renames to lowercase for JSON
-export type BackupStatus = 'pending' | 'inprogress' | 'completed' | 'failed' | 'cancelled'
+type BackupStatus = 'pending' | 'inprogress' | 'completed' | 'failed' | 'cancelled'
 
-export interface BackupJob {
+interface BackupJob {
   id: string
   projectId: string
   projectName: string
@@ -104,7 +104,7 @@ export interface BackupJob {
   errorMessage?: string
 }
 
-export interface BackupProgress {
+interface BackupProgress {
   jobId: string
   fileName: string
   currentFile: number
@@ -115,7 +115,7 @@ export interface BackupProgress {
   eta: number
 }
 
-export interface BackupHistory {
+interface BackupHistory {
   id: string
   projectId: string
   projectName: string
@@ -130,9 +130,9 @@ export interface BackupHistory {
   errorMessage?: string
 }
 
-export type JobStatus = 'pending' | 'inprogress' | 'completed' | 'failed'
+type JobStatus = 'pending' | 'inprogress' | 'completed' | 'failed'
 
-export interface DeliveryJob {
+interface DeliveryJob {
   id: string
   projectId: string
   projectName: string
@@ -151,7 +151,7 @@ export interface DeliveryJob {
   manifestPath?: string
 }
 
-export interface DeliveryDestination {
+interface DeliveryDestination {
   id: string
   name: string
   path: string
@@ -159,7 +159,7 @@ export interface DeliveryDestination {
   createdAt: string
 }
 
-export interface DeliveryProgress {
+interface DeliveryProgress {
   jobId: string
   fileName: string
   currentFile: number
@@ -170,7 +170,7 @@ export interface DeliveryProgress {
   eta: number
 }
 
-export interface ArchiveJob {
+interface ArchiveJob {
   id: string
   projectId: string
   projectName: string
@@ -189,7 +189,7 @@ export interface ArchiveJob {
   errorMessage?: string
 }
 
-export interface ProjectFile {
+interface ProjectFile {
   name: string
   path: string
   size: number
@@ -197,3 +197,25 @@ export interface ProjectFile {
   type: string
   relativePath: string
 }
+
+export type {
+  SDCard,
+  Project,
+  ImportProgress,
+  FileInfo,
+  ImportHistory,
+  CopyResult,
+  BackupDestination,
+  BackupStatus,
+  BackupJob,
+  BackupProgress,
+  BackupHistory,
+  JobStatus,
+  DeliveryJob,
+  DeliveryDestination,
+  DeliveryProgress,
+  ArchiveJob,
+  ProjectFile,
+}
+
+export { ProjectStatus }

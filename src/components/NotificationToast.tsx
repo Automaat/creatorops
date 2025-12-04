@@ -7,21 +7,15 @@ export function NotificationToast() {
   return (
     <div className="notification-container">
       {notifications.map((notification) => (
-        <div
-          key={notification.id}
-          className={`notification notification-${notification.type}`}
-          onClick={() => removeNotification(notification.id)}
-        >
+        <div key={notification.id} className={`notification notification-${notification.type}`}>
           <div className="notification-content">
             <span className="notification-icon">{getIcon(notification.type)}</span>
             <span className="notification-message">{notification.message}</span>
           </div>
           <button
+            type="button"
             className="notification-close"
-            onClick={(e) => {
-              e.stopPropagation()
-              removeNotification(notification.id)
-            }}
+            onClick={() => removeNotification(notification.id)}
             aria-label="Dismiss notification"
           >
             ×

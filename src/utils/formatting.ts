@@ -1,27 +1,32 @@
-export function formatBytes(bytes: number): string {
+const BYTES_PER_KB = 1024
+const DECIMAL_PLACES = 2
+const SECONDS_PER_HOUR = 3600
+const SECONDS_PER_MINUTE = 60
+const MILLISECONDS_PER_SECOND = 1000
+
+function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
     return '0 B'
   }
   if (bytes === 0) {
     return '0 B'
   }
-  const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
+  const i = Math.floor(Math.log(bytes) / Math.log(BYTES_PER_KB))
+  return `${(bytes / BYTES_PER_KB ** i).toFixed(DECIMAL_PLACES)} ${sizes[i]}`
 }
 
-export function formatSpeed(bytesPerSecond: number): string {
+function formatSpeed(bytesPerSecond: number): string {
   return `${formatBytes(bytesPerSecond)}/s`
 }
 
-export function formatETA(seconds: number): string {
+function formatETA(seconds: number): string {
   if (seconds === 0) {
     return '--'
   }
-  const hrs = Math.floor(seconds / 3600)
-  const mins = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
+  const hrs = Math.floor(seconds / SECONDS_PER_HOUR)
+  const mins = Math.floor((seconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE)
+  const secs = seconds % SECONDS_PER_MINUTE
   if (hrs > 0) {
     return `${hrs}h ${mins}m`
   }
@@ -31,10 +36,10 @@ export function formatETA(seconds: number): string {
   return `${secs}s`
 }
 
-export function formatDate(dateString: string): string {
+function formatDate(dateString: string): string {
   try {
-    const timestamp = Number.parseInt(dateString, 10) * 1000
-    if (isNaN(timestamp)) {
+    const timestamp = Number.parseInt(dateString, 10) * MILLISECONDS_PER_SECOND
+    if (Number.isNaN(timestamp)) {
       return dateString
     }
 
@@ -51,10 +56,10 @@ export function formatDate(dateString: string): string {
   }
 }
 
-export function formatDateShort(dateString: string): string {
+function formatDateShort(dateString: string): string {
   try {
     const date = new Date(dateString)
-    if (isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime())) {
       return dateString
     }
 
@@ -98,9 +103,24 @@ const MONTH_NAMES_FULL = [
   'December',
 ] as const
 
-export function formatDisplayDate(date: Date | string): string {
+function formatDisplayDate(date: Date | string | undefined): string {
+  if (!date) {
+    return ''
+  }
   const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime())) {
+    return typeof date === 'string' ? date : ''
+  }
   return `${MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
 }
 
-export { MONTH_NAMES_SHORT, MONTH_NAMES_FULL }
+export {
+  formatBytes,
+  formatSpeed,
+  formatETA,
+  formatDate,
+  formatDateShort,
+  formatDisplayDate,
+  MONTH_NAMES_SHORT,
+  MONTH_NAMES_FULL,
+}
