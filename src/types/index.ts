@@ -201,7 +201,6 @@ interface ProjectFile {
 export type {
   SDCard,
   Project,
-  ProjectStatus,
   ImportProgress,
   FileInfo,
   ImportHistory,

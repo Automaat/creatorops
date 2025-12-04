@@ -103,9 +103,12 @@ const MONTH_NAMES_FULL = [
   'December',
 ] as const
 
-function formatDisplayDate(date: Date | string): string {
+function formatDisplayDate(date: Date | string | undefined): string {
+  if (!date) {
+    return ''
+  }
   const d = typeof date === 'string' ? new Date(date) : date
-  if (!d || Number.isNaN(d.getTime())) {
+  if (Number.isNaN(d.getTime())) {
     return typeof date === 'string' ? date : ''
   }
   return `${MONTH_NAMES_SHORT[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`

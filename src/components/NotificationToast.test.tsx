@@ -133,7 +133,7 @@ describe('notificationToast', () => {
     expect(screen.queryByText('Success message')).toBeNull()
   })
 
-  it('removes notification when notification itself is clicked', async () => {
+  it('removes notification when close button is clicked', async () => {
     const user = userEvent.setup()
 
     render(
@@ -145,8 +145,8 @@ describe('notificationToast', () => {
     await user.click(screen.getByText('Trigger Success'))
     expect(screen.getByText('Success message')).toBeTruthy()
 
-    const notification = screen.getByText('Success message').closest('.notification')
-    await user.click(notification!)
+    const closeButton = screen.getByLabelText('Dismiss notification')
+    await user.click(closeButton)
 
     expect(screen.queryByText('Success message')).toBeNull()
   })
