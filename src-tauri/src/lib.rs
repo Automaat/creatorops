@@ -42,6 +42,9 @@ use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::exit)] // Tauri's run() internally uses process::exit
 pub fn run() -> AppResult {
+    // Load .env file if present (for Google OAuth credentials in development)
+    let _ = dotenvy::dotenv();
+
     // Initialize database with dependency injection
     let db =
         modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
