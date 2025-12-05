@@ -309,6 +309,18 @@ input[type='checkbox'] + label {
   margin-bottom: var(--space-md);
 }
 
+.card-section-description {
+  margin-bottom: var(--space-sm);
+}
+
+.card-section-value {
+  margin: 0;
+}
+
+.ml-auto {
+  margin-left: auto;
+}
+
 /* Progress Bar */
 
 .progress {
@@ -1068,6 +1080,42 @@ input[type='checkbox'] + label {
   margin-bottom: var(--space-md);
 }
 
+/* Google Drive Integration */
+
+.drive-account-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-md);
+}
+
+.drive-account-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.drive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+
+.drive-conflict-mode {
+  margin-top: var(--space-md);
+}
+
+.drive-conflict-description {
+  margin-bottom: var(--space-sm);
+}
+
 .destination-item {
   display: flex;
   justify-content: space-between;
@@ -1408,6 +1456,36 @@ input[type='checkbox'] + label {
   border-radius: var(--radius-lg);
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
+}
+
+.shareable-link {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.link-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.link-container a {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  word-break: break-all;
+  transition: color var(--transition-fast);
+}
+
+.link-container a:hover {
+  color: var(--color-hover);
+  text-decoration: underline;
 }
 
 /* Project Actions */

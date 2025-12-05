@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useTheme } from '../hooks/useTheme'
 import { useNotification } from '../hooks/useNotification'
-import type { BackupDestination, DeliveryDestination } from '../types'
+import { migrateDeliveryDestinations } from '../utils/deliveryDestinations'
+import type { BackupDestination, DeliveryDestination, GoogleDriveAccount } from '../types'
 
 const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
 const DEFAULT_FILE_TEMPLATE = '{original}'
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
-  const { error: showError } = useNotification()
+  const { error: showError, success: showSuccess } = useNotification()
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
@@ -19,6 +22,11 @@ export function Settings() {
   const [folderTemplate, setFolderTemplate] = useState(DEFAULT_FOLDER_TEMPLATE)
   const [fileRenameTemplate, setFileRenameTemplate] = useState(DEFAULT_FILE_TEMPLATE)
   const [autoEject, setAutoEject] = useState(false)
+  const [driveAccount, setDriveAccount] = useState<GoogleDriveAccount | null>(null)
+  const [driveConflictMode, setDriveConflictMode] = useState<'overwrite' | 'rename' | 'skip'>(
+    'rename'
+  )
+  const [connectingDrive, setConnectingDrive] = useState(false)
 
   useEffect(() => {
     loadDestinations()
@@ -27,6 +35,8 @@ export function Settings() {
     loadArchiveLocation()
     loadTemplates()
     loadAutoEject()
+    loadDriveAccount().catch(console.error)
+    loadDriveConflictMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -102,19 +112,9 @@ export function Settings() {
       const stored = localStorage.getItem('delivery_destinations')
       if (stored) {
         const parsed: unknown = JSON.parse(stored)
-        if (
-          Array.isArray(parsed) &&
-          parsed.every(
-            (item): item is DeliveryDestination =>
-              typeof item === 'object' &&
-              item !== null &&
-              'id' in item &&
-              'name' in item &&
-              'path' in item
-          )
-        ) {
-          setDeliveryDestinations(parsed)
-        }
+        const migrated = migrateDeliveryDestinations(parsed)
+        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+        setDeliveryDestinations(migrated)
       }
     } catch (error) {
       console.error('Failed to load delivery destinations:', error)
@@ -161,6 +161,7 @@ export function Settings() {
 
       if (selected) {
         const newDest: DeliveryDestination = {
+          type: 'local',
           createdAt: new Date().toISOString(),
           enabled: true,
           id: crypto.randomUUID(),
@@ -260,6 +261,100 @@ export function Settings() {
     saveFileRenameTemplate(DEFAULT_FILE_TEMPLATE)
   }
 
+  async function loadDriveAccount() {
+    try {
+      const account = await invoke<GoogleDriveAccount | null>('get_google_drive_account')
+      setDriveAccount(account)
+    } catch (error) {
+      console.error('Failed to load Google Drive account:', error)
+    }
+  }
+
+  function loadDriveConflictMode() {
+    try {
+      const stored = localStorage.getItem('drive_conflict_mode')
+      if (stored && (stored === 'overwrite' || stored === 'rename' || stored === 'skip')) {
+        setDriveConflictMode(stored)
+      }
+    } catch (error) {
+      console.error('Failed to load conflict mode:', error)
+    }
+  }
+
+  function saveDriveConflictMode(mode: 'overwrite' | 'rename' | 'skip') {
+    localStorage.setItem('drive_conflict_mode', mode)
+    setDriveConflictMode(mode)
+  }
+
+  async function handleConnectDrive() {
+    try {
+      setConnectingDrive(true)
+      const { authUrl } = await invoke<{ authUrl: string }>('start_google_drive_auth')
+      await openUrl(authUrl).catch((err: unknown) => {
+        console.error('Failed to open auth URL:', err)
+      })
+
+      // Poll for authentication completion
+      const maxAttempts = 150 // 5 minutes (150 * 2 seconds)
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          const account = await invoke<GoogleDriveAccount>('complete_google_drive_auth')
+          setDriveAccount(account)
+          showSuccess('Google Drive connected successfully')
+          return
+        } catch {
+          // Authentication not complete yet, wait and retry
+          if (attempt < maxAttempts - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+          } else {
+            throw new Error('Authentication timeout - please try again')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to connect Google Drive:', error)
+      showError(error instanceof Error ? error.message : 'Failed to connect Google Drive')
+    } finally {
+      setConnectingDrive(false)
+    }
+  }
+
+  async function handleDisconnectDrive() {
+    try {
+      await invoke('remove_google_drive_account')
+      setDriveAccount(null)
+      showSuccess('Google Drive disconnected')
+    } catch (error) {
+      console.error('Failed to disconnect Google Drive:', error)
+      showError('Failed to disconnect Google Drive')
+    }
+  }
+
+  async function handleConfigureParentFolder() {
+    try {
+      const folderId = prompt('Enter Google Drive parent folder ID (or leave empty for root):')
+      if (folderId === null) return // User cancelled
+      await invoke('set_drive_parent_folder', {
+        folderId: folderId.trim() || null,
+      })
+      await loadDriveAccount()
+      showSuccess('Parent folder configured')
+    } catch (error) {
+      console.error('Failed to configure parent folder:', error)
+      showError('Failed to configure parent folder')
+    }
+  }
+
+  async function handleTestConnection() {
+    try {
+      await invoke('test_google_drive_connection')
+      showSuccess('Connection test successful')
+    } catch (error) {
+      console.error('Connection test failed:', error)
+      showError('Connection test failed')
+    }
+  }
+
   return (
     <div className="content-body">
       <div className="settings-header">
@@ -274,7 +369,7 @@ export function Settings() {
               <div className="flex flex-col gap-md">
                 <div>
                   <div className="font-medium">Theme</div>
-                  <p className="text-secondary text-sm" style={{ marginBottom: 'var(--space-sm)' }}>
+                  <p className="text-secondary text-sm card-section-description">
                     Choose how CreatorOps looks
                   </p>
                 </div>
@@ -376,9 +471,14 @@ export function Settings() {
                               checked={dest.enabled}
                               onChange={() => toggleDeliveryDestination(dest.id)}
                             />
-                            <span className="font-medium">{dest.name}</span>
+                            <span className="font-medium">
+                              {dest.type === 'google-drive' && '☁️ '}
+                              {dest.name}
+                            </span>
                           </div>
-                          <p className="text-secondary text-sm">{dest.path}</p>
+                          <p className="text-secondary text-sm">
+                            {dest.type === 'local' ? dest.path : 'Google Drive'}
+                          </p>
                         </div>
                         <button
                           onClick={() => removeDeliveryDestination(dest.id)}
@@ -413,19 +513,124 @@ export function Settings() {
           </section>
 
           <section>
+            <h2>Google Drive Integration</h2>
+            <div className="card">
+              <div className="flex flex-col gap-md">
+                <p className="text-secondary text-sm">
+                  Connect Google Drive for cloud-based client deliveries
+                </p>
+
+                {driveAccount ? (
+                  <>
+                    <div className="drive-account-info">
+                      <div className="drive-account-details">
+                        <div className="font-medium">{driveAccount.displayName}</div>
+                        <p className="text-secondary text-sm">{driveAccount.email}</p>
+                        {driveAccount.parentFolderId && (
+                          <p className="text-secondary text-sm">
+                            Parent folder: {driveAccount.parentFolderId}
+                          </p>
+                        )}
+                      </div>
+                      <div className="drive-actions">
+                        <button
+                          onClick={() => void handleConfigureParentFolder()}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Configure Parent Folder
+                        </button>
+                        <button
+                          onClick={() => void handleTestConnection()}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Test Connection
+                        </button>
+                        <button
+                          onClick={() => void handleDisconnectDrive()}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="drive-conflict-mode">
+                      <h4 className="card-section-label">File Conflict Handling</h4>
+                      <p className="text-secondary text-sm drive-conflict-description">
+                        What to do when a file already exists in Google Drive
+                      </p>
+                      <div className="flex flex-col gap-sm">
+                        <label className="flex align-center gap-sm">
+                          <input
+                            type="radio"
+                            name="conflict-mode"
+                            value="overwrite"
+                            checked={driveConflictMode === 'overwrite'}
+                            onChange={(e) =>
+                              saveDriveConflictMode(
+                                e.target.value as 'overwrite' | 'rename' | 'skip'
+                              )
+                            }
+                          />
+                          <span>Overwrite existing files</span>
+                        </label>
+                        <label className="flex align-center gap-sm">
+                          <input
+                            type="radio"
+                            name="conflict-mode"
+                            value="rename"
+                            checked={driveConflictMode === 'rename'}
+                            onChange={(e) =>
+                              saveDriveConflictMode(
+                                e.target.value as 'overwrite' | 'rename' | 'skip'
+                              )
+                            }
+                          />
+                          <span>Rename new files (e.g., photo (1).jpg)</span>
+                        </label>
+                        <label className="flex align-center gap-sm">
+                          <input
+                            type="radio"
+                            name="conflict-mode"
+                            value="skip"
+                            checked={driveConflictMode === 'skip'}
+                            onChange={(e) =>
+                              saveDriveConflictMode(
+                                e.target.value as 'overwrite' | 'rename' | 'skip'
+                              )
+                            }
+                          />
+                          <span>Skip existing files</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => void handleConnectDrive()}
+                    className="btn btn-primary"
+                    disabled={connectingDrive}
+                  >
+                    {connectingDrive ? 'Connecting...' : 'Connect Google Drive'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section>
             <h2>Storage Paths</h2>
             <div className="card">
               <div className="flex flex-col">
                 <div className="card-section">
                   <h4 className="card-section-label">Default Import Location</h4>
                   <div className="flex gap-md align-center">
-                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                    <p className="text-secondary text-sm card-section-value">
                       {defaultImportLocation || '~/CreatorOps/Projects'}
                     </p>
                     <button
                       onClick={() => void selectDefaultImportLocation()}
-                      className="btn btn-primary"
-                      style={{ marginLeft: 'auto' }}
+                      className="btn btn-primary ml-auto"
                     >
                       {defaultImportLocation ? 'Change Location' : 'Select Location'}
                     </button>
@@ -435,13 +640,12 @@ export function Settings() {
                 <div className="card-section">
                   <h4 className="card-section-label">Archive Location</h4>
                   <div className="flex gap-md align-center">
-                    <p className="text-secondary text-sm" style={{ margin: 0 }}>
+                    <p className="text-secondary text-sm card-section-value">
                       {archiveLocation || 'Not configured'}
                     </p>
                     <button
                       onClick={() => void selectArchiveLocation()}
-                      className="btn btn-primary"
-                      style={{ marginLeft: 'auto' }}
+                      className="btn btn-primary ml-auto"
                     >
                       Select Location
                     </button>

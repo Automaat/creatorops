@@ -149,15 +149,38 @@ interface DeliveryJob {
   completedAt?: string
   errorMessage?: string
   manifestPath?: string
+  shareableLink?: string
+  destinationType?: 'local' | 'google-drive'
 }
 
-interface DeliveryDestination {
+interface GoogleDriveAccount {
   id: string
-  name: string
-  path: string
+  email: string
+  displayName: string
   enabled: boolean
   createdAt: string
+  lastAuthenticated: string
+  parentFolderId?: string
 }
+
+type DeliveryDestination =
+  | {
+      type: 'local'
+      id: string
+      name: string
+      path: string
+      enabled: boolean
+      createdAt: string
+    }
+  | {
+      type: 'google-drive'
+      id: string
+      name: string
+      accountId: string
+      folderId?: string
+      enabled: boolean
+      createdAt: string
+    }
 
 interface DeliveryProgress {
   jobId: string
@@ -216,6 +239,7 @@ export type {
   DeliveryProgress,
   ArchiveJob,
   ProjectFile,
+  GoogleDriveAccount,
 }
 
 export { ProjectStatus }
