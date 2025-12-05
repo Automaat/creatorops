@@ -1,7 +1,18 @@
 #![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
+use http_body_util::Full;
+use hyper::body::{Bytes, Incoming};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::net::TcpListener;
+use std::sync::{Arc, Mutex};
+use tokio::net::TcpListener as TokioTcpListener;
+use tokio::sync::oneshot;
 
 use crate::modules::db::Database;
 
@@ -34,30 +45,411 @@ struct TokenData {
     expires_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone)]
+struct PkceData {
+    verifier: String,
+    challenge: String,
+}
+
+type CodeSender = Arc<Mutex<Option<oneshot::Sender<String>>>>;
+type CodeReceiver = Arc<Mutex<Option<oneshot::Receiver<String>>>>;
+
+#[derive(Debug, Clone)]
+struct OAuthSession {
+    pkce: PkceData,
+    state: String,
+    port: u16,
+    code_sender: CodeSender,
+}
+
+lazy_static::lazy_static! {
+    static ref OAUTH_SESSION: Arc<Mutex<Option<OAuthSession>>> = Arc::new(Mutex::new(None));
+    static ref OAUTH_CODE_RECEIVER: CodeReceiver = Arc::new(Mutex::new(None));
+}
+
+// OAuth Helper Functions
+
+fn generate_pkce() -> PkceData {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    // Generate random verifier (43-128 characters)
+    let verifier: String = (0..128)
+        .map(|_| {
+            let idx = rng.gen_range(0..62);
+            match idx {
+                0..=25 => (b'A' + idx) as char,
+                26..=51 => (b'a' + (idx - 26)) as char,
+                _ => (b'0' + (idx - 52)) as char,
+            }
+        })
+        .collect();
+
+    // Generate challenge: BASE64URL(SHA256(verifier))
+    let mut hasher = Sha256::new();
+    hasher.update(verifier.as_bytes());
+    let hash = hasher.finalize();
+    let challenge = URL_SAFE_NO_PAD.encode(hash);
+
+    PkceData {
+        verifier,
+        challenge,
+    }
+}
+
+fn generate_state() -> String {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..32)
+        .map(|_| {
+            let idx = rng.gen_range(0..62);
+            match idx {
+                0..=25 => (b'A' + idx) as char,
+                26..=51 => (b'a' + (idx - 26)) as char,
+                _ => (b'0' + (idx - 52)) as char,
+            }
+        })
+        .collect()
+}
+
+fn find_available_port() -> Result<u16, String> {
+    TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("Failed to bind to port: {e}"))?
+        .local_addr()
+        .map(|addr| addr.port())
+        .map_err(|e| format!("Failed to get port: {e}"))
+}
+
+async fn handle_oauth_redirect(
+    req: Request<Incoming>,
+) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
+    let uri = req.uri();
+    let query = uri.query().unwrap_or("");
+
+    // Parse query parameters
+    let params: std::collections::HashMap<String, String> = query
+        .split('&')
+        .filter_map(|param| {
+            let mut parts = param.splitn(2, '=');
+            Some((parts.next()?.to_owned(), parts.next()?.to_owned()))
+        })
+        .collect();
+
+    // Verify state parameter
+    let session_data = {
+        let session_guard = OAUTH_SESSION
+            .lock()
+            .map_err(|e| format!("Failed to lock OAuth session: {e}"))?;
+        session_guard.clone()
+    };
+
+    if let Some(session) = session_data.as_ref() {
+        if let (Some(code), Some(state)) = (params.get("code"), params.get("state")) {
+            if state == &session.state {
+                // Send code through channel
+                if let Ok(mut sender_guard) = session.code_sender.lock() {
+                    if let Some(sender) = sender_guard.take() {
+                        let _ = sender.send(code.clone());
+                    }
+                }
+
+                let response_body = r#"
+                    <!DOCTYPE html>
+                    <html>
+                    <head><title>CreatorOps - Authorization Successful</title></head>
+                    <body style="font-family: system-ui; text-align: center; padding: 50px;">
+                        <h1>✅ Authorization Successful</h1>
+                        <p>You can close this window and return to CreatorOps.</p>
+                    </body>
+                    </html>
+                "#;
+
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/html")
+                    .body(Full::new(Bytes::from(response_body)))?);
+            }
+        }
+    }
+
+    // Error case
+    let error_body = r#"
+        <!DOCTYPE html>
+        <html>
+        <head><title>CreatorOps - Authorization Failed</title></head>
+        <body style="font-family: system-ui; text-align: center; padding: 50px;">
+            <h1>❌ Authorization Failed</h1>
+            <p>Please try again in CreatorOps.</p>
+        </body>
+        </html>
+    "#;
+
+    Ok(Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .header("Content-Type", "text/html")
+        .body(Full::new(Bytes::from(error_body)))?)
+}
+
+#[derive(Debug, Deserialize)]
+struct TokenResponse {
+    access_token: String,
+    refresh_token: String,
+    expires_in: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct UserInfo {
+    email: String,
+    name: String,
+}
+
+async fn exchange_code_for_tokens(
+    code: &str,
+    client_id: &str,
+    client_secret: &str,
+    redirect_uri: &str,
+    code_verifier: &str,
+) -> Result<TokenResponse, String> {
+    let client = reqwest::Client::new();
+
+    let params = [
+        ("code", code),
+        ("client_id", client_id),
+        ("client_secret", client_secret),
+        ("redirect_uri", redirect_uri),
+        ("grant_type", "authorization_code"),
+        ("code_verifier", code_verifier),
+    ];
+
+    let response = client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Token exchange request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("Token exchange failed: {error_text}"));
+    }
+
+    response
+        .json::<TokenResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse token response: {e}"))
+}
+
+async fn get_user_info(access_token: &str) -> Result<UserInfo, String> {
+    let client = reqwest::Client::new();
+
+    let response = client
+        .get("https://www.googleapis.com/oauth2/v2/userinfo")
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .map_err(|e| format!("User info request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("User info request failed: {error_text}"));
+    }
+
+    response
+        .json::<UserInfo>()
+        .await
+        .map_err(|e| format!("Failed to parse user info: {e}"))
+}
+
 // OAuth Tauri Commands
 
 #[tauri::command]
 pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
-    // TODO: Implement OAuth flow startup
-    // 1. Load client secret from resources
-    // 2. Generate PKCE challenge
-    // 3. Find available port
-    // 4. Build auth URL
-    // 5. Spawn localhost server to capture redirect
+    // 1. Generate PKCE challenge
+    let pkce = generate_pkce();
+    let state = generate_state();
 
-    Err("Not implemented yet".to_owned())
+    // 2. Find available port
+    let port = find_available_port()?;
+
+    // 3. Create channel for auth code
+    let (tx, rx) = oneshot::channel::<String>();
+
+    // 4. Store session
+    {
+        let mut session_guard = OAUTH_SESSION
+            .lock()
+            .map_err(|_| "Failed to lock OAuth session".to_owned())?;
+        *session_guard = Some(OAuthSession {
+            pkce: pkce.clone(),
+            state: state.clone(),
+            port,
+            code_sender: Arc::new(Mutex::new(Some(tx))),
+        });
+    }
+
+    // 5. Spawn HTTP server
+    let addr = format!("127.0.0.1:{port}");
+    tokio::spawn(async move {
+        if let Ok(listener) = TokioTcpListener::bind(&addr).await {
+            // Accept connections for up to 5 minutes
+            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(300));
+            tokio::pin!(timeout);
+
+            loop {
+                tokio::select! {
+                    Ok((stream, _)) = listener.accept() => {
+                        let service = service_fn(handle_oauth_redirect);
+                        tokio::spawn(async move {
+                            let _ = http1::Builder::new()
+                                .serve_connection(hyper_util::rt::TokioIo::new(stream), service)
+                                .await;
+                        });
+                    }
+                    () = &mut timeout => break,
+                }
+            }
+        }
+    });
+
+    // Store receiver for complete_google_drive_auth to use
+    // We'll store it in a separate static for now
+    OAUTH_CODE_RECEIVER
+        .lock()
+        .map_err(|_| "Failed to lock code receiver".to_owned())?
+        .replace(rx);
+
+    // 6. Build auth URL
+    // Note: This uses hardcoded client ID - in production, load from resources
+    let client_id = std::env::var("GOOGLE_CLIENT_ID")
+        .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
+
+    let redirect_uri = format!("http://localhost:{port}");
+    let auth_url = format!(
+        "https://accounts.google.com/o/oauth2/v2/auth?\
+        client_id={}&\
+        redirect_uri={}&\
+        response_type=code&\
+        scope=https://www.googleapis.com/auth/drive.file%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile&\
+        state={}&\
+        code_challenge={}&\
+        code_challenge_method=S256&\
+        access_type=offline&\
+        prompt=consent",
+        urlencoding::encode(&client_id),
+        urlencoding::encode(&redirect_uri),
+        state,
+        pkce.challenge
+    );
+
+    Ok(OAuthState {
+        auth_url,
+        server_port: port,
+    })
 }
 
 #[tauri::command]
-pub async fn complete_google_drive_auth() -> Result<GoogleDriveAccount, String> {
-    // TODO: Implement OAuth completion
-    // 1. Wait for OAuth server to receive code
-    // 2. Exchange code for tokens
-    // 3. Get user profile (email, name)
-    // 4. Store tokens in keychain
-    // 5. Save account to database
+pub async fn complete_google_drive_auth(
+    db: tauri::State<'_, Database>,
+) -> Result<GoogleDriveAccount, String> {
+    // 1. Wait for OAuth server to receive code (with timeout)
+    let receiver = {
+        let mut receiver_guard = OAUTH_CODE_RECEIVER
+            .lock()
+            .map_err(|_| "Failed to lock code receiver".to_owned())?;
 
-    Err("Not implemented yet".to_owned())
+        receiver_guard
+            .take()
+            .ok_or_else(|| "No OAuth session in progress".to_owned())?
+    };
+
+    let code = tokio::time::timeout(tokio::time::Duration::from_secs(300), receiver)
+        .await
+        .map_err(|_| "OAuth timeout - no response received".to_owned())?
+        .map_err(|_| "Failed to receive auth code".to_owned())?;
+
+    // 2. Get session data
+    let session = {
+        let session_guard = OAUTH_SESSION
+            .lock()
+            .map_err(|_| "Failed to lock OAuth session".to_owned())?;
+        session_guard
+            .clone()
+            .ok_or_else(|| "OAuth session not found".to_owned())?
+    };
+
+    // 3. Exchange code for tokens
+    let client_id = std::env::var("GOOGLE_CLIENT_ID")
+        .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
+    let client_secret =
+        std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "YOUR_CLIENT_SECRET".to_owned());
+
+    let redirect_uri = format!("http://localhost:{}", session.port);
+
+    let token_response = exchange_code_for_tokens(
+        &code,
+        &client_id,
+        &client_secret,
+        &redirect_uri,
+        &session.pkce.verifier,
+    )
+    .await?;
+
+    // 4. Get user profile
+    let user_info = get_user_info(&token_response.access_token).await?;
+
+    // 5. Store tokens in keychain
+    let token_data = TokenData {
+        access_token: token_response.access_token.clone(),
+        refresh_token: token_response.refresh_token.clone(),
+        expires_at: Utc::now() + chrono::Duration::seconds(token_response.expires_in),
+    };
+    store_tokens_in_keychain(&user_info.email, &token_data)?;
+
+    // 6. Save account to database
+    let account = GoogleDriveAccount {
+        id: uuid::Uuid::new_v4().to_string(),
+        email: user_info.email.clone(),
+        display_name: user_info.name,
+        parent_folder_id: None,
+        enabled: true,
+        created_at: get_current_timestamp(),
+        last_authenticated: get_current_timestamp(),
+    };
+
+    db.execute(|conn| {
+        conn.execute(
+            "INSERT OR REPLACE INTO google_drive_accounts \
+             (id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                &account.id,
+                &account.email,
+                &account.display_name,
+                &account.parent_folder_id,
+                i32::from(account.enabled),
+                &account.created_at,
+                &account.last_authenticated,
+            ],
+        )?;
+        Ok(())
+    })
+    .map_err(|e: rusqlite::Error| format!("Failed to save account: {e}"))?;
+
+    // 7. Clear OAuth session
+    {
+        let mut session_guard = OAUTH_SESSION
+            .lock()
+            .map_err(|_| "Failed to lock OAuth session".to_owned())?;
+        *session_guard = None;
+    }
+
+    Ok(account)
 }
 
 #[tauri::command]
@@ -168,14 +560,53 @@ fn get_tokens_from_keychain(email: &str) -> Result<TokenData, String> {
     Ok(tokens)
 }
 
-#[allow(dead_code)]
-fn refresh_access_token(_refresh_token: &str) -> Result<TokenData, String> {
-    // TODO: Implement token refresh (will be async when implemented)
-    // 1. Load client secret
-    // 2. Make refresh token request to Google
-    // 3. Return new TokenData
+#[derive(Deserialize)]
+struct RefreshResponse {
+    access_token: String,
+    expires_in: i64,
+}
 
-    Err("Not implemented yet".to_owned())
+#[allow(dead_code)]
+async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> {
+    let client_id = std::env::var("GOOGLE_CLIENT_ID")
+        .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
+    let client_secret =
+        std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "YOUR_CLIENT_SECRET".to_owned());
+
+    let client = reqwest::Client::new();
+
+    let params = [
+        ("client_id", client_id.as_str()),
+        ("client_secret", client_secret.as_str()),
+        ("refresh_token", refresh_token),
+        ("grant_type", "refresh_token"),
+    ];
+
+    let response = client
+        .post("https://oauth2.googleapis.com/token")
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Token refresh request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("Token refresh failed: {error_text}"));
+    }
+
+    let refresh_response = response
+        .json::<RefreshResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse refresh response: {e}"))?;
+
+    Ok(TokenData {
+        access_token: refresh_response.access_token,
+        refresh_token: refresh_token.to_owned(),
+        expires_at: Utc::now() + chrono::Duration::seconds(refresh_response.expires_in),
+    })
 }
 
 // Helper Functions
@@ -252,25 +683,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_start_google_drive_auth_not_implemented() {
+    async fn test_start_google_drive_auth_generates_state() {
         let result = start_google_drive_auth().await;
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Not implemented yet");
+        assert!(result.is_ok());
+        let state = result.unwrap();
+        assert!(state.auth_url.contains("accounts.google.com"));
+        assert!(state.auth_url.contains("code_challenge"));
+        assert!(state.server_port > 0);
     }
 
-    #[tokio::test]
-    async fn test_complete_google_drive_auth_not_implemented() {
-        let result = complete_google_drive_auth().await;
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Not implemented yet");
-    }
-
-    #[test]
-    fn test_refresh_access_token_not_implemented() {
-        let result = refresh_access_token("test_token");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Not implemented yet");
-    }
+    // Note: complete_google_drive_auth requires tauri::State which is difficult to mock in tests
+    // It will be tested via integration tests or manual testing
 
     // Database-dependent tests
     use tempfile::TempDir;
