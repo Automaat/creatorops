@@ -672,5 +672,174 @@ describe('settings', () => {
         expect(mockInvoke).toHaveBeenCalledWith('test_google_drive_connection')
       })
     })
+
+    it('defaults to rename conflict mode', () => {
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      expect(localStorage.getItem('drive_conflict_mode')).toBeNull()
+    })
+
+    it('changes conflict mode to overwrite', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const overwriteRadio = screen.getByLabelText(/Overwrite existing files/)
+      await user.click(overwriteRadio)
+
+      expect(localStorage.getItem('drive_conflict_mode')).toBe('overwrite')
+    })
+
+    it('changes conflict mode to skip', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const skipRadio = screen.getByLabelText(/Skip existing files/)
+      await user.click(skipRadio)
+
+      expect(localStorage.getItem('drive_conflict_mode')).toBe('skip')
+    })
+
+    it('loads saved conflict mode', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      localStorage.setItem('drive_conflict_mode', 'overwrite')
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const overwriteRadio = screen.getByLabelText(/Overwrite existing files/) as HTMLInputElement
+      expect(overwriteRadio.checked).toBe(true)
+    })
+
+    it('displays parent folder ID when set', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: 'parent-folder-123',
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+        expect(screen.getByText(/Parent folder: parent-folder-123/)).toBeTruthy()
+      })
+    })
+
+    it('changes conflict mode to rename', async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const mockInvoke = vi.mocked(invoke)
+
+      localStorage.setItem('drive_conflict_mode', 'overwrite')
+
+      mockInvoke.mockImplementation((cmd: string) => {
+        if (cmd === 'get_google_drive_account') {
+          return Promise.resolve({
+            displayName: 'Test User',
+            email: 'test@example.com',
+            parentFolderId: null,
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Settings />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeTruthy()
+      })
+
+      const renameRadio = screen.getByLabelText(/Rename new files/)
+      await user.click(renameRadio)
+
+      expect(localStorage.getItem('drive_conflict_mode')).toBe('rename')
+    })
   })
 })
