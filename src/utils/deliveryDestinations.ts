@@ -18,9 +18,9 @@ export function migrateDeliveryDestinations(parsed: unknown): DeliveryDestinatio
           path: item.path as string,
           enabled: (item.enabled as boolean) ?? true,
           createdAt:
-            ('createdAt' in item && typeof item.createdAt === 'string'
+            'createdAt' in item && typeof item.createdAt === 'string'
               ? item.createdAt
-              : new Date().toISOString()),
+              : new Date().toISOString(),
         }
       }
     }

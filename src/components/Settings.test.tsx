@@ -15,7 +15,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({
 }))
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
-  open: vi.fn().mockResolvedValue(undefined),
+  openUrl: vi.fn().mockResolvedValue(undefined),
 }))
 
 const mockOpen = vi.mocked(open)

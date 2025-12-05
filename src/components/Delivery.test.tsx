@@ -47,8 +47,9 @@ const createMockProjectFile = (overrides?: Partial<ProjectFile>): ProjectFile =>
 })
 
 const createMockDeliveryDestination = (
-  overrides?: Partial<DeliveryDestination>
+  overrides?: Partial<Extract<DeliveryDestination, { type: 'local' }>>
 ): DeliveryDestination => ({
+  type: 'local',
   id: 'dest-1',
   name: 'Client Portal',
   path: '/Volumes/ClientDelivery',

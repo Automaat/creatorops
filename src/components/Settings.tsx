@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { open as openUrl } from '@tauri-apps/plugin-opener'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useTheme } from '../hooks/useTheme'
 import { useNotification } from '../hooks/useNotification'
 import { migrateDeliveryDestinations } from '../utils/deliveryDestinations'
@@ -290,7 +290,7 @@ export function Settings() {
     try {
       setConnectingDrive(true)
       const { authUrl } = await invoke<{ authUrl: string }>('start_google_drive_auth')
-      await openUrl(authUrl).catch((err) => {
+      await openUrl(authUrl).catch((err: unknown) => {
         console.error('Failed to open auth URL:', err)
       })
 
@@ -313,9 +313,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to connect Google Drive:', error)
-      showError(
-        error instanceof Error ? error.message : 'Failed to connect Google Drive'
-      )
+      showError(error instanceof Error ? error.message : 'Failed to connect Google Drive')
     } finally {
       setConnectingDrive(false)
     }
