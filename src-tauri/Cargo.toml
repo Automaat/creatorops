@@ -38,9 +38,16 @@ log = "0.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 google-drive3 = "6.0.0"
 yup-oauth2 = "11"
-hyper = "1.0"
+hyper = { version = "1.0", features = ["server", "http1"] }
 hyper-rustls = "0.27"
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["tokio"] }
 keyring = "3.0"
+rand = "0.8"
+base64 = "0.22"
+urlencoding = "2.1"
+reqwest = { version = "0.12", features = ["json"] }
+dotenvy = "0.15"
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -55,7 +55,7 @@ Add Google Drive as delivery destination alongside existing local filesystem des
 
 ### Phase 1: Backend Foundation
 
-**STATUS**: ✅ Foundation Complete | ⏳ OAuth Pending
+**STATUS**: ✅ Complete
 
 **Completed Work**:
 
@@ -65,14 +65,7 @@ Add Google Drive as delivery destination alongside existing local filesystem des
 - ✅ Working Tauri commands: get_google_drive_account, set_drive_parent_folder, remove_google_drive_account
 - ✅ Token management functions: store_tokens_in_keychain, get_tokens_from_keychain
 - ✅ Module registered in mod.rs and lib.rs
-- ✅ 7 unit tests passing (serialization, timestamp, CRUD)
-
-**Pending**:
-
-- ⏳ OAuth flow implementation (start_google_drive_auth, complete_google_drive_auth currently stubbed)
-- ⏳ PKCE generation/verification
-- ⏳ Localhost server for OAuth redirect
-- ⏳ Token refresh logic (refresh_access_token currently stubbed)
+- ✅ Unit tests passing (233 total tests)
 
 ---
 
@@ -194,6 +187,23 @@ export type DeliveryDestination =
 Migrate existing `delivery_destinations` from string paths to typed objects with `type: 'local'`.
 
 ### Phase 3: OAuth Implementation Details
+
+**STATUS**: ✅ Complete | PR: #44
+
+**Completed Work**:
+
+- ✅ OAuth PKCE flow implementation (start_google_drive_auth, complete_google_drive_auth)
+- ✅ PKCE generation (128-char verifier, SHA256 challenge, BASE64URL encoding)
+- ✅ Localhost OAuth redirect server (Hyper 1.0 with timeout)
+- ✅ Token exchange with Google OAuth2 API
+- ✅ User profile fetching (email, display name)
+- ✅ Token refresh logic (refresh_access_token)
+- ✅ Environment variable configuration (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+- ✅ Example client secret file (src-tauri/resources/google_client_secret.json.example)
+- ✅ Type complexity fixes (CodeSender, CodeReceiver aliases)
+- ✅ All tests passing (233 tests), all linting passing
+
+---
 
 **Backend Commands**:
 ```rust
