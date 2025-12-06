@@ -1293,6 +1293,7 @@ mod tests {
         assert_eq!(session.port, 8080);
         assert_eq!(session.state.len(), 32);
         assert_eq!(session.pkce.verifier.len(), 128);
+        drop(session_guard);
     }
 
     #[tokio::test]
@@ -1344,8 +1345,7 @@ mod tests {
             let _cleanup = SessionCleanup;
         }
 
-        let session_guard = OAUTH_SESSION.lock().unwrap();
-        assert!(session_guard.is_none());
+        assert!(OAUTH_SESSION.lock().unwrap().is_none());
     }
 
     #[test]
