@@ -23,7 +23,7 @@ use modules::file_system::{
 use modules::file_utils::get_home_directory;
 use modules::google_drive::{
     complete_google_drive_auth, get_google_drive_account, remove_google_drive_account,
-    set_drive_parent_folder, start_google_drive_auth,
+    set_drive_parent_folder, start_google_drive_auth, upload_to_google_drive,
 };
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
@@ -97,6 +97,7 @@ pub fn run() -> AppResult {
             get_google_drive_account,
             set_drive_parent_folder,
             remove_google_drive_account,
+            upload_to_google_drive,
         ])
         .run(tauri::generate_context!())?;
 

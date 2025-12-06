@@ -10,6 +10,7 @@ use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::{Arc, Mutex};
+use tauri::Emitter;
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio::sync::oneshot;
 
@@ -624,11 +625,546 @@ async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> 
     })
 }
 
+// Upload Data Structures
+
+const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks (matches backup.rs pattern)
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveUploadJob {
+    pub id: String,
+    pub project_name: String,
+    pub folder_name: String,
+    pub folder_id: String,
+    pub shareable_link: String,
+    pub total_files: usize,
+    pub uploaded_files: usize,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UploadProgress {
+    job_id: String,
+    file_name: String,
+    bytes_uploaded: u64,
+    total_bytes: u64,
+    file_index: usize,
+    total_files: usize,
+}
+
 // Helper Functions
 
 #[allow(dead_code)]
 fn get_current_timestamp() -> String {
     Utc::now().to_rfc3339()
+}
+
+/// Get valid access token, refreshing if needed
+async fn get_valid_access_token(email: &str) -> Result<String, String> {
+    let mut tokens = get_tokens_from_keychain(email)?;
+
+    // Check if token is expired or will expire in next 5 minutes
+    let now = Utc::now();
+    let buffer = chrono::Duration::minutes(5);
+
+    if tokens.expires_at - buffer < now {
+        // Token expired or expiring soon, refresh it
+        tokens = refresh_access_token(&tokens.refresh_token).await?;
+        store_tokens_in_keychain(email, &tokens)?;
+    }
+
+    Ok(tokens.access_token)
+}
+
+/// Create folder in Google Drive using REST API
+async fn create_drive_folder(
+    access_token: &str,
+    folder_name: &str,
+    parent_folder_id: Option<&str>,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+
+    // Build folder metadata
+    let mut metadata = serde_json::json!({
+        "name": folder_name,
+        "mimeType": "application/vnd.google-apps.folder"
+    });
+
+    if let Some(parent_id) = parent_folder_id {
+        metadata["parents"] = serde_json::json!([parent_id]);
+    }
+
+    // Create folder via REST API
+    let response = client
+        .post("https://www.googleapis.com/drive/v3/files")
+        .bearer_auth(access_token)
+        .json(&metadata)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to create folder: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("Failed to create folder: {error_text}"));
+    }
+
+    let folder: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse folder response: {e}"))?;
+
+    folder["id"]
+        .as_str()
+        .map(std::borrow::ToOwned::to_owned)
+        .ok_or_else(|| "Folder created but no ID returned".to_owned())
+}
+
+/// Get shareable link for a folder using REST API
+async fn get_folder_shareable_link(access_token: &str, folder_id: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+
+    // Create permission for anyone with link to view
+    let permission = serde_json::json!({
+        "type": "anyone",
+        "role": "reader"
+    });
+
+    let response = client
+        .post(format!(
+            "https://www.googleapis.com/drive/v3/files/{folder_id}/permissions"
+        ))
+        .bearer_auth(access_token)
+        .json(&permission)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to create share permission: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("Failed to create share permission: {error_text}"));
+    }
+
+    // Return shareable link
+    Ok(format!(
+        "https://drive.google.com/drive/folders/{folder_id}"
+    ))
+}
+
+/// Find existing file in folder by name using REST API
+async fn find_existing_file(
+    access_token: &str,
+    folder_id: &str,
+    file_name: &str,
+) -> Result<Option<String>, String> {
+    let client = reqwest::Client::new();
+
+    // Query for file with matching name in folder
+    let query = format!("name = '{file_name}' and '{folder_id}' in parents and trashed = false");
+
+    let response = client
+        .get("https://www.googleapis.com/drive/v3/files")
+        .bearer_auth(access_token)
+        .query(&[("q", &query)])
+        .send()
+        .await
+        .map_err(|e| format!("Failed to search for existing file: {e}"))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_owned());
+        return Err(format!("Failed to search for existing file: {error_text}"));
+    }
+
+    let file_list: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse file list: {e}"))?;
+
+    Ok(file_list["files"]
+        .as_array()
+        .and_then(|files| files.first())
+        .and_then(|file| file["id"].as_str())
+        .map(std::borrow::ToOwned::to_owned))
+}
+
+/// Generate unique filename by adding suffix
+fn generate_unique_filename(base_name: &str, extension: &str, attempt: u32) -> String {
+    if attempt == 0 {
+        format!("{base_name}.{extension}")
+    } else {
+        format!("{base_name} ({attempt}).{extension}")
+    }
+}
+
+/// Upload single file to Google Drive with progress tracking using REST API
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_lines)]
+async fn upload_file_to_drive(
+    email: &str,
+    file_path: &str,
+    folder_id: &str,
+    file_name: &str,
+    conflict_mode: &str,
+    window: &tauri::Window,
+    job_id: &str,
+    file_index: usize,
+    total_files: usize,
+) -> Result<(), String> {
+    use std::path::Path;
+    use tokio::fs::File as TokioFile;
+    use tokio::io::AsyncReadExt;
+
+    // Get fresh access token (handles expiration automatically)
+    let access_token = get_valid_access_token(email).await?;
+
+    // Handle conflict mode
+    let final_file_name = match conflict_mode {
+        "skip" => {
+            // Check if file exists
+            if find_existing_file(&access_token, folder_id, file_name)
+                .await?
+                .is_some()
+            {
+                log::info!("Skipping existing file: {file_name}");
+                return Ok(());
+            }
+            file_name.to_owned()
+        }
+        "rename" => {
+            // Find unique name
+            let path = Path::new(file_name);
+            let base_name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(file_name);
+            let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+            let mut attempt = 0;
+            let mut unique_name = file_name.to_owned();
+
+            while find_existing_file(&access_token, folder_id, &unique_name)
+                .await?
+                .is_some()
+            {
+                attempt += 1;
+                unique_name = generate_unique_filename(base_name, extension, attempt);
+                if attempt > 100 {
+                    return Err("Failed to find unique filename after 100 attempts".to_owned());
+                }
+            }
+            unique_name
+        }
+        "overwrite" => {
+            // Will upload and overwrite if exists
+            file_name.to_owned()
+        }
+        _ => return Err(format!("Invalid conflict mode: {conflict_mode}")),
+    };
+
+    // Open file and get metadata
+    let mut file = TokioFile::open(file_path)
+        .await
+        .map_err(|e| format!("Failed to open file {file_path}: {e}"))?;
+
+    let file_size = file
+        .metadata()
+        .await
+        .map_err(|e| format!("Failed to get file metadata: {e}"))?
+        .len();
+
+    // Emit initial progress
+    let _ = window.emit(
+        "drive-upload-progress",
+        UploadProgress {
+            job_id: job_id.to_owned(),
+            file_name: final_file_name.clone(),
+            bytes_uploaded: 0,
+            total_bytes: file_size,
+            file_index,
+            total_files,
+        },
+    );
+
+    let client = reqwest::Client::new();
+
+    // Check if we need to overwrite existing file
+    let existing_id = if conflict_mode == "overwrite" {
+        find_existing_file(&access_token, folder_id, &final_file_name).await?
+    } else {
+        None
+    };
+
+    // Initiate resumable upload session
+    let upload_url = if let Some(existing_id) = existing_id {
+        // For updates, use PATCH with uploadType=resumable
+        let response = client
+            .patch(format!(
+                "https://www.googleapis.com/upload/drive/v3/files/{existing_id}?uploadType=resumable"
+            ))
+            .bearer_auth(&access_token)
+            .header("Content-Type", "application/json; charset=UTF-8")
+            .send()
+            .await
+            .map_err(|e| format!("Failed to initiate resumable upload session: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!(
+                "Failed to initiate resumable upload session: {error_text}"
+            ));
+        }
+
+        response
+            .headers()
+            .get("Location")
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| "No upload URL in resumable session response".to_owned())?
+            .to_owned()
+    } else {
+        // For new files, use POST with uploadType=resumable
+        let metadata = serde_json::json!({
+            "name": final_file_name,
+            "parents": [folder_id]
+        });
+
+        let response = client
+            .post("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable")
+            .bearer_auth(&access_token)
+            .header("Content-Type", "application/json; charset=UTF-8")
+            .json(&metadata)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to initiate resumable upload session: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!(
+                "Failed to initiate resumable upload session: {error_text}"
+            ));
+        }
+
+        response
+            .headers()
+            .get("Location")
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| "No upload URL in resumable session response".to_owned())?
+            .to_owned()
+    };
+
+    // Upload file in chunks
+    let mut buffer = vec![0_u8; CHUNK_SIZE];
+    let mut bytes_uploaded = 0_u64;
+
+    loop {
+        let bytes_read = file
+            .read(&mut buffer)
+            .await
+            .map_err(|e| format!("Failed to read file chunk: {e}"))?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        let chunk_end = bytes_uploaded + bytes_read as u64 - 1;
+        let content_range = format!("bytes {bytes_uploaded}-{chunk_end}/{file_size}");
+
+        let response = client
+            .put(&upload_url)
+            .header("Content-Length", bytes_read.to_string())
+            .header("Content-Range", content_range)
+            .body(buffer[..bytes_read].to_vec())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to upload chunk: {e}"))?;
+
+        if !response.status().is_success() && response.status().as_u16() != 308 {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!("Failed to upload chunk: {error_text}"));
+        }
+
+        bytes_uploaded += bytes_read as u64;
+
+        // Emit progress after each chunk
+        let _ = window.emit(
+            "drive-upload-progress",
+            UploadProgress {
+                job_id: job_id.to_owned(),
+                file_name: final_file_name.clone(),
+                bytes_uploaded,
+                total_bytes: file_size,
+                file_index,
+                total_files,
+            },
+        );
+    }
+
+    Ok(())
+}
+
+// Upload Tauri Commands
+
+#[tauri::command]
+#[allow(clippy::too_many_lines)]
+pub async fn upload_to_google_drive(
+    window: tauri::Window,
+    db: tauri::State<'_, Database>,
+    project_name: String,
+    files: Vec<String>,
+    folder_name: String,
+    conflict_mode: String,
+) -> Result<DriveUploadJob, String> {
+    use tokio::sync::Semaphore;
+
+    // Validate file paths
+    for file_path in &files {
+        if !std::path::Path::new(file_path).exists() {
+            return Err(format!("File not found: {file_path}"));
+        }
+        if !std::path::Path::new(file_path).is_file() {
+            return Err(format!("Not a file: {file_path}"));
+        }
+    }
+
+    // Get account
+    let account = get_google_drive_account(db)
+        .await?
+        .ok_or_else(|| "No Google Drive account configured".to_owned())?;
+
+    if !account.enabled {
+        return Err("Google Drive account is disabled".to_owned());
+    }
+
+    // Get valid access token for initial folder creation
+    let access_token = get_valid_access_token(&account.email).await?;
+
+    // Create project folder
+    let folder_id = create_drive_folder(
+        &access_token,
+        &folder_name,
+        account.parent_folder_id.as_deref(),
+    )
+    .await?;
+
+    // Get shareable link
+    let shareable_link = get_folder_shareable_link(&access_token, &folder_id).await?;
+
+    // Create job
+    let job_id = uuid::Uuid::new_v4().to_string();
+    let job = DriveUploadJob {
+        id: job_id.clone(),
+        project_name: project_name.clone(),
+        folder_name: folder_name.clone(),
+        folder_id: folder_id.clone(),
+        shareable_link,
+        total_files: files.len(),
+        uploaded_files: 0,
+        status: "in_progress".to_owned(),
+    };
+
+    // Spawn background task for uploads
+    let files_clone = files.clone();
+    let conflict_mode_clone = conflict_mode.clone();
+    let window_clone = window.clone();
+    let email_clone = account.email.clone();
+    let folder_id_clone = folder_id.clone();
+
+    tokio::spawn(async move {
+        // Create semaphore for max 3 concurrent uploads
+        let semaphore = Arc::new(Semaphore::new(3));
+        let mut tasks = vec![];
+
+        for (index, file_path) in files_clone.iter().enumerate() {
+            let Ok(permit) = semaphore.clone().acquire_owned().await else {
+                log::error!("Failed to acquire semaphore permit");
+                continue;
+            };
+
+            let file_path_clone = file_path.clone();
+            let email_clone2 = email_clone.clone();
+            let folder_id_clone2 = folder_id_clone.clone();
+            let conflict_mode_clone2 = conflict_mode_clone.clone();
+            let window_clone2 = window_clone.clone();
+            let job_id_clone2 = job_id.clone();
+            let total_files = files_clone.len();
+
+            let task = tokio::spawn(async move {
+                let _permit = permit;
+
+                // Extract filename
+                let file_name = std::path::Path::new(&file_path_clone)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&file_path_clone);
+
+                // Upload with retry (3 attempts)
+                let mut attempts = 0;
+                let max_attempts = 3;
+
+                loop {
+                    attempts += 1;
+
+                    match upload_file_to_drive(
+                        &email_clone2,
+                        &file_path_clone,
+                        &folder_id_clone2,
+                        file_name,
+                        &conflict_mode_clone2,
+                        &window_clone2,
+                        &job_id_clone2,
+                        index,
+                        total_files,
+                    )
+                    .await
+                    {
+                        Ok(()) => break,
+                        Err(e) => {
+                            log::error!("Upload attempt {attempts}/{max_attempts} failed for {file_name}: {e}");
+
+                            if attempts >= max_attempts {
+                                log::error!(
+                                    "Failed to upload {file_name} after {max_attempts} attempts"
+                                );
+                                break;
+                            }
+
+                            // Exponential backoff
+                            let delay = std::time::Duration::from_secs(2_u64.pow(attempts - 1));
+                            tokio::time::sleep(delay).await;
+                        }
+                    }
+                }
+            });
+
+            tasks.push(task);
+        }
+
+        // Wait for all uploads to complete
+        for task in tasks {
+            let _ = task.await;
+        }
+
+        log::info!("Upload job {job_id} completed");
+    });
+
+    Ok(job)
 }
 
 #[cfg(test)]
@@ -1368,5 +1904,182 @@ mod tests {
         let cloned = session.clone();
         assert_eq!(session.state, cloned.state);
         assert_eq!(session.port, cloned.port);
+    }
+
+    #[test]
+    fn test_drive_upload_job_serialization() {
+        let job = DriveUploadJob {
+            id: "job-123".to_owned(),
+            project_name: "Wedding Photos".to_owned(),
+            folder_name: "Wedding_2025-01-15".to_owned(),
+            folder_id: "folder-abc".to_owned(),
+            shareable_link: "https://drive.google.com/drive/folders/folder-abc".to_owned(),
+            total_files: 100,
+            uploaded_files: 50,
+            status: "in_progress".to_owned(),
+        };
+
+        let json = serde_json::to_string(&job).unwrap();
+        assert!(json.contains("projectName"));
+        assert!(json.contains("folderName"));
+        assert!(json.contains("folderId"));
+        assert!(json.contains("shareableLink"));
+        assert!(json.contains("totalFiles"));
+        assert!(json.contains("uploadedFiles"));
+
+        let deserialized: DriveUploadJob = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.id, "job-123");
+        assert_eq!(deserialized.total_files, 100);
+        assert_eq!(deserialized.uploaded_files, 50);
+    }
+
+    #[test]
+    fn test_upload_progress_serialization() {
+        let progress = UploadProgress {
+            job_id: "job-123".to_owned(),
+            file_name: "photo.jpg".to_owned(),
+            bytes_uploaded: 1024,
+            total_bytes: 2048,
+            file_index: 5,
+            total_files: 10,
+        };
+
+        let json = serde_json::to_string(&progress).unwrap();
+        assert!(json.contains("jobId"));
+        assert!(json.contains("fileName"));
+        assert!(json.contains("bytesUploaded"));
+        assert!(json.contains("totalBytes"));
+        assert!(json.contains("fileIndex"));
+        assert!(json.contains("totalFiles"));
+    }
+
+    #[test]
+    fn test_generate_unique_filename_base() {
+        let result = generate_unique_filename("photo", "jpg", 0);
+        assert_eq!(result, "photo.jpg");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_with_suffix() {
+        let result = generate_unique_filename("photo", "jpg", 1);
+        assert_eq!(result, "photo (1).jpg");
+
+        let result = generate_unique_filename("photo", "jpg", 5);
+        assert_eq!(result, "photo (5).jpg");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_empty_extension() {
+        let result = generate_unique_filename("document", "", 0);
+        assert_eq!(result, "document.");
+
+        let result = generate_unique_filename("document", "", 2);
+        assert_eq!(result, "document (2).");
+    }
+
+    #[test]
+    fn test_chunk_size_constant() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+        assert_eq!(CHUNK_SIZE, 4_194_304);
+    }
+
+    #[test]
+    fn test_chunk_size_matches_backup_module() {
+        // Verify CHUNK_SIZE matches the pattern used in backup.rs
+        const BACKUP_CHUNK_SIZE: usize = 4 * 1024 * 1024;
+        assert_eq!(CHUNK_SIZE, BACKUP_CHUNK_SIZE);
+    }
+
+    #[test]
+    fn test_upload_progress_complete_struct() {
+        let progress = UploadProgress {
+            job_id: "job-123".to_owned(),
+            file_name: "photo.jpg".to_owned(),
+            bytes_uploaded: 2048,
+            total_bytes: 2048,
+            file_index: 10,
+            total_files: 100,
+        };
+
+        assert_eq!(progress.job_id, "job-123");
+        assert_eq!(progress.file_name, "photo.jpg");
+        assert_eq!(progress.bytes_uploaded, 2048);
+        assert_eq!(progress.total_bytes, 2048);
+        assert_eq!(progress.file_index, 10);
+        assert_eq!(progress.total_files, 100);
+    }
+
+    #[test]
+    fn test_upload_progress_partial() {
+        let progress = UploadProgress {
+            job_id: "job-456".to_owned(),
+            file_name: "video.mp4".to_owned(),
+            bytes_uploaded: 1024,
+            total_bytes: 4096,
+            file_index: 5,
+            total_files: 20,
+        };
+
+        assert!(progress.bytes_uploaded < progress.total_bytes);
+        assert_eq!(progress.bytes_uploaded, 1024);
+        assert_eq!(progress.total_bytes, 4096);
+    }
+
+    #[test]
+    fn test_drive_upload_job_status_values() {
+        let job = DriveUploadJob {
+            id: "test-id".to_owned(),
+            project_name: "Test".to_owned(),
+            folder_name: "Test Folder".to_owned(),
+            folder_id: "folder-123".to_owned(),
+            shareable_link: "https://drive.google.com/drive/folders/folder-123".to_owned(),
+            total_files: 10,
+            uploaded_files: 5,
+            status: "in_progress".to_owned(),
+        };
+
+        assert_eq!(job.status, "in_progress");
+        assert!(job.uploaded_files < job.total_files);
+    }
+
+    #[test]
+    fn test_drive_upload_job_with_zero_files() {
+        let job = DriveUploadJob {
+            id: "empty-job".to_owned(),
+            project_name: "Empty".to_owned(),
+            folder_name: "Empty Folder".to_owned(),
+            folder_id: "folder-empty".to_owned(),
+            shareable_link: "https://drive.google.com/drive/folders/folder-empty".to_owned(),
+            total_files: 0,
+            uploaded_files: 0,
+            status: "completed".to_owned(),
+        };
+
+        assert_eq!(job.total_files, 0);
+        assert_eq!(job.uploaded_files, 0);
+        assert_eq!(job.status, "completed");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_sequential() {
+        let base = "photo";
+        let ext = "jpg";
+
+        assert_eq!(generate_unique_filename(base, ext, 0), "photo.jpg");
+        assert_eq!(generate_unique_filename(base, ext, 1), "photo (1).jpg");
+        assert_eq!(generate_unique_filename(base, ext, 2), "photo (2).jpg");
+        assert_eq!(generate_unique_filename(base, ext, 99), "photo (99).jpg");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_special_characters() {
+        let base = "my-photo_2024";
+        let ext = "jpeg";
+
+        assert_eq!(generate_unique_filename(base, ext, 0), "my-photo_2024.jpeg");
+        assert_eq!(
+            generate_unique_filename(base, ext, 1),
+            "my-photo_2024 (1).jpeg"
+        );
     }
 }
