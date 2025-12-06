@@ -627,6 +627,8 @@ async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> 
 
 // Upload Data Structures
 
+const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks (matches backup.rs pattern)
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DriveUploadJob {
@@ -750,7 +752,9 @@ async fn get_folder_shareable_link(access_token: &str, folder_id: &str) -> Resul
     }
 
     // Return shareable link
-    Ok(format!("https://drive.google.com/drive/folders/{folder_id}"))
+    Ok(format!(
+        "https://drive.google.com/drive/folders/{folder_id}"
+    ))
 }
 
 /// Find existing file in folder by name using REST API
@@ -805,7 +809,7 @@ fn generate_unique_filename(base_name: &str, extension: &str, attempt: u32) -> S
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_lines)]
 async fn upload_file_to_drive(
-    access_token: &str,
+    email: &str,
     file_path: &str,
     folder_id: &str,
     file_name: &str,
@@ -819,11 +823,17 @@ async fn upload_file_to_drive(
     use tokio::fs::File as TokioFile;
     use tokio::io::AsyncReadExt;
 
+    // Get fresh access token (handles expiration automatically)
+    let access_token = get_valid_access_token(email).await?;
+
     // Handle conflict mode
     let final_file_name = match conflict_mode {
         "skip" => {
             // Check if file exists
-            if find_existing_file(access_token, folder_id, file_name).await?.is_some() {
+            if find_existing_file(&access_token, folder_id, file_name)
+                .await?
+                .is_some()
+            {
                 log::info!("Skipping existing file: {file_name}");
                 return Ok(());
             }
@@ -832,17 +842,19 @@ async fn upload_file_to_drive(
         "rename" => {
             // Find unique name
             let path = Path::new(file_name);
-            let base_name = path.file_stem()
+            let base_name = path
+                .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or(file_name);
-            let extension = path.extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
             let mut attempt = 0;
             let mut unique_name = file_name.to_owned();
 
-            while find_existing_file(access_token, folder_id, &unique_name).await?.is_some() {
+            while find_existing_file(&access_token, folder_id, &unique_name)
+                .await?
+                .is_some()
+            {
                 attempt += 1;
                 unique_name = generate_unique_filename(base_name, extension, attempt);
                 if attempt > 100 {
@@ -858,20 +870,16 @@ async fn upload_file_to_drive(
         _ => return Err(format!("Invalid conflict mode: {conflict_mode}")),
     };
 
-    // Read file
+    // Open file and get metadata
     let mut file = TokioFile::open(file_path)
         .await
         .map_err(|e| format!("Failed to open file {file_path}: {e}"))?;
 
-    let file_size = file.metadata()
+    let file_size = file
+        .metadata()
         .await
         .map_err(|e| format!("Failed to get file metadata: {e}"))?
         .len();
-
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .await
-        .map_err(|e| format!("Failed to read file: {e}"))?;
 
     // Emit initial progress
     let _ = window.emit(
@@ -889,90 +897,124 @@ async fn upload_file_to_drive(
     let client = reqwest::Client::new();
 
     // Check if we need to overwrite existing file
-    if conflict_mode == "overwrite" {
-        if let Some(existing_id) = find_existing_file(access_token, folder_id, &final_file_name).await? {
-            // Update existing file using multipart upload
-            let response = client
-                .patch(format!(
-                    "https://www.googleapis.com/upload/drive/v3/files/{existing_id}?uploadType=media"
-                ))
-                .bearer_auth(access_token)
-                .header("Content-Type", "application/octet-stream")
-                .body(buffer)
-                .send()
-                .await
-                .map_err(|e| format!("Failed to overwrite file: {e}"))?;
+    let existing_id = if conflict_mode == "overwrite" {
+        find_existing_file(&access_token, folder_id, &final_file_name).await?
+    } else {
+        None
+    };
 
-            if !response.status().is_success() {
-                let error_text = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "Unknown error".to_owned());
-                return Err(format!("Failed to overwrite file: {error_text}"));
-            }
-
-            // Emit completion progress
-            let _ = window.emit(
-                "drive-upload-progress",
-                UploadProgress {
-                    job_id: job_id.to_owned(),
-                    file_name: final_file_name,
-                    bytes_uploaded: file_size,
-                    total_bytes: file_size,
-                    file_index,
-                    total_files,
-                },
-            );
-
-            return Ok(());
-        }
-    }
-
-    // Create new file using multipart upload
-    let metadata = serde_json::json!({
-        "name": final_file_name,
-        "parents": [folder_id]
-    });
-
-    let boundary = "boundary_string";
-    let multipart_body = format!(
-        "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{}\r\n--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\n",
-        serde_json::to_string(&metadata).map_err(|e| format!("Failed to serialize metadata: {e}"))?
-    );
-
-    let mut body = multipart_body.into_bytes();
-    body.extend_from_slice(&buffer);
-    body.extend_from_slice(format!("\r\n--{boundary}--").as_bytes());
-
-    let response = client
-        .post("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")
-        .bearer_auth(access_token)
-        .header("Content-Type", format!("multipart/related; boundary={boundary}"))
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to upload file: {e}"))?;
-
-    if !response.status().is_success() {
-        let error_text = response
-            .text()
+    // Initiate resumable upload session
+    let upload_url = if let Some(existing_id) = existing_id {
+        // For updates, use PATCH with uploadType=resumable
+        let response = client
+            .patch(format!(
+                "https://www.googleapis.com/upload/drive/v3/files/{existing_id}?uploadType=resumable"
+            ))
+            .bearer_auth(&access_token)
+            .header("Content-Type", "application/json; charset=UTF-8")
+            .send()
             .await
-            .unwrap_or_else(|_| "Unknown error".to_owned());
-        return Err(format!("Failed to upload file: {error_text}"));
-    }
+            .map_err(|e| format!("Failed to initiate resumable upload session: {e}"))?;
 
-    // Emit completion progress
-    let _ = window.emit(
-        "drive-upload-progress",
-        UploadProgress {
-            job_id: job_id.to_owned(),
-            file_name: final_file_name,
-            bytes_uploaded: file_size,
-            total_bytes: file_size,
-            file_index,
-            total_files,
-        },
-    );
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!(
+                "Failed to initiate resumable upload session: {error_text}"
+            ));
+        }
+
+        response
+            .headers()
+            .get("Location")
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| "No upload URL in resumable session response".to_owned())?
+            .to_owned()
+    } else {
+        // For new files, use POST with uploadType=resumable
+        let metadata = serde_json::json!({
+            "name": final_file_name,
+            "parents": [folder_id]
+        });
+
+        let response = client
+            .post("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable")
+            .bearer_auth(&access_token)
+            .header("Content-Type", "application/json; charset=UTF-8")
+            .json(&metadata)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to initiate resumable upload session: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!(
+                "Failed to initiate resumable upload session: {error_text}"
+            ));
+        }
+
+        response
+            .headers()
+            .get("Location")
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| "No upload URL in resumable session response".to_owned())?
+            .to_owned()
+    };
+
+    // Upload file in chunks
+    let mut buffer = vec![0_u8; CHUNK_SIZE];
+    let mut bytes_uploaded = 0_u64;
+
+    loop {
+        let bytes_read = file
+            .read(&mut buffer)
+            .await
+            .map_err(|e| format!("Failed to read file chunk: {e}"))?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        let chunk_end = bytes_uploaded + bytes_read as u64 - 1;
+        let content_range = format!("bytes {bytes_uploaded}-{chunk_end}/{file_size}");
+
+        let response = client
+            .put(&upload_url)
+            .header("Content-Length", bytes_read.to_string())
+            .header("Content-Range", content_range)
+            .body(buffer[..bytes_read].to_vec())
+            .send()
+            .await
+            .map_err(|e| format!("Failed to upload chunk: {e}"))?;
+
+        if !response.status().is_success() && response.status().as_u16() != 308 {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(format!("Failed to upload chunk: {error_text}"));
+        }
+
+        bytes_uploaded += bytes_read as u64;
+
+        // Emit progress after each chunk
+        let _ = window.emit(
+            "drive-upload-progress",
+            UploadProgress {
+                job_id: job_id.to_owned(),
+                file_name: final_file_name.clone(),
+                bytes_uploaded,
+                total_bytes: file_size,
+                file_index,
+                total_files,
+            },
+        );
+    }
 
     Ok(())
 }
@@ -990,6 +1032,16 @@ pub async fn upload_to_google_drive(
 ) -> Result<DriveUploadJob, String> {
     use tokio::sync::Semaphore;
 
+    // Validate file paths
+    for file_path in &files {
+        if !std::path::Path::new(file_path).exists() {
+            return Err(format!("File not found: {file_path}"));
+        }
+        if !std::path::Path::new(file_path).is_file() {
+            return Err(format!("Not a file: {file_path}"));
+        }
+    }
+
     // Get account
     let account = get_google_drive_account(db)
         .await?
@@ -999,7 +1051,7 @@ pub async fn upload_to_google_drive(
         return Err("Google Drive account is disabled".to_owned());
     }
 
-    // Get valid access token
+    // Get valid access token for initial folder creation
     let access_token = get_valid_access_token(&account.email).await?;
 
     // Create project folder
@@ -1030,7 +1082,7 @@ pub async fn upload_to_google_drive(
     let files_clone = files.clone();
     let conflict_mode_clone = conflict_mode.clone();
     let window_clone = window.clone();
-    let access_token_clone = access_token.clone();
+    let email_clone = account.email.clone();
     let folder_id_clone = folder_id.clone();
 
     tokio::spawn(async move {
@@ -1045,7 +1097,7 @@ pub async fn upload_to_google_drive(
             };
 
             let file_path_clone = file_path.clone();
-            let access_token_clone2 = access_token_clone.clone();
+            let email_clone2 = email_clone.clone();
             let folder_id_clone2 = folder_id_clone.clone();
             let conflict_mode_clone2 = conflict_mode_clone.clone();
             let window_clone2 = window_clone.clone();
@@ -1069,7 +1121,7 @@ pub async fn upload_to_google_drive(
                     attempts += 1;
 
                     match upload_file_to_drive(
-                        &access_token_clone2,
+                        &email_clone2,
                         &file_path_clone,
                         &folder_id_clone2,
                         file_name,
@@ -1086,7 +1138,9 @@ pub async fn upload_to_google_drive(
                             log::error!("Upload attempt {attempts}/{max_attempts} failed for {file_name}: {e}");
 
                             if attempts >= max_attempts {
-                                log::error!("Failed to upload {file_name} after {max_attempts} attempts");
+                                log::error!(
+                                    "Failed to upload {file_name} after {max_attempts} attempts"
+                                );
                                 break;
                             }
 
