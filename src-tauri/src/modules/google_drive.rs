@@ -1166,4 +1166,207 @@ mod tests {
             .unwrap();
         assert!(result.is_some());
     }
+
+    #[test]
+    fn test_generate_random_alphanumeric_length() {
+        let result = generate_random_alphanumeric(64);
+        assert_eq!(result.len(), 64);
+    }
+
+    #[test]
+    fn test_generate_random_alphanumeric_characters() {
+        let result = generate_random_alphanumeric(100);
+        assert!(result.chars().all(|c| c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_generate_random_alphanumeric_uniqueness() {
+        let result1 = generate_random_alphanumeric(50);
+        let result2 = generate_random_alphanumeric(50);
+        assert_ne!(result1, result2);
+    }
+
+    #[test]
+    fn test_generate_pkce_verifier_length() {
+        let pkce = generate_pkce();
+        assert_eq!(pkce.verifier.len(), 128);
+    }
+
+    #[test]
+    fn test_generate_pkce_challenge_format() {
+        let pkce = generate_pkce();
+        assert!(!pkce.challenge.is_empty());
+        assert!(pkce.challenge.len() > 40);
+    }
+
+    #[test]
+    fn test_generate_pkce_challenge_base64url() {
+        let pkce = generate_pkce();
+        assert!(pkce
+            .challenge
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert!(!pkce.challenge.contains('='));
+        assert!(!pkce.challenge.contains('+'));
+        assert!(!pkce.challenge.contains('/'));
+    }
+
+    #[test]
+    fn test_generate_pkce_uniqueness() {
+        let pkce1 = generate_pkce();
+        let pkce2 = generate_pkce();
+        assert_ne!(pkce1.verifier, pkce2.verifier);
+        assert_ne!(pkce1.challenge, pkce2.challenge);
+    }
+
+    #[test]
+    fn test_generate_state_length() {
+        let state = generate_state();
+        assert_eq!(state.len(), 32);
+    }
+
+    #[test]
+    fn test_generate_state_alphanumeric() {
+        let state = generate_state();
+        assert!(state.chars().all(|c| c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_generate_state_uniqueness() {
+        let state1 = generate_state();
+        let state2 = generate_state();
+        assert_ne!(state1, state2);
+    }
+
+    #[tokio::test]
+    async fn test_store_and_retrieve_tokens() {
+        let test_email = format!("test-{}@example.com", Uuid::new_v4());
+        let token_data = TokenData {
+            access_token: "test_access".to_owned(),
+            refresh_token: "test_refresh".to_owned(),
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+        };
+
+        let store_result = store_tokens_in_keychain(&test_email, &token_data);
+        assert!(store_result.is_ok());
+
+        if store_result.is_ok() {
+            let retrieved = get_tokens_from_keychain(&test_email);
+            if let Ok(tokens) = retrieved {
+                assert_eq!(tokens.access_token, "test_access");
+                assert_eq!(tokens.refresh_token, "test_refresh");
+            }
+
+            let entry = keyring::Entry::new("com.creatorops.google-drive", &test_email).unwrap();
+            let _ = entry.delete_credential();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_start_google_drive_auth_url_parameters() {
+        let result = start_google_drive_auth().await.unwrap();
+
+        assert!(result.auth_url.contains("client_id="));
+        assert!(result.auth_url.contains("redirect_uri="));
+        assert!(result.auth_url.contains("response_type=code"));
+        assert!(result.auth_url.contains("code_challenge="));
+        assert!(result.auth_url.contains("code_challenge_method=S256"));
+        assert!(result.auth_url.contains("access_type=offline"));
+        assert!(result.auth_url.contains("prompt=consent"));
+        assert!(result.auth_url.contains("state="));
+    }
+
+    #[tokio::test]
+    async fn test_start_google_drive_auth_port() {
+        let result = start_google_drive_auth().await.unwrap();
+        assert_eq!(result.server_port, 8080);
+    }
+
+    #[tokio::test]
+    async fn test_start_google_drive_auth_creates_session() {
+        let _ = start_google_drive_auth().await.unwrap();
+
+        let session_guard = OAUTH_SESSION.lock().unwrap();
+        assert!(session_guard.is_some());
+
+        let session = session_guard.as_ref().unwrap();
+        assert_eq!(session.port, 8080);
+        assert_eq!(session.state.len(), 32);
+        assert_eq!(session.pkce.verifier.len(), 128);
+    }
+
+    #[tokio::test]
+    async fn test_refresh_response_deserialization() {
+        let json = r#"{"access_token":"new_access","expires_in":3600}"#;
+        let response: RefreshResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.access_token, "new_access");
+        assert_eq!(response.expires_in, 3600);
+    }
+
+    #[tokio::test]
+    async fn test_token_response_deserialization() {
+        let json = r#"{"access_token":"access","refresh_token":"refresh","expires_in":3600}"#;
+        let response: TokenResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.access_token, "access");
+        assert_eq!(response.refresh_token, Some("refresh".to_owned()));
+        assert_eq!(response.expires_in, 3600);
+    }
+
+    #[tokio::test]
+    async fn test_token_response_without_refresh() {
+        let json = r#"{"access_token":"access","expires_in":3600}"#;
+        let response: TokenResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.access_token, "access");
+        assert_eq!(response.refresh_token, None);
+    }
+
+    #[tokio::test]
+    async fn test_user_info_deserialization() {
+        let json = r#"{"email":"user@example.com","name":"Test User"}"#;
+        let user_info: UserInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(user_info.email, "user@example.com");
+        assert_eq!(user_info.name, "Test User");
+    }
+
+    #[test]
+    fn test_session_cleanup_drop() {
+        {
+            let mut session_guard = OAUTH_SESSION.lock().unwrap();
+            *session_guard = Some(OAuthSession {
+                pkce: generate_pkce(),
+                state: generate_state(),
+                port: 8080,
+                code_sender: Arc::new(Mutex::new(None)),
+            });
+        }
+
+        {
+            let _cleanup = SessionCleanup;
+        }
+
+        let session_guard = OAUTH_SESSION.lock().unwrap();
+        assert!(session_guard.is_none());
+    }
+
+    #[test]
+    fn test_pkce_data_clone() {
+        let pkce = generate_pkce();
+        let cloned = pkce.clone();
+        assert_eq!(pkce.verifier, cloned.verifier);
+        assert_eq!(pkce.challenge, cloned.challenge);
+    }
+
+    #[test]
+    fn test_oauth_session_clone() {
+        let session = OAuthSession {
+            pkce: generate_pkce(),
+            state: generate_state(),
+            port: 8080,
+            code_sender: Arc::new(Mutex::new(None)),
+        };
+
+        let cloned = session.clone();
+        assert_eq!(session.state, cloned.state);
+        assert_eq!(session.port, cloned.port);
+    }
 }
