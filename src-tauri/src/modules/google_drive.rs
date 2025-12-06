@@ -9,7 +9,6 @@ use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener as TokioTcpListener;
 use tokio::sync::oneshot;
@@ -112,14 +111,6 @@ fn generate_state() -> String {
         .collect()
 }
 
-fn find_available_port() -> Result<u16, String> {
-    TcpListener::bind("127.0.0.1:0")
-        .map_err(|e| format!("Failed to bind to port: {e}"))?
-        .local_addr()
-        .map(|addr| addr.port())
-        .map_err(|e| format!("Failed to get port: {e}"))
-}
-
 async fn handle_oauth_redirect(
     req: Request<Incoming>,
 ) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
@@ -156,7 +147,10 @@ async fn handle_oauth_redirect(
                 let response_body = r#"
                     <!DOCTYPE html>
                     <html>
-                    <head><title>CreatorOps - Authorization Successful</title></head>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>CreatorOps - Authorization Successful</title>
+                    </head>
                     <body style="font-family: system-ui; text-align: center; padding: 50px;">
                         <h1>✅ Authorization Successful</h1>
                         <p>You can close this window and return to CreatorOps.</p>
@@ -176,7 +170,10 @@ async fn handle_oauth_redirect(
     let error_body = r#"
         <!DOCTYPE html>
         <html>
-        <head><title>CreatorOps - Authorization Failed</title></head>
+        <head>
+            <meta charset="UTF-8">
+            <title>CreatorOps - Authorization Failed</title>
+        </head>
         <body style="font-family: system-ui; text-align: center; padding: 50px;">
             <h1>❌ Authorization Failed</h1>
             <p>Please try again in CreatorOps.</p>
@@ -274,8 +271,8 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     let pkce = generate_pkce();
     let state = generate_state();
 
-    // 2. Find available port
-    let port = find_available_port()?;
+    // 2. Use fixed port for OAuth redirect
+    let port = 8080;
 
     // 3. Create channel for auth code
     let (tx, rx) = oneshot::channel::<String>();
@@ -329,23 +326,28 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     let client_id = std::env::var("GOOGLE_CLIENT_ID")
         .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
 
-    let redirect_uri = format!("http://localhost:{port}");
-    let auth_url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?\
-        client_id={}&\
-        redirect_uri={}&\
-        response_type=code&\
-        scope=https://www.googleapis.com/auth/drive.file%20https://www.googleapis.com/auth/userinfo.email%20https://www.googleapis.com/auth/userinfo.profile&\
-        state={}&\
-        code_challenge={}&\
-        code_challenge_method=S256&\
-        access_type=offline&\
-        prompt=consent",
-        urlencoding::encode(&client_id),
-        urlencoding::encode(&redirect_uri),
-        state,
-        pkce.challenge
-    );
+    let redirect_uri = format!("http://127.0.0.1:{port}");
+
+    // Build OAuth URL using query parameters
+    let params = [
+        ("client_id", client_id.as_str()),
+        ("redirect_uri", redirect_uri.as_str()),
+        ("response_type", "code"),
+        ("scope", "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"),
+        ("state", state.as_str()),
+        ("code_challenge", pkce.challenge.as_str()),
+        ("code_challenge_method", "S256"),
+        ("access_type", "offline"),
+        ("prompt", "consent"),
+    ];
+
+    let query_string = params
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .collect::<Vec<_>>()
+        .join("&");
+
+    let auth_url = format!("https://accounts.google.com/o/oauth2/v2/auth?{}", query_string);
 
     Ok(OAuthState {
         auth_url,
@@ -389,7 +391,7 @@ pub async fn complete_google_drive_auth(
     let client_secret =
         std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "YOUR_CLIENT_SECRET".to_owned());
 
-    let redirect_uri = format!("http://localhost:{}", session.port);
+    let redirect_uri = format!("http://127.0.0.1:{}", session.port);
 
     let token_response = exchange_code_for_tokens(
         &code,
