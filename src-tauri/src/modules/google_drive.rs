@@ -66,14 +66,22 @@ lazy_static::lazy_static! {
     static ref OAUTH_CODE_RECEIVER: CodeReceiver = Arc::new(Mutex::new(None));
 }
 
+const OAUTH_TIMEOUT_SECS: u64 = 300;
+
+// Drop guard to ensure OAuth session cleanup
+struct SessionCleanup;
+impl Drop for SessionCleanup {
+    fn drop(&mut self) {
+        let _ = OAUTH_SESSION.lock().map(|mut guard| *guard = None);
+    }
+}
+
 // OAuth Helper Functions
 
-fn generate_pkce() -> PkceData {
+fn generate_random_alphanumeric(length: usize) -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-
-    // Generate random verifier (43-128 characters)
-    let verifier: String = (0..128)
+    (0..length)
         .map(|_| {
             let idx = rng.gen_range(0..62);
             match idx {
@@ -82,7 +90,12 @@ fn generate_pkce() -> PkceData {
                 _ => (b'0' + (idx - 52)) as char,
             }
         })
-        .collect();
+        .collect()
+}
+
+fn generate_pkce() -> PkceData {
+    // Generate random verifier (43-128 characters)
+    let verifier = generate_random_alphanumeric(128);
 
     // Generate challenge: BASE64URL(SHA256(verifier))
     let mut hasher = Sha256::new();
@@ -97,18 +110,7 @@ fn generate_pkce() -> PkceData {
 }
 
 fn generate_state() -> String {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    (0..32)
-        .map(|_| {
-            let idx = rng.gen_range(0..62);
-            match idx {
-                0..=25 => (b'A' + idx) as char,
-                26..=51 => (b'a' + (idx - 26)) as char,
-                _ => (b'0' + (idx - 52)) as char,
-            }
-        })
-        .collect()
+    generate_random_alphanumeric(32)
 }
 
 async fn handle_oauth_redirect(
@@ -190,7 +192,7 @@ async fn handle_oauth_redirect(
 #[derive(Debug, Deserialize)]
 struct TokenResponse {
     access_token: String,
-    refresh_token: String,
+    refresh_token: Option<String>,
     expires_in: i64,
 }
 
@@ -295,7 +297,7 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     tokio::spawn(async move {
         if let Ok(listener) = TokioTcpListener::bind(&addr).await {
             // Accept connections for up to 5 minutes
-            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(300));
+            let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS));
             tokio::pin!(timeout);
 
             loop {
@@ -347,7 +349,7 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
         .collect::<Vec<_>>()
         .join("&");
 
-    let auth_url = format!("https://accounts.google.com/o/oauth2/v2/auth?{}", query_string);
+    let auth_url = format!("https://accounts.google.com/o/oauth2/v2/auth?{query_string}");
 
     Ok(OAuthState {
         auth_url,
@@ -370,10 +372,13 @@ pub async fn complete_google_drive_auth(
             .ok_or_else(|| "No OAuth session in progress".to_owned())?
     };
 
-    let code = tokio::time::timeout(tokio::time::Duration::from_secs(300), receiver)
-        .await
-        .map_err(|_| "OAuth timeout - no response received".to_owned())?
-        .map_err(|_| "Failed to receive auth code".to_owned())?;
+    let code = tokio::time::timeout(
+        tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS),
+        receiver,
+    )
+    .await
+    .map_err(|_| "OAuth timeout - no response received".to_owned())?
+    .map_err(|_| "Failed to receive auth code".to_owned())?;
 
     // 2. Get session data
     let session = {
@@ -384,6 +389,9 @@ pub async fn complete_google_drive_auth(
             .clone()
             .ok_or_else(|| "OAuth session not found".to_owned())?
     };
+
+    // Ensure session cleanup on error via Drop guard
+    let _cleanup = SessionCleanup;
 
     // 3. Exchange code for tokens
     let client_id = std::env::var("GOOGLE_CLIENT_ID")
@@ -405,15 +413,27 @@ pub async fn complete_google_drive_auth(
     // 4. Get user profile
     let user_info = get_user_info(&token_response.access_token).await?;
 
-    // 5. Store tokens in keychain
+    // 5. Handle refresh_token - use from response or fall back to existing
+    let refresh_token = match token_response.refresh_token {
+        Some(token) => token,
+        None => {
+            // Try to get existing refresh_token from keychain
+            get_tokens_from_keychain(&user_info.email)
+                .ok()
+                .map(|tokens| tokens.refresh_token)
+                .ok_or_else(|| "No refresh token available - please reconnect account".to_owned())?
+        }
+    };
+
+    // 6. Store tokens in keychain
     let token_data = TokenData {
         access_token: token_response.access_token.clone(),
-        refresh_token: token_response.refresh_token.clone(),
+        refresh_token,
         expires_at: Utc::now() + chrono::Duration::seconds(token_response.expires_in),
     };
     store_tokens_in_keychain(&user_info.email, &token_data)?;
 
-    // 6. Save account to database
+    // 7. Save account to database
     let account = GoogleDriveAccount {
         id: uuid::Uuid::new_v4().to_string(),
         email: user_info.email.clone(),
@@ -443,14 +463,7 @@ pub async fn complete_google_drive_auth(
     })
     .map_err(|e: rusqlite::Error| format!("Failed to save account: {e}"))?;
 
-    // 7. Clear OAuth session
-    {
-        let mut session_guard = OAUTH_SESSION
-            .lock()
-            .map_err(|_| "Failed to lock OAuth session".to_owned())?;
-        *session_guard = None;
-    }
-
+    // Drop guard will clear OAuth session automatically
     Ok(account)
 }
 
