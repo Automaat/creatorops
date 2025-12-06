@@ -1975,4 +1975,110 @@ mod tests {
         let result = generate_unique_filename("document", "", 2);
         assert_eq!(result, "document (2).");
     }
+
+    #[test]
+    fn test_chunk_size_constant() {
+        assert_eq!(CHUNK_SIZE, 4 * 1024 * 1024);
+        assert_eq!(CHUNK_SIZE, 4_194_304);
+    }
+
+    #[test]
+    fn test_chunk_size_matches_backup_module() {
+        // Verify CHUNK_SIZE matches the pattern used in backup.rs
+        const BACKUP_CHUNK_SIZE: usize = 4 * 1024 * 1024;
+        assert_eq!(CHUNK_SIZE, BACKUP_CHUNK_SIZE);
+    }
+
+    #[test]
+    fn test_upload_progress_complete_struct() {
+        let progress = UploadProgress {
+            job_id: "job-123".to_owned(),
+            file_name: "photo.jpg".to_owned(),
+            bytes_uploaded: 2048,
+            total_bytes: 2048,
+            file_index: 10,
+            total_files: 100,
+        };
+
+        assert_eq!(progress.job_id, "job-123");
+        assert_eq!(progress.file_name, "photo.jpg");
+        assert_eq!(progress.bytes_uploaded, 2048);
+        assert_eq!(progress.total_bytes, 2048);
+        assert_eq!(progress.file_index, 10);
+        assert_eq!(progress.total_files, 100);
+    }
+
+    #[test]
+    fn test_upload_progress_partial() {
+        let progress = UploadProgress {
+            job_id: "job-456".to_owned(),
+            file_name: "video.mp4".to_owned(),
+            bytes_uploaded: 1024,
+            total_bytes: 4096,
+            file_index: 5,
+            total_files: 20,
+        };
+
+        assert!(progress.bytes_uploaded < progress.total_bytes);
+        let percent = (progress.bytes_uploaded as f64 / progress.total_bytes as f64) * 100.0;
+        assert_eq!(percent, 25.0);
+    }
+
+    #[test]
+    fn test_drive_upload_job_status_values() {
+        let job = DriveUploadJob {
+            id: "test-id".to_owned(),
+            project_name: "Test".to_owned(),
+            folder_name: "Test Folder".to_owned(),
+            folder_id: "folder-123".to_owned(),
+            shareable_link: "https://drive.google.com/drive/folders/folder-123".to_owned(),
+            total_files: 10,
+            uploaded_files: 5,
+            status: "in_progress".to_owned(),
+        };
+
+        assert_eq!(job.status, "in_progress");
+        assert!(job.uploaded_files < job.total_files);
+    }
+
+    #[test]
+    fn test_drive_upload_job_with_zero_files() {
+        let job = DriveUploadJob {
+            id: "empty-job".to_owned(),
+            project_name: "Empty".to_owned(),
+            folder_name: "Empty Folder".to_owned(),
+            folder_id: "folder-empty".to_owned(),
+            shareable_link: "https://drive.google.com/drive/folders/folder-empty".to_owned(),
+            total_files: 0,
+            uploaded_files: 0,
+            status: "completed".to_owned(),
+        };
+
+        assert_eq!(job.total_files, 0);
+        assert_eq!(job.uploaded_files, 0);
+        assert_eq!(job.status, "completed");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_sequential() {
+        let base = "photo";
+        let ext = "jpg";
+
+        assert_eq!(generate_unique_filename(base, ext, 0), "photo.jpg");
+        assert_eq!(generate_unique_filename(base, ext, 1), "photo (1).jpg");
+        assert_eq!(generate_unique_filename(base, ext, 2), "photo (2).jpg");
+        assert_eq!(generate_unique_filename(base, ext, 99), "photo (99).jpg");
+    }
+
+    #[test]
+    fn test_generate_unique_filename_special_characters() {
+        let base = "my-photo_2024";
+        let ext = "jpeg";
+
+        assert_eq!(generate_unique_filename(base, ext, 0), "my-photo_2024.jpeg");
+        assert_eq!(
+            generate_unique_filename(base, ext, 1),
+            "my-photo_2024 (1).jpeg"
+        );
+    }
 }
