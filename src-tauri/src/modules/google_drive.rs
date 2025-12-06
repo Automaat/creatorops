@@ -1022,6 +1022,7 @@ async fn upload_file_to_drive(
 // Upload Tauri Commands
 
 #[tauri::command]
+#[allow(clippy::too_many_lines)]
 pub async fn upload_to_google_drive(
     window: tauri::Window,
     db: tauri::State<'_, Database>,
@@ -2020,8 +2021,8 @@ mod tests {
         };
 
         assert!(progress.bytes_uploaded < progress.total_bytes);
-        let percent = (progress.bytes_uploaded as f64 / progress.total_bytes as f64) * 100.0;
-        assert_eq!(percent, 25.0);
+        assert_eq!(progress.bytes_uploaded, 1024);
+        assert_eq!(progress.total_bytes, 4096);
     }
 
     #[test]
