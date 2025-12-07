@@ -16,6 +16,11 @@ use tokio::sync::oneshot;
 
 use crate::modules::db::Database;
 
+// Constants
+const MIN_TOKEN_EXPIRY_SECONDS: i64 = 60; // Minimum valid token expiry time
+const DEFAULT_TOKEN_EXPIRY_SECONDS: i64 = 3600; // Default 1 hour if invalid expiry received
+const HTTP_TIMEOUT_SECONDS: u64 = 60; // HTTP client timeout
+
 // Data Structures
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -210,7 +215,11 @@ async fn exchange_code_for_tokens(
     redirect_uri: &str,
     code_verifier: &str,
 ) -> Result<TokenResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECONDS))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
     let params = [
         ("code", code),
@@ -243,14 +252,42 @@ async fn exchange_code_for_tokens(
 }
 
 async fn get_user_info(access_token: &str) -> Result<UserInfo, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECONDS)) // Increase timeout
+        .connect_timeout(std::time::Duration::from_secs(30)) // Add connection timeout
+        .pool_idle_timeout(std::time::Duration::from_secs(90))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
-    let response = client
-        .get("https://www.googleapis.com/oauth2/v2/userinfo")
-        .bearer_auth(access_token)
-        .send()
-        .await
-        .map_err(|e| format!("User info request failed: {e}"))?;
+    // Retry logic with exponential backoff for network failures (3 total attempts)
+    let mut retries = 2;
+    let mut delay = std::time::Duration::from_secs(1);
+
+    let response = loop {
+        log::info!("Attempting to fetch user info (retries left: {})", retries);
+
+        let result = client
+            .get("https://www.googleapis.com/oauth2/v2/userinfo")
+            .bearer_auth(access_token)
+            .send()
+            .await;
+
+        match result {
+            Ok(response) => {
+                log::info!("Successfully fetched user info");
+                break response;
+            }
+            Err(e) if retries > 0 => {
+                log::warn!("User info request failed: {}, retrying in {:?}", e, delay);
+                tokio::time::sleep(delay).await;
+                retries -= 1;
+                delay *= 2; // Exponential backoff
+            }
+            Err(e) => {
+                return Err(format!("User info request failed after retries: {e}"));
+            }
+        }
+    };
 
     if !response.status().is_success() {
         let error_text = response
@@ -414,36 +451,74 @@ pub async fn complete_google_drive_auth(
     // 4. Get user profile
     let user_info = get_user_info(&token_response.access_token).await?;
 
+    // Normalize email to lowercase for consistent storage/retrieval
+    let normalized_email = user_info.email.to_lowercase();
+    log::info!(
+        "Authenticated user email (original): '{}', normalized: '{}'",
+        user_info.email,
+        normalized_email
+    );
+
     // 5. Handle refresh_token - use from response or fall back to existing
     let refresh_token = match token_response.refresh_token {
         Some(token) => token,
         None => {
             // Try to get existing refresh_token from keychain
-            get_tokens_from_keychain(&user_info.email)
+            get_tokens_from_keychain(&normalized_email)
                 .ok()
                 .map(|tokens| tokens.refresh_token)
                 .ok_or_else(|| "No refresh token available - please reconnect account".to_owned())?
         }
     };
 
-    // 6. Store tokens in keychain
+    // 6. Validate and store tokens in keychain
+    // Ensure expires_in is reasonable (at least MIN_TOKEN_EXPIRY_SECONDS)
+    let expires_in = if token_response.expires_in < MIN_TOKEN_EXPIRY_SECONDS {
+        log::warn!(
+            "Received unusually short expires_in from Google: {} seconds, using {}",
+            token_response.expires_in,
+            DEFAULT_TOKEN_EXPIRY_SECONDS
+        );
+        DEFAULT_TOKEN_EXPIRY_SECONDS
+    } else {
+        token_response.expires_in
+    };
+
     let token_data = TokenData {
         access_token: token_response.access_token.clone(),
         refresh_token,
-        expires_at: Utc::now() + chrono::Duration::seconds(token_response.expires_in),
+        expires_at: Utc::now() + chrono::Duration::seconds(expires_in),
     };
-    store_tokens_in_keychain(&user_info.email, &token_data)?;
+    store_tokens_in_keychain(&normalized_email, &token_data)?;
 
-    // 7. Save account to database
+    // 7. Check if account exists and get its ID, or generate new one
+    let existing_account = get_google_drive_account(db.clone()).await?;
+    let account_id = if let Some(existing) = existing_account.as_ref() {
+        if existing.email.to_lowercase() == normalized_email {
+            existing.id.clone()
+        } else {
+            uuid::Uuid::new_v4().to_string()
+        }
+    } else {
+        uuid::Uuid::new_v4().to_string()
+    };
+
+    // 8. Save account to database
     let account = GoogleDriveAccount {
-        id: uuid::Uuid::new_v4().to_string(),
-        email: user_info.email.clone(),
+        id: account_id.clone(),
+        email: normalized_email.clone(),
         display_name: user_info.name,
-        parent_folder_id: None,
+        parent_folder_id: existing_account.and_then(|a| a.parent_folder_id),
         enabled: true,
         created_at: get_current_timestamp(),
         last_authenticated: get_current_timestamp(),
     };
+
+    log::info!(
+        "Saving account to database - ID: '{}', Email: '{}'",
+        account_id,
+        normalized_email
+    );
 
     db.execute(|conn| {
         conn.execute(
@@ -526,12 +601,14 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
     let account = get_google_drive_account(db.clone()).await?;
 
     if let Some(acc) = account {
-        // Remove from keychain
-        let entry = keyring::Entry::new("com.creatorops.google-drive", &acc.email)
-            .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
+        // Normalize email for token removal
+        let normalized_email = acc.email.to_lowercase();
 
-        // Ignore error if token doesn't exist in keychain
-        let _ = entry.delete_credential();
+        // Remove token file
+        let token_file = get_token_file_path(&normalized_email).unwrap_or_else(|_| String::new());
+
+        // Ignore error if file doesn't exist
+        let _ = std::fs::remove_file(&token_file);
 
         // Remove from database
         db.execute(|conn| {
@@ -539,40 +616,222 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
             Ok(())
         })
         .map_err(|e: rusqlite::Error| format!("Failed to delete account: {e}"))?;
+
+        log::info!("Removed Google Drive account for {}", normalized_email);
     }
 
     Ok(())
 }
 
+#[tauri::command]
+pub async fn test_google_drive_connection(db: tauri::State<'_, Database>) -> Result<(), String> {
+    let account = get_google_drive_account(db)
+        .await?
+        .ok_or_else(|| "No Google Drive account configured".to_owned())?;
+
+    log::info!(
+        "Testing Google Drive connection for account: '{}' (ID: {})",
+        account.email,
+        account.id
+    );
+
+    // Get valid access token (handles refresh if needed)
+    let access_token = get_valid_access_token(&account.email).await.map_err(|e| {
+        log::error!("Failed to get valid access token for {}: {}", account.email, e);
+
+        if e.contains("Failed to read token file") || e.contains("No such file") || e.contains("Failed to get tokens") {
+            format!("Authentication expired - please disconnect and reconnect your account. (Error: {})", e)
+        } else if e.contains("Failed to deserialize") || e.contains("Failed to decrypt") {
+            format!("Token data corrupted - please disconnect and reconnect your account. (Error: {})", e)
+        } else {
+            e
+        }
+    })?;
+
+    // Test connection by fetching user info
+    log::info!("Testing connection by fetching user info...");
+    get_user_info(&access_token).await.map_err(|e| {
+        log::error!("Failed to get user info: {}", e);
+        format!("Connection test failed: {}", e)
+    })?;
+
+    log::info!("Google Drive connection test successful");
+    Ok(())
+}
+
 // Token Management Functions
+
+/// Get the token file path for a given email address
+fn get_token_file_path(email: &str) -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|_| "Failed to get HOME directory")?;
+    let normalized_email = email.to_lowercase();
+    Ok(format!(
+        "{}/.creatorops/google_tokens_{}.enc",
+        home,
+        normalized_email.replace('@', "_at_").replace('.', "_")
+    ))
+}
+
+/// Generate a machine-specific encryption key
+fn get_encryption_key() -> Result<[u8; 32], String> {
+    use sha2::{Digest, Sha256};
+
+    // Combine multiple machine-specific values for the key
+    let mut hasher = Sha256::new();
+
+    // Add username
+    if let Ok(user) = std::env::var("USER") {
+        hasher.update(user.as_bytes());
+    }
+
+    // Add home directory path
+    if let Ok(home) = std::env::var("HOME") {
+        hasher.update(home.as_bytes());
+    }
+
+    // Add hostname if available
+    if let Ok(hostname) = std::process::Command::new("hostname").output() {
+        hasher.update(&hostname.stdout);
+    }
+
+    // Add a fixed salt for this application
+    hasher.update(b"CreatorOps-GoogleDrive-TokenEncryption-2024");
+
+    let result = hasher.finalize();
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result);
+    Ok(key)
+}
+
+/// Encrypt data using AES-256-GCM for secure token storage
+/// Uses authenticated encryption with random nonces for each encryption
+fn encrypt_data(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
+    use aes_gcm::{
+        aead::{Aead, AeadCore, KeyInit, OsRng},
+        Aes256Gcm,
+    };
+
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Failed to create cipher: {e}"))?;
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+    let ciphertext = cipher
+        .encrypt(&nonce, data)
+        .map_err(|e| format!("Failed to encrypt data: {e}"))?;
+
+    // Prepend nonce to ciphertext for storage
+    let mut result = nonce.to_vec();
+    result.extend_from_slice(&ciphertext);
+
+    Ok(result)
+}
+
+/// Decrypt data using AES-256-GCM authenticated encryption
+/// Validates authenticity and integrity before returning plaintext
+fn decrypt_data(encrypted: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
+    use aes_gcm::{
+        aead::{Aead, KeyInit},
+        Aes256Gcm, Nonce,
+    };
+
+    // Extract nonce (first 12 bytes) and ciphertext
+    if encrypted.len() < 12 {
+        return Err("Invalid encrypted data: too short".to_string());
+    }
+
+    let (nonce_bytes, ciphertext) = encrypted.split_at(12);
+    let nonce = Nonce::from_slice(nonce_bytes);
+
+    let cipher =
+        Aes256Gcm::new_from_slice(key).map_err(|e| format!("Failed to create cipher: {e}"))?;
+
+    cipher
+        .decrypt(nonce, ciphertext)
+        .map_err(|e| format!("Failed to decrypt data: {e}"))
+}
 
 #[allow(dead_code)]
 fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), String> {
-    let entry = keyring::Entry::new("com.creatorops.google-drive", email)
-        .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
+    log::info!("Storing tokens for email: '{}'", email);
 
+    // Use encrypted file-based approach as fallback for keychain issues
+    let home = std::env::var("HOME").map_err(|_| "Failed to get HOME directory")?;
+    let token_dir = format!("{}/.creatorops", home);
+    std::fs::create_dir_all(&token_dir)
+        .map_err(|e| format!("Failed to create token directory: {e}"))?;
+
+    // Set restrictive permissions on the directory (owner only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata =
+            std::fs::metadata(&token_dir).map_err(|e| format!("Failed to get metadata: {e}"))?;
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&token_dir, permissions)
+            .map_err(|e| format!("Failed to set permissions: {e}"))?;
+    }
+
+    let token_file = get_token_file_path(email)?;
     let token_json =
         serde_json::to_string(&tokens).map_err(|e| format!("Failed to serialize tokens: {e}"))?;
 
-    entry
-        .set_password(&token_json)
-        .map_err(|e| format!("Failed to store tokens in keychain: {e}"))?;
+    // Encrypt the token data
+    let key = get_encryption_key()?;
+    let encrypted = encrypt_data(token_json.as_bytes(), &key)?;
+    use base64::{engine::general_purpose, Engine as _};
+    let encoded = general_purpose::STANDARD.encode(&encrypted);
 
+    std::fs::write(&token_file, encoded).map_err(|e| format!("Failed to write token file: {e}"))?;
+
+    // Set restrictive permissions on the file (owner read/write only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata =
+            std::fs::metadata(&token_file).map_err(|e| format!("Failed to get metadata: {e}"))?;
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o600);
+        std::fs::set_permissions(&token_file, permissions)
+            .map_err(|e| format!("Failed to set permissions: {e}"))?;
+    }
+
+    log::info!(
+        "Successfully stored encrypted tokens for email: '{}'",
+        email
+    );
     Ok(())
 }
 
 #[allow(dead_code)]
 fn get_tokens_from_keychain(email: &str) -> Result<TokenData, String> {
-    let entry = keyring::Entry::new("com.creatorops.google-drive", email)
-        .map_err(|e| format!("Failed to create keychain entry: {e}"))?;
+    log::info!("Attempting to get tokens for email: '{}'", email);
 
-    let token_json = entry
-        .get_password()
-        .map_err(|e| format!("Failed to get tokens from keychain: {e}"))?;
+    // Use encrypted file-based approach as fallback for keychain issues
+    let token_file = get_token_file_path(email)?;
+
+    let encoded = std::fs::read_to_string(&token_file).map_err(|e| {
+        log::error!("Failed to read token file for '{}': {}", email, e);
+        format!("Failed to get tokens: {e}")
+    })?;
+
+    // Decrypt the token data
+    use base64::{engine::general_purpose, Engine as _};
+    let encrypted = general_purpose::STANDARD
+        .decode(&encoded)
+        .map_err(|e| format!("Failed to decode token data: {e}"))?;
+    let key = get_encryption_key()?;
+    let decrypted = decrypt_data(&encrypted, &key)?;
+    let token_json = String::from_utf8(decrypted)
+        .map_err(|e| format!("Failed to decode decrypted data: {e}"))?;
 
     let tokens: TokenData = serde_json::from_str(&token_json)
         .map_err(|e| format!("Failed to deserialize tokens: {e}"))?;
 
+    log::info!(
+        "Successfully retrieved and decrypted tokens for email: '{}'",
+        email
+    );
     Ok(tokens)
 }
 
@@ -589,7 +848,11 @@ async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> 
     let client_secret =
         std::env::var("GOOGLE_CLIENT_SECRET").unwrap_or_else(|_| "YOUR_CLIENT_SECRET".to_owned());
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECONDS))
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {e}"))?;
 
     let params = [
         ("client_id", client_id.as_str()),
@@ -662,16 +925,26 @@ fn get_current_timestamp() -> String {
 
 /// Get valid access token, refreshing if needed
 async fn get_valid_access_token(email: &str) -> Result<String, String> {
-    let mut tokens = get_tokens_from_keychain(email)?;
+    // Normalize email for consistent keychain access
+    let normalized_email = email.to_lowercase();
+
+    let mut tokens = get_tokens_from_keychain(&normalized_email).map_err(|e| {
+        log::error!("Failed to get tokens for {}: {}", normalized_email, e);
+        e
+    })?;
 
     // Check if token is expired or will expire in next 5 minutes
     let now = Utc::now();
     let buffer = chrono::Duration::minutes(5);
 
     if tokens.expires_at - buffer < now {
+        log::info!(
+            "Token expired or expiring soon for {}, refreshing",
+            normalized_email
+        );
         // Token expired or expiring soon, refresh it
         tokens = refresh_access_token(&tokens.refresh_token).await?;
-        store_tokens_in_keychain(email, &tokens)?;
+        store_tokens_in_keychain(&normalized_email, &tokens)?;
     }
 
     Ok(tokens.access_token)
@@ -1588,9 +1861,7 @@ mod tests {
         let nonexistent_email = format!("nonexistent-{}@example.com", Uuid::new_v4());
         let result = get_tokens_from_keychain(&nonexistent_email);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Failed to get tokens from keychain"));
+        assert!(result.unwrap_err().contains("Failed to get tokens"));
     }
 
     #[test]
@@ -1855,6 +2126,80 @@ mod tests {
         let response: TokenResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.access_token, "access");
         assert_eq!(response.refresh_token, None);
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let key = [42u8; 32]; // Test key
+        let plaintext = b"This is a test message for encryption";
+
+        // Encrypt
+        let encrypted = encrypt_data(plaintext, &key).unwrap();
+
+        // Verify encrypted is different from plaintext
+        assert_ne!(&encrypted[12..], plaintext);
+
+        // Decrypt
+        let decrypted = decrypt_data(&encrypted, &key).unwrap();
+
+        // Verify roundtrip
+        assert_eq!(&decrypted[..], plaintext);
+    }
+
+    #[test]
+    fn test_encrypt_different_nonces() {
+        let key = [42u8; 32];
+        let plaintext = b"Test message";
+
+        let encrypted1 = encrypt_data(plaintext, &key).unwrap();
+        let encrypted2 = encrypt_data(plaintext, &key).unwrap();
+
+        // Same plaintext should produce different ciphertexts (different nonces)
+        assert_ne!(encrypted1, encrypted2);
+
+        // But both should decrypt to same plaintext
+        let decrypted1 = decrypt_data(&encrypted1, &key).unwrap();
+        let decrypted2 = decrypt_data(&encrypted2, &key).unwrap();
+        assert_eq!(decrypted1, decrypted2);
+        assert_eq!(&decrypted1[..], plaintext);
+    }
+
+    #[test]
+    fn test_decrypt_invalid_data() {
+        let key = [42u8; 32];
+
+        // Too short (less than nonce size)
+        let short_data = vec![1, 2, 3];
+        let result = decrypt_data(&short_data, &key);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too short"));
+
+        // Invalid ciphertext (random data)
+        let mut invalid_data = vec![0u8; 50];
+        invalid_data[..12].copy_from_slice(&[1u8; 12]); // Valid nonce size
+        let result = decrypt_data(&invalid_data, &key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_token_file_path() {
+        let email = "test@example.com";
+        let path = get_token_file_path(email).unwrap();
+
+        assert!(path.ends_with("/.creatorops/google_tokens_test_at_example_com.enc"));
+        assert!(path.contains(std::env::var("HOME").unwrap_or_default().as_str()));
+    }
+
+    #[test]
+    fn test_get_token_file_path_normalization() {
+        let email1 = "Test@Example.Com";
+        let email2 = "test@example.com";
+
+        let path1 = get_token_file_path(email1).unwrap();
+        let path2 = get_token_file_path(email2).unwrap();
+
+        // Both should produce same path (normalized)
+        assert_eq!(path1, path2);
     }
 
     #[tokio::test]
