@@ -2424,8 +2424,8 @@ mod tests {
     fn test_store_and_get_tokens_roundtrip() {
         let email = format!("test-{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
-            access_token: "test-access-token-12345".to_string(),
-            refresh_token: "test-refresh-token-67890".to_string(),
+            access_token: "test-access-token-12345".to_owned(),
+            refresh_token: "test-refresh-token-67890".to_owned(),
             expires_at: Utc::now() + chrono::Duration::hours(1),
         };
 
@@ -2458,8 +2458,8 @@ mod tests {
     fn test_store_tokens_creates_directory() {
         let email = format!("test-dir-{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
-            access_token: "test-token".to_string(),
-            refresh_token: "refresh-token".to_string(),
+            access_token: "test-token".to_owned(),
+            refresh_token: "refresh-token".to_owned(),
             expires_at: Utc::now() + chrono::Duration::hours(1),
         };
 
@@ -2499,6 +2499,8 @@ mod tests {
 
     #[test]
     fn test_get_tokens_handles_invalid_encrypted_data() {
+        use base64::{engine::general_purpose, Engine as _};
+
         let email = format!("test-invalid-{}@example.com", Uuid::new_v4());
 
         // Create a file with valid base64 but invalid encrypted content
@@ -2506,8 +2508,6 @@ mod tests {
         let home = std::env::var("HOME").unwrap();
         let token_dir = format!("{home}/.creatorops");
         let _ = std::fs::create_dir_all(&token_dir);
-
-        use base64::{engine::general_purpose, Engine as _};
         // Create random data that's not properly encrypted
         let invalid_data = vec![0_u8; 100];
         let encoded = general_purpose::STANDARD.encode(&invalid_data);
@@ -2597,7 +2597,7 @@ mod tests {
         );
 
         // Check the filename part doesn't contain raw email characters
-        let filename = path1.split('/').last().unwrap();
+        let filename = path1.rsplit('/').next().unwrap();
         assert!(!filename.contains('@'), "Filename should not contain raw @");
         assert!(
             filename.contains("_at_"),
@@ -2609,8 +2609,8 @@ mod tests {
     fn test_store_tokens_with_special_characters() {
         let email = format!("test+special.chars{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
-            access_token: "token-with-special-chars!@#$%^&*()".to_string(),
-            refresh_token: "refresh-with-unicode-émojis-🎉".to_string(),
+            access_token: "token-with-special-chars!@#$%^&*()".to_owned(),
+            refresh_token: "refresh-with-unicode-émojis-🎉".to_owned(),
             expires_at: Utc::now() + chrono::Duration::hours(1),
         };
 
@@ -2627,6 +2627,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::significant_drop_tightening)]
     fn test_concurrent_token_storage() {
         use std::sync::Arc;
         use std::sync::Mutex;
@@ -2642,8 +2643,8 @@ mod tests {
 
             let handle = thread::spawn(move || {
                 let tokens = TokenData {
-                    access_token: format!("token-{}", i),
-                    refresh_token: format!("refresh-{}", i),
+                    access_token: format!("token-{i}"),
+                    refresh_token: format!("refresh-{i}"),
                     expires_at: Utc::now() + chrono::Duration::hours(1),
                 };
 
@@ -2658,11 +2659,13 @@ mod tests {
             handle.join().unwrap();
         }
 
-        let all_results = results.lock().unwrap();
-        assert!(
-            all_results.iter().all(|&r| r),
-            "All concurrent stores should succeed"
-        );
+        {
+            let all_results = results.lock().unwrap();
+            assert!(
+                all_results.iter().all(|&r| r),
+                "All concurrent stores should succeed"
+            );
+        } // Drop the lock guard here
 
         // Verify we can still read tokens
         let final_tokens = get_tokens_from_keychain(&email);
