@@ -23,7 +23,8 @@ use modules::file_system::{
 use modules::file_utils::get_home_directory;
 use modules::google_drive::{
     complete_google_drive_auth, get_google_drive_account, remove_google_drive_account,
-    set_drive_parent_folder, start_google_drive_auth, upload_to_google_drive,
+    set_drive_parent_folder, start_google_drive_auth, test_google_drive_connection,
+    upload_to_google_drive,
 };
 use modules::import_history::{
     get_import_history, get_project_import_history, save_import_history,
@@ -42,6 +43,9 @@ use modules::sd_card::{eject_sd_card, list_sd_card_files, scan_sd_cards};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 #[allow(clippy::exit)] // Tauri's run() internally uses process::exit
 pub fn run() -> AppResult {
+    // Initialize logger (safe to call multiple times)
+    let _ = env_logger::try_init();
+
     // Load .env file if present (for Google OAuth credentials in development)
     let _ = dotenvy::dotenv();
 
@@ -97,6 +101,7 @@ pub fn run() -> AppResult {
             get_google_drive_account,
             set_drive_parent_folder,
             remove_google_drive_account,
+            test_google_drive_connection,
             upload_to_google_drive,
         ])
         .run(tauri::generate_context!())?;
