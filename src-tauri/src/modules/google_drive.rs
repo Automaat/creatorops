@@ -494,18 +494,16 @@ pub async fn complete_google_drive_auth(
 
     // 7. Check if account exists and get its ID, or generate new one
     let existing_account = get_google_drive_account(db.clone()).await?;
-    let account_id = existing_account
-        .as_ref()
-        .map_or_else(
-            || uuid::Uuid::new_v4().to_string(),
-            |existing| {
-                if existing.email.to_lowercase() == normalized_email {
-                    existing.id.clone()
-                } else {
-                    uuid::Uuid::new_v4().to_string()
-                }
-            },
-        );
+    let account_id = existing_account.as_ref().map_or_else(
+        || uuid::Uuid::new_v4().to_string(),
+        |existing| {
+            if existing.email.to_lowercase() == normalized_email {
+                existing.id.clone()
+            } else {
+                uuid::Uuid::new_v4().to_string()
+            }
+        },
+    );
 
     // 8. Save account to database
     let account = GoogleDriveAccount {
@@ -2433,11 +2431,19 @@ mod tests {
 
         // Store tokens
         let store_result = store_tokens_in_keychain(&email, &tokens);
-        assert!(store_result.is_ok(), "Failed to store tokens: {:?}", store_result.err());
+        assert!(
+            store_result.is_ok(),
+            "Failed to store tokens: {:?}",
+            store_result.err()
+        );
 
         // Retrieve tokens
         let retrieved_result = get_tokens_from_keychain(&email);
-        assert!(retrieved_result.is_ok(), "Failed to retrieve tokens: {:?}", retrieved_result.err());
+        assert!(
+            retrieved_result.is_ok(),
+            "Failed to retrieve tokens: {:?}",
+            retrieved_result.err()
+        );
 
         let retrieved = retrieved_result.unwrap();
         assert_eq!(retrieved.access_token, tokens.access_token);
@@ -2534,7 +2540,10 @@ mod tests {
         let data = b"";
 
         let encrypted = encrypt_data(data, &key).unwrap();
-        assert!(encrypted.len() >= 12, "Encrypted data should at least contain nonce");
+        assert!(
+            encrypted.len() >= 12,
+            "Encrypted data should at least contain nonce"
+        );
 
         let decrypted = decrypt_data(&encrypted, &key).unwrap();
         assert_eq!(decrypted, data);
@@ -2578,13 +2587,22 @@ mod tests {
         assert_eq!(path2, path3);
 
         // Should sanitize email special characters in the filename
-        assert!(path1.contains("google_tokens_user_at_example_com.enc"), "Should have sanitized filename");
-        assert!(path1.ends_with("user_at_example_com.enc"), "Should end with sanitized email");
+        assert!(
+            path1.contains("google_tokens_user_at_example_com.enc"),
+            "Should have sanitized filename"
+        );
+        assert!(
+            path1.ends_with("user_at_example_com.enc"),
+            "Should end with sanitized email"
+        );
 
         // Check the filename part doesn't contain raw email characters
         let filename = path1.split('/').last().unwrap();
         assert!(!filename.contains('@'), "Filename should not contain raw @");
-        assert!(filename.contains("_at_"), "Filename should replace @ with _at_");
+        assert!(
+            filename.contains("_at_"),
+            "Filename should replace @ with _at_"
+        );
     }
 
     #[test]
@@ -2641,7 +2659,10 @@ mod tests {
         }
 
         let all_results = results.lock().unwrap();
-        assert!(all_results.iter().all(|&r| r), "All concurrent stores should succeed");
+        assert!(
+            all_results.iter().all(|&r| r),
+            "All concurrent stores should succeed"
+        );
 
         // Verify we can still read tokens
         let final_tokens = get_tokens_from_keychain(&email);
