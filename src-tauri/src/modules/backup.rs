@@ -247,6 +247,7 @@ pub async fn remove_backup_job(
     }
 
     queue.remove(&job_id);
+    drop(queue);
     Ok(())
 }
 

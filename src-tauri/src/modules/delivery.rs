@@ -159,10 +159,9 @@ fn collect_project_files(
     Ok(())
 }
 
-/// Create a delivery job
-#[tauri::command]
-pub async fn create_delivery(
-    state: tauri::State<'_, crate::state::AppState>,
+/// Core logic for creating a delivery job (testable)
+pub async fn create_delivery_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
     project_id: String,
     project_name: String,
     selected_files: Vec<String>,
@@ -201,11 +200,32 @@ pub async fn create_delivery(
 
     // Add to queue
     {
-        let mut queue = state.delivery_queue.lock().await;
+        let mut queue = delivery_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
     Ok(job)
+}
+
+/// Create a delivery job
+#[tauri::command]
+pub async fn create_delivery(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_id: String,
+    project_name: String,
+    selected_files: Vec<String>,
+    delivery_path: String,
+    naming_template: Option<String>,
+) -> Result<DeliveryJob, String> {
+    create_delivery_impl(
+        &state.delivery_queue,
+        project_id,
+        project_name,
+        selected_files,
+        delivery_path,
+        naming_template,
+    )
+    .await
 }
 
 /// Start a delivery job
@@ -450,13 +470,29 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
     }
 }
 
+/// Core logic for getting delivery queue (testable)
+pub async fn get_delivery_queue_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
+) -> Result<Vec<DeliveryJob>, String> {
+    let queue = delivery_queue.lock().await;
+    Ok(queue.values().cloned().collect())
+}
+
 /// Get delivery queue
 #[tauri::command]
 pub async fn get_delivery_queue(
     state: tauri::State<'_, crate::state::AppState>,
 ) -> Result<Vec<DeliveryJob>, String> {
-    let queue = state.delivery_queue.lock().await;
-    Ok(queue.values().cloned().collect())
+    get_delivery_queue_impl(&state.delivery_queue).await
+}
+
+/// Core logic for removing a delivery job (testable)
+pub async fn remove_delivery_job_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
+    job_id: String,
+) -> Result<(), String> {
+    delivery_queue.lock().await.remove(&job_id);
+    Ok(())
 }
 
 /// Remove a delivery job from queue
@@ -465,9 +501,7 @@ pub async fn remove_delivery_job(
     state: tauri::State<'_, crate::state::AppState>,
     job_id: String,
 ) -> Result<(), String> {
-    let mut queue = state.delivery_queue.lock().await;
-    queue.remove(&job_id);
-    Ok(())
+    remove_delivery_job_impl(&state.delivery_queue, job_id).await
 }
 
 #[allow(clippy::wildcard_imports)]
