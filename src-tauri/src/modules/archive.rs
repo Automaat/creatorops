@@ -144,10 +144,13 @@ pub async fn start_archive(
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn process_archive(
     mut job: ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>>,
+    archive_queue: std::sync::Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>,
+    >,
 ) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
@@ -160,17 +163,26 @@ fn process_archive(
         return Err("Compression not yet implemented".to_owned());
     }
     // Move entire directory to archive location
-    move_directory_recursive(source_path, archive_path, &mut job, app_handle, archive_queue)?;
+    move_directory_recursive(
+        source_path,
+        archive_path,
+        &mut job,
+        app_handle,
+        archive_queue,
+    )?;
 
     Ok(())
 }
 
+#[allow(clippy::type_complexity, clippy::needless_pass_by_value)]
 fn move_directory_recursive(
     source: &Path,
     dest: &Path,
     job: &mut ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>>,
+    archive_queue: std::sync::Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>,
+    >,
 ) -> Result<(), String> {
     // Create destination directory
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
@@ -196,10 +208,11 @@ fn move_directory_recursive(
 
             // Update queue - must use blocking runtime since this is a sync function
             {
-                if let Ok(mut queue) = tokio::runtime::Handle::try_current()
-                    .and_then(|handle| tokio::task::block_in_place(|| handle.block_on(async {
-                        Ok(archive_queue.lock().await)
-                    }))) {
+                if let Ok(mut queue) = tokio::runtime::Handle::try_current().and_then(|handle| {
+                    tokio::task::block_in_place(|| {
+                        handle.block_on(async { Ok(archive_queue.lock().await) })
+                    })
+                }) {
                     if let Some(q_job) = queue.get_mut(&job.id) {
                         q_job.files_archived = job.files_archived;
                         q_job.bytes_transferred = job.bytes_transferred;

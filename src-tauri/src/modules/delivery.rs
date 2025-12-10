@@ -232,7 +232,8 @@ pub async fn start_delivery(
     // Spawn background task
     let delivery_queue = state.delivery_queue.clone();
     tokio::spawn(async move {
-        let result = process_delivery(job.clone(), app_handle.clone(), delivery_queue.clone()).await;
+        let result =
+            process_delivery(job.clone(), app_handle.clone(), delivery_queue.clone()).await;
 
         // Update job status
         let mut queue = delivery_queue.lock().await;
@@ -254,10 +255,13 @@ pub async fn start_delivery(
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
-    delivery_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, DeliveryJob>>>,
+    delivery_queue: std::sync::Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, DeliveryJob>>,
+    >,
 ) -> Result<(), String> {
     // Create delivery directory
     let delivery_path = Path::new(&job.delivery_path);

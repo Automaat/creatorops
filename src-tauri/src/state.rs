@@ -1,7 +1,7 @@
 //! Application state management
 //!
 //! Provides centralized state management for all async operations,
-//! replacing lazy_static global mutable state with Tauri-managed state.
+//! replacing `lazy_static` global mutable state with Tauri-managed state.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,21 +16,34 @@ use crate::modules::delivery::DeliveryJob;
 /// Maximum concurrent file copy operations
 const MAX_CONCURRENT_COPIES: usize = 4;
 
+/// Type alias for backup job queue
+pub type BackupQueue = Arc<Mutex<HashMap<String, BackupJob>>>;
+
+/// Type alias for delivery job queue
+pub type DeliveryQueue = Arc<Mutex<HashMap<String, DeliveryJob>>>;
+
+/// Type alias for archive job queue
+pub type ArchiveQueue = Arc<Mutex<HashMap<String, ArchiveJob>>>;
+
+/// Type alias for import cancellation tokens
+pub type ImportTokens = Arc<Mutex<HashMap<String, CancellationToken>>>;
+
 /// Centralized application state managed by Tauri
 pub struct AppState {
     /// Backup job queue
-    pub backup_queue: Arc<Mutex<HashMap<String, BackupJob>>>,
+    pub backup_queue: BackupQueue,
 
     /// Delivery job queue
-    pub delivery_queue: Arc<Mutex<HashMap<String, DeliveryJob>>>,
+    pub delivery_queue: DeliveryQueue,
 
     /// Archive job queue
-    pub archive_queue: Arc<Mutex<HashMap<String, ArchiveJob>>>,
+    pub archive_queue: ArchiveQueue,
 
     /// Import operation cancellation tokens
-    pub import_tokens: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    pub import_tokens: ImportTokens,
 
     /// Semaphore for limiting concurrent file copy operations
+    #[allow(dead_code)] // Reserved for future use
     pub file_semaphore: Arc<Semaphore>,
 }
 
@@ -53,6 +66,9 @@ mod tests {
     #[test]
     fn test_app_state_creation() {
         let state = AppState::default();
-        assert_eq!(state.file_semaphore.available_permits(), MAX_CONCURRENT_COPIES);
+        assert_eq!(
+            state.file_semaphore.available_permits(),
+            MAX_CONCURRENT_COPIES
+        );
     }
 }
