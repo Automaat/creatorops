@@ -1,4 +1,4 @@
-//! Error types for CreatorOps application
+//! Error types for `CreatorOps` application
 //!
 //! This module provides a unified error type using thiserror for better error handling
 //! and context preservation throughout the application.
@@ -49,11 +49,11 @@ pub enum AppError {
     Config(String),
 }
 
-/// Convert AppError to String for Tauri commands
+/// Convert `AppError` to String for Tauri commands
 ///
-/// Tauri commands return Result<T, String>, so we need to convert AppError to String
+/// Tauri commands return Result<T, String>, so we need to convert `AppError` to String
 impl From<AppError> for String {
-    fn from(err: AppError) -> String {
+    fn from(err: AppError) -> Self {
         err.to_string()
     }
 }

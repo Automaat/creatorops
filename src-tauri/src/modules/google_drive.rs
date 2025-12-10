@@ -1692,7 +1692,7 @@ mod tests {
         let account: Option<GoogleDriveAccount> = db
             .execute(|conn| {
                 let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
-                let result = stmt
+                Ok(stmt
                     .query_row(["account-1"], |row| {
                         Ok(GoogleDriveAccount {
                             id: row.get(0)?,
@@ -1704,9 +1704,7 @@ mod tests {
                             last_authenticated: row.get(6)?,
                         })
                     })
-                    .optional()
-                    .map_err(crate::error::AppError::from)?;
-                Ok(result)
+                    .optional()?)
             })
             .unwrap();
 
@@ -1756,7 +1754,7 @@ mod tests {
         let account: Option<GoogleDriveAccount> = db
             .execute(|conn| {
                 let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
-                let result = stmt
+                Ok(stmt
                     .query_row(["account-2"], |row| {
                         Ok(GoogleDriveAccount {
                             id: row.get(0)?,
@@ -1768,9 +1766,7 @@ mod tests {
                             last_authenticated: row.get(6)?,
                         })
                     })
-                    .optional()
-                    .map_err(crate::error::AppError::from)?;
-                Ok(result)
+                    .optional()?)
             })
             .unwrap();
 
@@ -1804,14 +1800,11 @@ mod tests {
         // Verify account exists
         let count: i32 = db
             .execute(|conn| {
-                let result = conn
-                    .query_row(
-                        "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
-                        ["remove-id"],
-                        |row| row.get(0),
-                    )
-                    .map_err(crate::error::AppError::from)?;
-                Ok(result)
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                    ["remove-id"],
+                    |row| row.get(0),
+                )?)
             })
             .unwrap();
         assert_eq!(count, 1);
@@ -1829,14 +1822,11 @@ mod tests {
         // Verify account is gone
         let count: i32 = db
             .execute(|conn| {
-                let result = conn
-                    .query_row(
-                        "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
-                        ["remove-id"],
-                        |row| row.get(0),
-                    )
-                    .map_err(crate::error::AppError::from)?;
-                Ok(result)
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                    ["remove-id"],
+                    |row| row.get(0),
+                )?)
             })
             .unwrap();
         assert_eq!(count, 0);
