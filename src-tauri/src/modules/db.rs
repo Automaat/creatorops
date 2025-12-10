@@ -1,4 +1,5 @@
-use rusqlite::{Connection, Result};
+use crate::error::AppError;
+use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -9,17 +10,16 @@ pub struct Database {
 
 impl Database {
     /// Create new database instance with default path
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, AppError> {
         let db_path = Self::get_default_path()?;
         Self::new_with_path(&db_path)
     }
 
     /// Create new database instance with custom path (for testing)
-    pub fn new_with_path(db_path: &Path) -> Result<Self> {
+    pub fn new_with_path(db_path: &Path) -> Result<Self, AppError> {
         // Create parent directory if it doesn't exist
         if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+            std::fs::create_dir_all(parent)?;
         }
 
         let conn = Connection::open(db_path)?;
@@ -33,7 +33,7 @@ impl Database {
     }
 
     /// Initialize database schema
-    fn init_schema(conn: &Connection) -> Result<()> {
+    fn init_schema(conn: &Connection) -> Result<(), AppError> {
         // Create projects table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
@@ -95,27 +95,35 @@ impl Database {
     }
 
     /// Get default database file path
-    fn get_default_path() -> Result<PathBuf> {
-        let home_dir = crate::modules::file_utils::get_home_dir().map_err(|e| {
-            rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                e,
-            )))
-        })?;
+    fn get_default_path() -> Result<PathBuf, AppError> {
+        let home_dir = crate::modules::file_utils::get_home_dir()
+            .map_err(|e| AppError::Config(format!("Failed to get home directory: {e}")))?;
 
         Ok(home_dir.join("CreatorOps").join("creatorops.db"))
     }
 
     /// Execute a query with the database connection
-    pub fn execute<F, R>(&self, f: F) -> Result<R>
+    pub fn execute<F, R>(&self, f: F) -> Result<R, AppError>
     where
-        F: FnOnce(&Connection) -> Result<R>,
+        F: FnOnce(&Connection) -> Result<R, AppError>,
     {
-        let conn = self
-            .conn
-            .lock()
-            .map_err(|_| rusqlite::Error::InvalidQuery)?;
+        let conn = self.conn.lock().map_err(|_| AppError::LockFailed)?;
         f(&conn)
+    }
+
+    /// Execute a transaction with the database connection
+    ///
+    /// This method ensures atomic operations by wrapping multiple database operations
+    /// in a transaction. If any operation fails, all changes are rolled back.
+    pub fn transaction<F, R>(&self, f: F) -> Result<R, AppError>
+    where
+        F: FnOnce(&rusqlite::Transaction) -> Result<R, AppError>,
+    {
+        let mut conn = self.conn.lock().map_err(|_| AppError::LockFailed)?;
+        let tx = conn.transaction()?;
+        let result = f(&tx)?;
+        tx.commit()?;
+        Ok(result)
     }
 }
 
@@ -142,10 +150,12 @@ mod tests {
         // Verify schema was initialized
         let result = db
             .execute(|conn| {
-                let mut stmt = conn.prepare(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'",
-                )?;
-                let exists = stmt.exists([])?;
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='projects'",
+                    )
+                    .map_err(AppError::from)?;
+                let exists = stmt.exists([]).map_err(AppError::from)?;
                 Ok(exists)
             })
             .unwrap();
@@ -161,12 +171,16 @@ mod tests {
 
         let indexes = db
             .execute(|conn| {
-                let mut stmt = conn.prepare(
-                    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='projects'",
-                )?;
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='projects'",
+                    )
+                    .map_err(AppError::from)?;
                 let index_names: Vec<String> = stmt
-                    .query_map([], |row| row.get(0))?
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .query_map([], |row| row.get(0))
+                    .map_err(AppError::from)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(AppError::from)?;
                 Ok(index_names)
             })
             .unwrap();
@@ -200,7 +214,8 @@ mod tests {
                     "2024-01-01T00:00:00Z",
                     None::<String>,
                 ],
-            )?;
+            )
+            .map_err(AppError::from)?;
             Ok(())
         });
 
@@ -215,8 +230,9 @@ mod tests {
 
         let count: usize = db
             .execute(|conn| {
-                let count: usize =
-                    conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+                let count: usize = conn
+                    .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+                    .map_err(AppError::from)?;
                 Ok(count)
             })
             .unwrap();
@@ -245,27 +261,114 @@ mod tests {
                 "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 rusqlite::params!["id1", "Name1", "Client1", "2024-01-01", "Type1", "New", "/path1", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z", None::<String>],
-            )?;
+            )
+            .map_err(AppError::from)?;
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         db.execute(|conn| {
             conn.execute(
                 "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 rusqlite::params!["id2", "Name2", "Client2", "2024-01-02", "Type2", "Editing", "/path2", "2024-01-02T00:00:00Z", "2024-01-02T00:00:00Z", None::<String>],
-            )?;
+            )
+            .map_err(AppError::from)?;
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
 
         let count: usize = db
             .execute(|conn| {
-                let count: usize =
-                    conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
+                let count: usize = conn
+                    .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+                    .map_err(AppError::from)?;
                 Ok(count)
             })
             .unwrap();
 
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_transaction_commits_on_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(&db_path).unwrap();
+
+        // Transaction should commit successfully
+        let result = db.transaction(|tx| {
+            tx.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["tx1", "Name1", "Client1", "2024-01-01", "Type1", "New", "/path1", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z", None::<String>],
+            )
+            .map_err(AppError::from)?;
+
+            tx.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["tx2", "Name2", "Client2", "2024-01-02", "Type2", "Editing", "/path2", "2024-01-02T00:00:00Z", "2024-01-02T00:00:00Z", None::<String>],
+            )
+            .map_err(AppError::from)?;
+
+            Ok(())
+        });
+
+        assert!(result.is_ok());
+
+        // Verify both records were committed
+        let count: usize = db
+            .execute(|conn| {
+                let count: usize = conn
+                    .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+                    .map_err(AppError::from)?;
+                Ok(count)
+            })
+            .unwrap();
+
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_transaction_rolls_back_on_error() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(&db_path).unwrap();
+
+        // Transaction should rollback on error
+        let result = db.transaction(|tx| {
+            tx.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["tx1", "Name1", "Client1", "2024-01-01", "Type1", "New", "/path1", "2024-01-01T00:00:00Z", "2024-01-01T00:00:00Z", None::<String>],
+            )
+            .map_err(AppError::from)?;
+
+            // This should fail due to duplicate ID
+            tx.execute(
+                "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                rusqlite::params!["tx1", "Name2", "Client2", "2024-01-02", "Type2", "Editing", "/path2", "2024-01-02T00:00:00Z", "2024-01-02T00:00:00Z", None::<String>],
+            )
+            .map_err(AppError::from)?;
+
+            Ok(())
+        });
+
+        // Transaction should have failed
+        assert!(result.is_err());
+
+        // Verify no records were committed
+        let count: usize = db
+            .execute(|conn| {
+                let count: usize = conn
+                    .query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))
+                    .map_err(AppError::from)?;
+                Ok(count)
+            })
+            .unwrap();
+
+        assert_eq!(count, 0);
     }
 }

@@ -787,6 +787,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tempfile",
+ "thiserror 2.0.17",
  "tokio",
  "tokio-retry",
  "tokio-util",

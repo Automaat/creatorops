@@ -535,7 +535,7 @@ pub async fn complete_google_drive_auth(
         )?;
         Ok(())
     })
-    .map_err(|e: rusqlite::Error| format!("Failed to save account: {e}"))?;
+    .map_err(|e| format!("Failed to save account: {e}"))?;
 
     // Drop guard will clear OAuth session automatically
     Ok(account)
@@ -567,7 +567,7 @@ pub async fn get_google_drive_account(
 
         Ok(account)
     })
-    .map_err(|e: rusqlite::Error| format!("Failed to get account: {e}"))
+    .map_err(|e| format!("Failed to get account: {e}"))
 }
 
 #[tauri::command]
@@ -588,7 +588,7 @@ pub async fn set_drive_parent_folder(
                 )?;
                 Ok(())
             })
-            .map_err(|e: rusqlite::Error| format!("Failed to update parent folder: {e}"))
+            .map_err(|e| format!("Failed to update parent folder: {e}"))
         },
     )
 }
@@ -613,7 +613,7 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
             conn.execute("DELETE FROM google_drive_accounts WHERE id = ?1", [&acc.id])?;
             Ok(())
         })
-        .map_err(|e: rusqlite::Error| format!("Failed to delete account: {e}"))?;
+        .map_err(|e| format!("Failed to delete account: {e}"))?;
 
         log::info!("Removed Google Drive account for {normalized_email}");
     }
@@ -1692,18 +1692,21 @@ mod tests {
         let account: Option<GoogleDriveAccount> = db
             .execute(|conn| {
                 let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
-                stmt.query_row(["account-1"], |row| {
-                    Ok(GoogleDriveAccount {
-                        id: row.get(0)?,
-                        email: row.get(1)?,
-                        display_name: row.get(2)?,
-                        parent_folder_id: row.get(3)?,
-                        enabled: row.get::<_, i32>(4)? != 0,
-                        created_at: row.get(5)?,
-                        last_authenticated: row.get(6)?,
+                let result = stmt
+                    .query_row(["account-1"], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
                     })
-                })
-                .optional()
+                    .optional()
+                    .map_err(crate::error::AppError::from)?;
+                Ok(result)
             })
             .unwrap();
 
@@ -1753,18 +1756,21 @@ mod tests {
         let account: Option<GoogleDriveAccount> = db
             .execute(|conn| {
                 let mut stmt = conn.prepare("SELECT id, email, display_name, parent_folder_id, enabled, created_at, last_authenticated FROM google_drive_accounts WHERE id = ?1")?;
-                stmt.query_row(["account-2"], |row| {
-                    Ok(GoogleDriveAccount {
-                        id: row.get(0)?,
-                        email: row.get(1)?,
-                        display_name: row.get(2)?,
-                        parent_folder_id: row.get(3)?,
-                        enabled: row.get::<_, i32>(4)? != 0,
-                        created_at: row.get(5)?,
-                        last_authenticated: row.get(6)?,
+                let result = stmt
+                    .query_row(["account-2"], |row| {
+                        Ok(GoogleDriveAccount {
+                            id: row.get(0)?,
+                            email: row.get(1)?,
+                            display_name: row.get(2)?,
+                            parent_folder_id: row.get(3)?,
+                            enabled: row.get::<_, i32>(4)? != 0,
+                            created_at: row.get(5)?,
+                            last_authenticated: row.get(6)?,
+                        })
                     })
-                })
-                .optional()
+                    .optional()
+                    .map_err(crate::error::AppError::from)?;
+                Ok(result)
             })
             .unwrap();
 
@@ -1798,11 +1804,14 @@ mod tests {
         // Verify account exists
         let count: i32 = db
             .execute(|conn| {
-                conn.query_row(
-                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
-                    ["remove-id"],
-                    |row| row.get(0),
-                )
+                let result = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                        ["remove-id"],
+                        |row| row.get(0),
+                    )
+                    .map_err(crate::error::AppError::from)?;
+                Ok(result)
             })
             .unwrap();
         assert_eq!(count, 1);
@@ -1820,11 +1829,14 @@ mod tests {
         // Verify account is gone
         let count: i32 = db
             .execute(|conn| {
-                conn.query_row(
-                    "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
-                    ["remove-id"],
-                    |row| row.get(0),
-                )
+                let result = conn
+                    .query_row(
+                        "SELECT COUNT(*) FROM google_drive_accounts WHERE id = ?1",
+                        ["remove-id"],
+                        |row| row.get(0),
+                    )
+                    .map_err(crate::error::AppError::from)?;
+                Ok(result)
             })
             .unwrap();
         assert_eq!(count, 0);

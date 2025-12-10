@@ -2,6 +2,7 @@
 //!
 //! This is the core library for the `CreatorOps` Tauri application.
 
+mod error;
 mod modules;
 
 /// Result type for application-level operations
