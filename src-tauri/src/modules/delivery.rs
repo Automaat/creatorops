@@ -2,10 +2,8 @@
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
@@ -64,13 +62,6 @@ pub struct ProjectFile {
     pub modified: String,
     pub file_type: String,
     pub relative_path: String,
-}
-
-// Global delivery queue state
-type DeliveryQueue = Arc<Mutex<HashMap<String, DeliveryJob>>>;
-
-lazy_static::lazy_static! {
-    static ref DELIVERY_QUEUE: DeliveryQueue = Arc::new(Mutex::new(HashMap::new()));
 }
 
 /// List all files in a project directory
@@ -169,6 +160,7 @@ fn collect_project_files(
 /// Create a delivery job
 #[tauri::command]
 pub async fn create_delivery(
+    state: tauri::State<'_, crate::state::AppState>,
     project_id: String,
     project_name: String,
     selected_files: Vec<String>,
@@ -207,7 +199,7 @@ pub async fn create_delivery(
 
     // Add to queue
     {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.delivery_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
@@ -216,10 +208,14 @@ pub async fn create_delivery(
 
 /// Start a delivery job
 #[tauri::command]
-pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_delivery(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     // Get job from queue
     let job = {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.delivery_queue.lock().await;
         let job = queue.get_mut(&job_id).ok_or("Job not found")?;
 
         if job.status != DeliveryStatus::Pending {
@@ -234,22 +230,22 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
     };
 
     // Spawn background task
+    let delivery_queue = state.delivery_queue.clone();
     tokio::spawn(async move {
-        let result = process_delivery(job.clone(), app_handle.clone()).await;
+        let result = process_delivery(job.clone(), app_handle.clone(), delivery_queue.clone()).await;
 
         // Update job status
-        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-            if let Some(job) = queue.get_mut(&job_id) {
-                match result {
-                    Ok(()) => {
-                        job.status = DeliveryStatus::Completed;
-                        job.completed_at = Some(get_timestamp());
-                    }
-                    Err(e) => {
-                        job.status = DeliveryStatus::Failed;
-                        job.error_message = Some(e);
-                        job.completed_at = Some(get_timestamp());
-                    }
+        let mut queue = delivery_queue.lock().await;
+        if let Some(job) = queue.get_mut(&job_id) {
+            match result {
+                Ok(()) => {
+                    job.status = DeliveryStatus::Completed;
+                    job.completed_at = Some(get_timestamp());
+                }
+                Err(e) => {
+                    job.status = DeliveryStatus::Failed;
+                    job.error_message = Some(e);
+                    job.completed_at = Some(get_timestamp());
                 }
             }
         }
@@ -261,6 +257,7 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
 async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
+    delivery_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, DeliveryJob>>>,
 ) -> Result<(), String> {
     // Create delivery directory
     let delivery_path = Path::new(&job.delivery_path);
@@ -307,11 +304,10 @@ async fn process_delivery(
 
         // Update queue
         {
-            if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-                if let Some(q_job) = queue.get_mut(&job.id) {
-                    q_job.files_copied = job.files_copied;
-                    q_job.bytes_transferred = job.bytes_transferred;
-                }
+            let mut queue = delivery_queue.lock().await;
+            if let Some(q_job) = queue.get_mut(&job.id) {
+                q_job.files_copied = job.files_copied;
+                q_job.bytes_transferred = job.bytes_transferred;
             }
         }
     }
@@ -337,10 +333,9 @@ async fn process_delivery(
 
     // Update job with manifest path
     {
-        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-            if let Some(q_job) = queue.get_mut(&job.id) {
-                q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
-            }
+        let mut queue = delivery_queue.lock().await;
+        if let Some(q_job) = queue.get_mut(&job.id) {
+            q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
         }
     }
 
@@ -453,18 +448,21 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
 
 /// Get delivery queue
 #[tauri::command]
-pub async fn get_delivery_queue() -> Result<Vec<DeliveryJob>, String> {
-    let queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+pub async fn get_delivery_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<DeliveryJob>, String> {
+    let queue = state.delivery_queue.lock().await;
     Ok(queue.values().cloned().collect())
 }
 
 /// Remove a delivery job from queue
 #[tauri::command]
-pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
-        queue.remove(&job_id);
-    }
+pub async fn remove_delivery_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = state.delivery_queue.lock().await;
+    queue.remove(&job_id);
     Ok(())
 }
 

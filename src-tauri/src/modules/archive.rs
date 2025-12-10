@@ -1,10 +1,8 @@
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 use tauri::Emitter;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -50,16 +48,10 @@ pub struct ArchiveProgress {
     pub total_bytes: u64,
 }
 
-// Global archive queue state
-type ArchiveQueue = Arc<Mutex<HashMap<String, ArchiveJob>>>;
-
-lazy_static::lazy_static! {
-    static ref ARCHIVE_QUEUE: ArchiveQueue = Arc::new(Mutex::new(HashMap::new()));
-}
-
 /// Create an archive job
 #[tauri::command]
 pub async fn create_archive(
+    state: tauri::State<'_, crate::state::AppState>,
     project_id: String,
     project_name: String,
     source_path: String,
@@ -97,7 +89,7 @@ pub async fn create_archive(
 
     // Add to queue
     {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.archive_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
@@ -106,10 +98,14 @@ pub async fn create_archive(
 
 /// Start an archive job
 #[tauri::command]
-pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_archive(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     // Get job from queue
     let job = {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.archive_queue.lock().await;
         let job = queue.get_mut(&job_id).ok_or("Job not found")?;
 
         if job.status != ArchiveStatus::Pending {
@@ -124,22 +120,22 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
     };
 
     // Spawn background task
+    let archive_queue = state.archive_queue.clone();
     tokio::spawn(async move {
-        let result = process_archive(job.clone(), &app_handle);
+        let result = process_archive(job.clone(), &app_handle, archive_queue.clone());
 
         // Update job status
-        if let Ok(mut queue) = ARCHIVE_QUEUE.lock() {
-            if let Some(job) = queue.get_mut(&job_id) {
-                match result {
-                    Ok(()) => {
-                        job.status = ArchiveStatus::Completed;
-                        job.completed_at = Some(get_timestamp());
-                    }
-                    Err(e) => {
-                        job.status = ArchiveStatus::Failed;
-                        job.error_message = Some(e);
-                        job.completed_at = Some(get_timestamp());
-                    }
+        let mut queue = archive_queue.lock().await;
+        if let Some(job) = queue.get_mut(&job_id) {
+            match result {
+                Ok(()) => {
+                    job.status = ArchiveStatus::Completed;
+                    job.completed_at = Some(get_timestamp());
+                }
+                Err(e) => {
+                    job.status = ArchiveStatus::Failed;
+                    job.error_message = Some(e);
+                    job.completed_at = Some(get_timestamp());
                 }
             }
         }
@@ -148,7 +144,11 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
     Ok(())
 }
 
-fn process_archive(mut job: ArchiveJob, app_handle: &tauri::AppHandle) -> Result<(), String> {
+fn process_archive(
+    mut job: ArchiveJob,
+    app_handle: &tauri::AppHandle,
+    archive_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>>,
+) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
     let source_path = Path::new(&source_path_str);
@@ -160,7 +160,7 @@ fn process_archive(mut job: ArchiveJob, app_handle: &tauri::AppHandle) -> Result
         return Err("Compression not yet implemented".to_owned());
     }
     // Move entire directory to archive location
-    move_directory_recursive(source_path, archive_path, &mut job, app_handle)?;
+    move_directory_recursive(source_path, archive_path, &mut job, app_handle, archive_queue)?;
 
     Ok(())
 }
@@ -170,6 +170,7 @@ fn move_directory_recursive(
     dest: &Path,
     job: &mut ArchiveJob,
     app_handle: &tauri::AppHandle,
+    archive_queue: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>>,
 ) -> Result<(), String> {
     // Create destination directory
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
@@ -193,9 +194,12 @@ fn move_directory_recursive(
             let metadata = entry.metadata().map_err(|e| e.to_string())?;
             job.bytes_transferred += metadata.len();
 
-            // Update queue
+            // Update queue - must use blocking runtime since this is a sync function
             {
-                if let Ok(mut queue) = ARCHIVE_QUEUE.lock() {
+                if let Ok(mut queue) = tokio::runtime::Handle::try_current()
+                    .and_then(|handle| tokio::task::block_in_place(|| handle.block_on(async {
+                        Ok(archive_queue.lock().await)
+                    }))) {
                     if let Some(q_job) = queue.get_mut(&job.id) {
                         q_job.files_archived = job.files_archived;
                         q_job.bytes_transferred = job.bytes_transferred;
@@ -231,18 +235,21 @@ fn move_directory_recursive(
 
 /// Get archive queue
 #[tauri::command]
-pub async fn get_archive_queue() -> Result<Vec<ArchiveJob>, String> {
-    let queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+pub async fn get_archive_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<ArchiveJob>, String> {
+    let queue = state.archive_queue.lock().await;
     Ok(queue.values().cloned().collect())
 }
 
 /// Remove an archive job from queue
 #[tauri::command]
-pub async fn remove_archive_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
-        queue.remove(&job_id);
-    }
+pub async fn remove_archive_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = state.archive_queue.lock().await;
+    queue.remove(&job_id);
     Ok(())
 }
 

@@ -1,6 +1,5 @@
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -37,14 +36,6 @@ fn get_file_type(path: &Path) -> Option<&'static str> {
     }
 }
 
-// Global map of active import cancellation tokens
-type ImportTokensMap = Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>>;
-
-lazy_static::lazy_static! {
-    static ref IMPORT_TOKENS: ImportTokensMap =
-        Arc::new(tokio::sync::Mutex::new(HashMap::new()));
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyResult {
@@ -70,6 +61,7 @@ pub struct ImportProgress {
 #[allow(clippy::too_many_lines)] // Complex import logic requires detailed handling
 #[tauri::command]
 pub async fn copy_files(
+    state: tauri::State<'_, crate::state::AppState>,
     app: AppHandle,
     import_id: String,
     source_paths: Vec<String>,
@@ -85,7 +77,7 @@ pub async fn copy_files(
     // Create cancellation token and register it
     let cancel_token = CancellationToken::new();
     {
-        let mut tokens = IMPORT_TOKENS.lock().await;
+        let mut tokens = state.import_tokens.lock().await;
         tokens.insert(import_id.clone(), cancel_token.clone());
     }
 
@@ -195,7 +187,7 @@ pub async fn copy_files(
 
     // Clean up token
     {
-        let mut tokens = IMPORT_TOKENS.lock().await;
+        let mut tokens = state.import_tokens.lock().await;
         tokens.remove(&import_id);
     }
 
@@ -246,8 +238,11 @@ async fn copy_file_with_retry(
 
 /// Cancel an ongoing import
 #[tauri::command]
-pub async fn cancel_import(import_id: String) -> Result<(), String> {
-    let tokens = IMPORT_TOKENS.lock().await;
+pub async fn cancel_import(
+    state: tauri::State<'_, crate::state::AppState>,
+    import_id: String,
+) -> Result<(), String> {
+    let tokens = state.import_tokens.lock().await;
     tokens.get(&import_id).map_or_else(
         || Err("Import not found or already completed".to_owned()),
         |token| {

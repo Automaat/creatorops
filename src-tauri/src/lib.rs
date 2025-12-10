@@ -4,6 +4,7 @@
 
 mod error;
 mod modules;
+mod state;
 
 /// Result type for application-level operations
 pub type AppResult = Result<(), Box<dyn std::error::Error>>;
@@ -54,8 +55,12 @@ pub fn run() -> AppResult {
     let db =
         modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
 
+    // Initialize application state
+    let app_state = state::AppState::default();
+
     tauri::Builder::default()
         .manage(db)
+        .manage(app_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())

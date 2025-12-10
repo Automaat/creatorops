@@ -3,7 +3,6 @@ use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -79,16 +78,10 @@ pub struct BackupHistory {
     pub error_message: Option<String>,
 }
 
-// Global backup queue state
-type BackupQueue = Arc<Mutex<HashMap<String, BackupJob>>>;
-
-lazy_static::lazy_static! {
-    static ref BACKUP_QUEUE: BackupQueue = Arc::new(Mutex::new(HashMap::new()));
-}
-
 /// Add a backup job to the queue
 #[tauri::command]
 pub async fn queue_backup(
+    state: tauri::State<'_, crate::state::AppState>,
     project_id: String,
     project_name: String,
     source_path: String,
@@ -123,9 +116,7 @@ pub async fn queue_backup(
     };
 
     {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = state.backup_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
@@ -134,11 +125,11 @@ pub async fn queue_backup(
 
 /// Get all backup jobs in the queue
 #[tauri::command]
-pub async fn get_backup_queue() -> Result<Vec<BackupJob>, String> {
+pub async fn get_backup_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<BackupJob>, String> {
     let mut jobs: Vec<BackupJob> = {
-        let queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let queue = state.backup_queue.lock().await;
         queue.values().cloned().collect()
     };
     jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -148,12 +139,14 @@ pub async fn get_backup_queue() -> Result<Vec<BackupJob>, String> {
 
 /// Start a backup job
 #[tauri::command]
-pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<BackupJob, String> {
+pub async fn start_backup(
+    state: tauri::State<'_, crate::state::AppState>,
+    window: tauri::Window,
+    job_id: String,
+) -> Result<BackupJob, String> {
     // Get job from queue
     let job = {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = state.backup_queue.lock().await;
         let job = queue
             .get_mut(&job_id)
             .ok_or("Backup job not found")?
@@ -170,9 +163,7 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
 
     // Update status to in-progress
     {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = state.backup_queue.lock().await;
         if let Some(j) = queue.get_mut(&job_id) {
             j.status = BackupStatus::InProgress;
             j.started_at = Some(get_timestamp());
@@ -182,42 +173,38 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
     // Perform backup in background
     let job_id_clone = job_id.clone();
     let window_clone = window;
+    let backup_queue = state.backup_queue.clone();
     tokio::spawn(async move {
         let result = perform_backup(&window_clone, &job_id_clone, &job).await;
 
         // Update job status
-        let queue_result = BACKUP_QUEUE.lock();
-        if let Ok(mut queue) = queue_result {
-            if let Some(j) = queue.get_mut(&job_id_clone) {
-                match result {
-                    Ok((files_copied, files_skipped, bytes_transferred)) => {
-                        j.status = BackupStatus::Completed;
-                        j.files_copied = files_copied;
-                        j.files_skipped = files_skipped;
-                        j.bytes_transferred = bytes_transferred;
-                        j.completed_at = Some(get_timestamp());
+        let mut queue = backup_queue.lock().await;
+        if let Some(j) = queue.get_mut(&job_id_clone) {
+            match result {
+                Ok((files_copied, files_skipped, bytes_transferred)) => {
+                    j.status = BackupStatus::Completed;
+                    j.files_copied = files_copied;
+                    j.files_skipped = files_skipped;
+                    j.bytes_transferred = bytes_transferred;
+                    j.completed_at = Some(get_timestamp());
 
-                        // Save to history
-                        let _ = save_backup_to_history(j);
-                    }
-                    Err(e) => {
-                        j.status = BackupStatus::Failed;
-                        j.error_message = Some(e);
-                        j.completed_at = Some(get_timestamp());
-                    }
+                    // Save to history
+                    let _ = save_backup_to_history(j);
                 }
-
-                // Emit job update
-                let _ = window_clone.emit("backup-job-updated", j.clone());
+                Err(e) => {
+                    j.status = BackupStatus::Failed;
+                    j.error_message = Some(e);
+                    j.completed_at = Some(get_timestamp());
+                }
             }
+
+            // Emit job update
+            let _ = window_clone.emit("backup-job-updated", j.clone());
         }
-        // Queue lock failed - continue without updating
     });
 
     // Return immediately with in-progress status
-    let queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
+    let queue = state.backup_queue.lock().await;
     queue
         .get(&job_id)
         .cloned()
@@ -226,10 +213,11 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
 
 /// Cancel a backup job
 #[tauri::command]
-pub async fn cancel_backup(job_id: String) -> Result<(), String> {
-    let mut queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
+pub async fn cancel_backup(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = state.backup_queue.lock().await;
 
     if let Some(job) = queue.get_mut(&job_id) {
         if job.status == BackupStatus::Pending {
@@ -246,20 +234,19 @@ pub async fn cancel_backup(job_id: String) -> Result<(), String> {
 
 /// Remove a completed/failed/cancelled backup job from queue
 #[tauri::command]
-pub async fn remove_backup_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+pub async fn remove_backup_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = state.backup_queue.lock().await;
 
-        if let Some(job) = queue.get(&job_id) {
-            if job.status == BackupStatus::InProgress {
-                return Err("Cannot remove in-progress backup".to_owned());
-            }
+    if let Some(job) = queue.get(&job_id) {
+        if job.status == BackupStatus::InProgress {
+            return Err("Cannot remove in-progress backup".to_owned());
         }
-
-        queue.remove(&job_id);
     }
+
+    queue.remove(&job_id);
     Ok(())
 }
 
