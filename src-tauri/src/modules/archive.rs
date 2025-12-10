@@ -528,6 +528,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -539,7 +540,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-size".to_owned(),
             "Size Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -551,13 +553,14 @@ mod tests {
         .unwrap();
 
         assert_eq!(job.total_bytes, 2048);
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_archive_counts_multiple_files() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -568,7 +571,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-multi".to_owned(),
             "Multi File Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -580,7 +584,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(job.total_files, 3);
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[test]
@@ -720,7 +724,8 @@ mod tests {
     async fn test_remove_nonexistent_archive_job() {
         let state = crate::state::AppState::default();
         // remove_archive_job returns Ok even for nonexistent jobs
-        let result = remove_archive_job_impl(&state.archive_queue, "nonexistent-id".to_owned()).await;
+        let result =
+            remove_archive_job_impl(&state.archive_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 }

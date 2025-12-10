@@ -682,7 +682,9 @@ mod tests {
         .unwrap();
 
         // Get queue
-        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
         // Clean up
@@ -716,7 +718,9 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify removed
-        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 
@@ -897,7 +901,8 @@ mod tests {
     async fn test_remove_nonexistent_delivery_job() {
         let state = crate::state::AppState::default();
         // remove_delivery_job returns Ok even for nonexistent jobs
-        let result = remove_delivery_job_impl(&state.delivery_queue, "nonexistent-id".to_owned()).await;
+        let result =
+            remove_delivery_job_impl(&state.delivery_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 
@@ -1177,7 +1182,9 @@ mod tests {
         let job2_id = job2.id.clone();
 
         // Get queue
-        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(queue.len() >= 2);
         assert!(queue.iter().any(|j| j.id == job1_id));
         assert!(queue.iter().any(|j| j.id == job2_id));
@@ -1186,7 +1193,9 @@ mod tests {
         let _ = remove_delivery_job_impl(&state.delivery_queue, job1.id).await;
         let _ = remove_delivery_job_impl(&state.delivery_queue, job2.id).await;
 
-        let queue_after = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue_after = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(!queue_after.iter().any(|j| j.id == job1_id));
         assert!(!queue_after.iter().any(|j| j.id == job2_id));
     }
