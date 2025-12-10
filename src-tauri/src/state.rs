@@ -98,15 +98,14 @@ mod tests {
             error_message: None,
         };
 
-        {
-            let mut queue = state.backup_queue.lock().await;
-            queue.insert(job.id.clone(), job.clone());
-        }
+        state
+            .backup_queue
+            .lock()
+            .await
+            .insert(job.id.clone(), job.clone());
 
-        {
-            let queue = state.backup_queue.lock().await;
-            assert!(queue.contains_key(&job.id));
-        }
+        let contains_key = state.backup_queue.lock().await.contains_key(&job.id);
+        assert!(contains_key);
     }
 
     #[tokio::test]
@@ -133,15 +132,14 @@ mod tests {
             manifest_path: None,
         };
 
-        {
-            let mut queue = state.delivery_queue.lock().await;
-            queue.insert(job.id.clone(), job.clone());
-        }
+        state
+            .delivery_queue
+            .lock()
+            .await
+            .insert(job.id.clone(), job.clone());
 
-        {
-            let queue = state.delivery_queue.lock().await;
-            assert!(queue.contains_key(&job.id));
-        }
+        let contains_key = state.delivery_queue.lock().await.contains_key(&job.id);
+        assert!(contains_key);
     }
 
     #[tokio::test]
@@ -168,15 +166,14 @@ mod tests {
             error_message: None,
         };
 
-        {
-            let mut queue = state.archive_queue.lock().await;
-            queue.insert(job.id.clone(), job.clone());
-        }
+        state
+            .archive_queue
+            .lock()
+            .await
+            .insert(job.id.clone(), job.clone());
 
-        {
-            let queue = state.archive_queue.lock().await;
-            assert!(queue.contains_key(&job.id));
-        }
+        let contains_key = state.archive_queue.lock().await.contains_key(&job.id);
+        assert!(contains_key);
     }
 
     #[tokio::test]
@@ -184,15 +181,14 @@ mod tests {
         let state = AppState::default();
         let token = CancellationToken::new();
 
-        {
-            let mut tokens = state.import_tokens.lock().await;
-            tokens.insert("import-1".to_owned(), token.clone());
-        }
+        state
+            .import_tokens
+            .lock()
+            .await
+            .insert("import-1".to_owned(), token.clone());
 
-        {
-            let tokens = state.import_tokens.lock().await;
-            assert!(tokens.contains_key("import-1"));
-        }
+        let contains_key = state.import_tokens.lock().await.contains_key("import-1");
+        assert!(contains_key);
     }
 
     #[test]
