@@ -43,7 +43,7 @@ pub struct AppState {
     pub import_tokens: ImportTokens,
 
     /// Semaphore for limiting concurrent file copy operations
-    /// TODO: Integrate with file_copy.rs copy_files function to use shared semaphore
+    /// TODO: Integrate with `file_copy.rs` `copy_files` function to use shared semaphore
     #[allow(dead_code)] // Reserved for future use
     pub file_semaphore: Arc<Semaphore>,
 }
