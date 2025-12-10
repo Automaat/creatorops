@@ -663,13 +663,15 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
         f1.write_all(b"test").unwrap();
 
         // Create a delivery job
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-456".to_owned(),
             "Queue Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -680,11 +682,11 @@ mod tests {
         .unwrap();
 
         // Get queue
-        let queue = get_delivery_queue().await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
         // Clean up
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[tokio::test]
