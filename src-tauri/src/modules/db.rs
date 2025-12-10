@@ -224,7 +224,9 @@ mod tests {
         let db = Database::new_with_path(&db_path).unwrap();
 
         let count: usize = db
-            .execute(|conn| Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?))
+            .execute(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
+            })
             .unwrap();
 
         assert_eq!(count, 0);
@@ -267,7 +269,9 @@ mod tests {
         .unwrap();
 
         let count: usize = db
-            .execute(|conn| Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?))
+            .execute(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
+            })
             .unwrap();
 
         assert_eq!(count, 2);
@@ -300,7 +304,9 @@ mod tests {
 
         // Verify both records were committed
         let count: usize = db
-            .execute(|conn| Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?))
+            .execute(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
+            })
             .unwrap();
 
         assert_eq!(count, 2);
@@ -335,7 +341,9 @@ mod tests {
 
         // Verify no records were committed
         let count: usize = db
-            .execute(|conn| Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?))
+            .execute(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
+            })
             .unwrap();
 
         assert_eq!(count, 0);
