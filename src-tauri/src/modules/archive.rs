@@ -1,8 +1,10 @@
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use tauri::Emitter;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -122,7 +124,7 @@ pub async fn start_archive(
     // Spawn background task
     let archive_queue = state.archive_queue.clone();
     tokio::spawn(async move {
-        let result = process_archive(job.clone(), &app_handle, archive_queue.clone());
+        let result = process_archive(job.clone(), &app_handle, archive_queue.clone()).await;
 
         // Update job status
         let mut queue = archive_queue.lock().await;
@@ -145,12 +147,10 @@ pub async fn start_archive(
 }
 
 #[allow(clippy::type_complexity)]
-fn process_archive(
+async fn process_archive(
     mut job: ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: std::sync::Arc<
-        tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>,
-    >,
+    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
 ) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
@@ -169,20 +169,19 @@ fn process_archive(
         &mut job,
         app_handle,
         archive_queue,
-    )?;
+    )
+    .await?;
 
     Ok(())
 }
 
 #[allow(clippy::type_complexity, clippy::needless_pass_by_value)]
-fn move_directory_recursive(
+async fn move_directory_recursive(
     source: &Path,
     dest: &Path,
     job: &mut ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: std::sync::Arc<
-        tokio::sync::Mutex<std::collections::HashMap<String, ArchiveJob>>,
-    >,
+    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
 ) -> Result<(), String> {
     // Create destination directory
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
@@ -206,17 +205,12 @@ fn move_directory_recursive(
             let metadata = entry.metadata().map_err(|e| e.to_string())?;
             job.bytes_transferred += metadata.len();
 
-            // Update queue - must use blocking runtime since this is a sync function
+            // Update queue
             {
-                if let Ok(mut queue) = tokio::runtime::Handle::try_current().and_then(|handle| {
-                    tokio::task::block_in_place(|| {
-                        handle.block_on(async { Ok(archive_queue.lock().await) })
-                    })
-                }) {
-                    if let Some(q_job) = queue.get_mut(&job.id) {
-                        q_job.files_archived = job.files_archived;
-                        q_job.bytes_transferred = job.bytes_transferred;
-                    }
+                let mut queue = archive_queue.lock().await;
+                if let Some(q_job) = queue.get_mut(&job.id) {
+                    q_job.files_archived = job.files_archived;
+                    q_job.bytes_transferred = job.bytes_transferred;
                 }
             }
 

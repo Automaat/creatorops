@@ -2,8 +2,10 @@
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
@@ -259,9 +261,7 @@ pub async fn start_delivery(
 async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
-    delivery_queue: std::sync::Arc<
-        tokio::sync::Mutex<std::collections::HashMap<String, DeliveryJob>>,
-    >,
+    delivery_queue: Arc<tokio::sync::Mutex<HashMap<String, DeliveryJob>>>,
 ) -> Result<(), String> {
     // Create delivery directory
     let delivery_path = Path::new(&job.delivery_path);
