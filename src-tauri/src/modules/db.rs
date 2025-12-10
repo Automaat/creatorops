@@ -115,6 +115,7 @@ impl Database {
     ///
     /// This method ensures atomic operations by wrapping multiple database operations
     /// in a transaction. If any operation fails, all changes are rolled back.
+    #[allow(dead_code)]
     pub fn transaction<F, R>(&self, f: F) -> Result<R, AppError>
     where
         F: FnOnce(&rusqlite::Transaction) -> Result<R, AppError>,
