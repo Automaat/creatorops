@@ -431,6 +431,7 @@ mod tests {
     async fn test_create_archive_with_compression() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -439,7 +440,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let result = create_archive(
+        let result = create_archive_impl(
+            &state.archive_queue,
             "proj-456".to_owned(),
             "Compressed Archive".to_owned(),
             source.to_string_lossy().to_string(),
@@ -454,13 +456,14 @@ mod tests {
         assert!(job.compress);
         assert_eq!(job.compression_format, Some("zip".to_owned()));
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_get_archive_queue() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -469,7 +472,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-789".to_owned(),
             "Queue Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -480,16 +484,17 @@ mod tests {
         .await
         .unwrap();
 
-        let queue = get_archive_queue().await.unwrap();
+        let queue = get_archive_queue_impl(&state.archive_queue).await.unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_archive_job() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -498,7 +503,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-remove".to_owned(),
             "Remove Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -509,11 +515,11 @@ mod tests {
         .await
         .unwrap();
 
-        let result = remove_archive_job(job.id.clone()).await;
+        let result = remove_archive_job_impl(&state.archive_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
         // Verify removed
-        let queue = get_archive_queue().await.unwrap();
+        let queue = get_archive_queue_impl(&state.archive_queue).await.unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 
@@ -681,6 +687,7 @@ mod tests {
     async fn test_create_archive_with_subdirectories() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         let subdir = source.join("subdir");
@@ -691,7 +698,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-subdir".to_owned(),
             "Subdir Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -705,13 +713,14 @@ mod tests {
         assert_eq!(job.total_files, 2);
         assert!(job.total_bytes > 0);
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_nonexistent_archive_job() {
+        let state = crate::state::AppState::default();
         // remove_archive_job returns Ok even for nonexistent jobs
-        let result = remove_archive_job("nonexistent-id".to_owned()).await;
+        let result = remove_archive_job_impl(&state.archive_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 }

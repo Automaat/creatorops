@@ -624,6 +624,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test1.jpg");
         let file2 = temp_dir.path().join("test2.jpg");
@@ -634,7 +635,8 @@ mod tests {
         let mut f2 = std::fs::File::create(&file2).unwrap();
         f2.write_all(b"test data 2").unwrap();
 
-        let result = create_delivery(
+        let result = create_delivery_impl(
+            &state.delivery_queue,
             "proj-123".to_owned(),
             "Test Project".to_owned(),
             vec![
