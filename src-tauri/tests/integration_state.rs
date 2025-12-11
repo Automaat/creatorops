@@ -304,10 +304,7 @@ mod file_copy_integration_tests {
 
         let result = cancel_import_impl(&state.import_tokens, "nonexistent-id".to_owned()).await;
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Import not found or already completed"
-        );
+        assert_eq!(result.unwrap_err(), "Import not found or already completed");
     }
 
     #[tokio::test]
@@ -363,9 +360,9 @@ mod file_copy_integration_tests {
 
         // Add both tokens to state
         {
-            let mut tokens = state.import_tokens.lock().await;
-            tokens.insert(import_id1.clone(), token1.clone());
-            tokens.insert(import_id2.clone(), token2.clone());
+            let mut import_tokens_map = state.import_tokens.lock().await;
+            import_tokens_map.insert(import_id1.clone(), token1.clone());
+            import_tokens_map.insert(import_id2.clone(), token2.clone());
         }
 
         // Cancel only first import

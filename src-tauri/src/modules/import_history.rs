@@ -345,6 +345,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn test_status_determination_logic() {
         let temp_dir = TempDir::new().unwrap();
         let _lock = HOME_TEST_MUTEX.lock().unwrap();
