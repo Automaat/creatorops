@@ -3,8 +3,8 @@
 //! This is the core library for the `CreatorOps` Tauri application.
 
 mod error;
-mod modules;
-mod state;
+pub mod modules;
+pub mod state;
 
 /// Result type for application-level operations
 pub type AppResult = Result<(), Box<dyn std::error::Error>>;
