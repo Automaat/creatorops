@@ -1,4 +1,4 @@
-/// Progress tracking abstraction (Phase 2/3 - extract duplicated progress logic)
+/// Progress tracking abstraction (Phase 3 - extract duplicated progress logic, deferred from Phase 2)
 use serde::Serialize;
 use tauri::{Emitter, Window};
 
@@ -52,7 +52,7 @@ impl ProgressReporter for TauriProgressReporter {
         let _ = self.window.emit(
             &format!("{}-error", self.event_name),
             &serde_json::json!({
-                "job_id": self.job_id,
+                "jobId": self.job_id,
                 "error": error
             }),
         );
