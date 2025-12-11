@@ -1,15 +1,16 @@
 //! Integration tests for state-managed Tauri commands
 //!
-//! These tests verify that the _impl functions work correctly with AppState
+//! These tests verify that the _impl functions work correctly with `AppState`
 
-use creatorops_lib::state::AppState;
+use creatorops_lib::{
+    cancel_backup_impl, create_archive_impl, create_delivery_impl, get_archive_queue_impl,
+    get_backup_queue_impl, get_delivery_queue_impl, queue_backup_impl, remove_archive_job_impl,
+    remove_backup_job_impl, remove_delivery_job_impl, state::AppState,
+};
 
 #[cfg(test)]
 mod backup_integration_tests {
     use super::*;
-    use creatorops_lib::modules::backup::{
-        cancel_backup_impl, get_backup_queue_impl, queue_backup_impl, remove_backup_job_impl,
-    };
     use tempfile::TempDir;
 
     #[tokio::test]
@@ -124,9 +125,6 @@ mod backup_integration_tests {
 #[cfg(test)]
 mod archive_integration_tests {
     use super::*;
-    use creatorops_lib::modules::archive::{
-        create_archive_impl, get_archive_queue_impl, remove_archive_job_impl,
-    };
     use tempfile::TempDir;
 
     #[tokio::test]
@@ -223,9 +221,6 @@ mod archive_integration_tests {
 #[cfg(test)]
 mod delivery_integration_tests {
     use super::*;
-    use creatorops_lib::modules::delivery::{
-        create_delivery_impl, get_delivery_queue_impl, remove_delivery_job_impl,
-    };
 
     #[tokio::test]
     async fn test_create_delivery_with_state() {
@@ -264,7 +259,9 @@ mod delivery_integration_tests {
         .await
         .unwrap();
 
-        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
         // Cleanup
@@ -289,7 +286,9 @@ mod delivery_integration_tests {
         let result = remove_delivery_job_impl(&state.delivery_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
-        let queue = get_delivery_queue_impl(&state.delivery_queue).await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 }

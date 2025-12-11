@@ -160,6 +160,10 @@ fn collect_project_files(
 }
 
 /// Core logic for creating a delivery job (testable)
+///
+/// # Errors
+///
+/// Returns error if job creation fails
 pub async fn create_delivery_impl(
     delivery_queue: &crate::state::DeliveryQueue,
     project_id: String,
@@ -471,6 +475,10 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
 }
 
 /// Core logic for getting delivery queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
 pub async fn get_delivery_queue_impl(
     delivery_queue: &crate::state::DeliveryQueue,
 ) -> Result<Vec<DeliveryJob>, String> {
@@ -487,6 +495,10 @@ pub async fn get_delivery_queue(
 }
 
 /// Core logic for removing a delivery job (testable)
+///
+/// # Errors
+///
+/// Returns error if job is in progress or cannot be removed
 pub async fn remove_delivery_job_impl(
     delivery_queue: &crate::state::DeliveryQueue,
     job_id: String,

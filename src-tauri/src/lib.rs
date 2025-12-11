@@ -3,8 +3,20 @@
 //! This is the core library for the `CreatorOps` Tauri application.
 
 mod error;
-pub mod modules;
+mod modules;
 pub mod state;
+
+// Re-export _impl functions for testing
+#[doc(hidden)]
+pub use modules::archive::{create_archive_impl, get_archive_queue_impl, remove_archive_job_impl};
+#[doc(hidden)]
+pub use modules::backup::{
+    cancel_backup_impl, get_backup_queue_impl, queue_backup_impl, remove_backup_job_impl,
+};
+#[doc(hidden)]
+pub use modules::delivery::{
+    create_delivery_impl, get_delivery_queue_impl, remove_delivery_job_impl,
+};
 
 /// Result type for application-level operations
 pub type AppResult = Result<(), Box<dyn std::error::Error>>;

@@ -51,6 +51,10 @@ pub struct ArchiveProgress {
 }
 
 /// Core logic for creating an archive job (testable)
+///
+/// # Errors
+///
+/// Returns error if source path doesn't exist or job creation fails
 pub async fn create_archive_impl(
     archive_queue: &crate::state::ArchiveQueue,
     project_id: String,
@@ -263,6 +267,10 @@ async fn move_directory_recursive(
 }
 
 /// Core logic for getting archive queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
 pub async fn get_archive_queue_impl(
     archive_queue: &crate::state::ArchiveQueue,
 ) -> Result<Vec<ArchiveJob>, String> {
@@ -279,6 +287,10 @@ pub async fn get_archive_queue(
 }
 
 /// Core logic for removing an archive job (testable)
+///
+/// # Errors
+///
+/// Returns error if job cannot be removed from queue
 pub async fn remove_archive_job_impl(
     archive_queue: &crate::state::ArchiveQueue,
     job_id: String,

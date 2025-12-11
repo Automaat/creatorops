@@ -78,8 +78,11 @@ pub struct BackupHistory {
     pub error_message: Option<String>,
 }
 
-/// Add a backup job to the queue
 /// Core logic for queuing a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if source path doesn't exist or job creation fails
 pub async fn queue_backup_impl(
     backup_queue: &crate::state::BackupQueue,
     project_id: String,
@@ -146,6 +149,10 @@ pub async fn queue_backup(
 }
 
 /// Core logic for getting backup queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
 pub async fn get_backup_queue_impl(
     backup_queue: &crate::state::BackupQueue,
 ) -> Result<Vec<BackupJob>, String> {
@@ -241,6 +248,10 @@ pub async fn start_backup(
 }
 
 /// Core logic for canceling a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if job not found or not in pending state
 pub async fn cancel_backup_impl(
     backup_queue: &crate::state::BackupQueue,
     job_id: String,
@@ -270,6 +281,10 @@ pub async fn cancel_backup(
 }
 
 /// Core logic for removing a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if job is in progress or cannot be removed
 pub async fn remove_backup_job_impl(
     backup_queue: &crate::state::BackupQueue,
     job_id: String,
