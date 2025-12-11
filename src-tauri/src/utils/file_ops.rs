@@ -54,7 +54,6 @@ pub async fn create_dir_all(path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_copy_file() {
