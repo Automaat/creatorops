@@ -347,10 +347,8 @@ mod tests {
     #[tokio::test]
     async fn test_status_determination_logic() {
         let temp_dir = TempDir::new().unwrap();
-        {
-            let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", temp_dir.path());
-        } // Lock dropped here
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
 
         // Test Failed status (0 files copied)
         let failed = save_import_history(
