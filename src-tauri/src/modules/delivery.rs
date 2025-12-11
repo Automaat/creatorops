@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
@@ -64,13 +64,6 @@ pub struct ProjectFile {
     pub modified: String,
     pub file_type: String,
     pub relative_path: String,
-}
-
-// Global delivery queue state
-type DeliveryQueue = Arc<Mutex<HashMap<String, DeliveryJob>>>;
-
-lazy_static::lazy_static! {
-    static ref DELIVERY_QUEUE: DeliveryQueue = Arc::new(Mutex::new(HashMap::new()));
 }
 
 /// List all files in a project directory
@@ -166,9 +159,13 @@ fn collect_project_files(
     Ok(())
 }
 
-/// Create a delivery job
-#[tauri::command]
-pub async fn create_delivery(
+/// Core logic for creating a delivery job (testable)
+///
+/// # Errors
+///
+/// Returns error if job creation fails
+pub async fn create_delivery_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
     project_id: String,
     project_name: String,
     selected_files: Vec<String>,
@@ -207,19 +204,44 @@ pub async fn create_delivery(
 
     // Add to queue
     {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = delivery_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
     Ok(job)
 }
 
+/// Create a delivery job
+#[tauri::command]
+pub async fn create_delivery(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_id: String,
+    project_name: String,
+    selected_files: Vec<String>,
+    delivery_path: String,
+    naming_template: Option<String>,
+) -> Result<DeliveryJob, String> {
+    create_delivery_impl(
+        &state.delivery_queue,
+        project_id,
+        project_name,
+        selected_files,
+        delivery_path,
+        naming_template,
+    )
+    .await
+}
+
 /// Start a delivery job
 #[tauri::command]
-pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_delivery(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     // Get job from queue
     let job = {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.delivery_queue.lock().await;
         let job = queue.get_mut(&job_id).ok_or("Job not found")?;
 
         if job.status != DeliveryStatus::Pending {
@@ -234,22 +256,23 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
     };
 
     // Spawn background task
+    let delivery_queue = state.delivery_queue.clone();
     tokio::spawn(async move {
-        let result = process_delivery(job.clone(), app_handle.clone()).await;
+        let result =
+            process_delivery(job.clone(), app_handle.clone(), delivery_queue.clone()).await;
 
         // Update job status
-        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-            if let Some(job) = queue.get_mut(&job_id) {
-                match result {
-                    Ok(()) => {
-                        job.status = DeliveryStatus::Completed;
-                        job.completed_at = Some(get_timestamp());
-                    }
-                    Err(e) => {
-                        job.status = DeliveryStatus::Failed;
-                        job.error_message = Some(e);
-                        job.completed_at = Some(get_timestamp());
-                    }
+        let mut queue = delivery_queue.lock().await;
+        if let Some(job) = queue.get_mut(&job_id) {
+            match result {
+                Ok(()) => {
+                    job.status = DeliveryStatus::Completed;
+                    job.completed_at = Some(get_timestamp());
+                }
+                Err(e) => {
+                    job.status = DeliveryStatus::Failed;
+                    job.error_message = Some(e);
+                    job.completed_at = Some(get_timestamp());
                 }
             }
         }
@@ -258,9 +281,11 @@ pub async fn start_delivery(job_id: String, app_handle: tauri::AppHandle) -> Res
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
+    delivery_queue: Arc<tokio::sync::Mutex<HashMap<String, DeliveryJob>>>,
 ) -> Result<(), String> {
     // Create delivery directory
     let delivery_path = Path::new(&job.delivery_path);
@@ -307,11 +332,10 @@ async fn process_delivery(
 
         // Update queue
         {
-            if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-                if let Some(q_job) = queue.get_mut(&job.id) {
-                    q_job.files_copied = job.files_copied;
-                    q_job.bytes_transferred = job.bytes_transferred;
-                }
+            let mut queue = delivery_queue.lock().await;
+            if let Some(q_job) = queue.get_mut(&job.id) {
+                q_job.files_copied = job.files_copied;
+                q_job.bytes_transferred = job.bytes_transferred;
             }
         }
     }
@@ -337,10 +361,9 @@ async fn process_delivery(
 
     // Update job with manifest path
     {
-        if let Ok(mut queue) = DELIVERY_QUEUE.lock() {
-            if let Some(q_job) = queue.get_mut(&job.id) {
-                q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
-            }
+        let mut queue = delivery_queue.lock().await;
+        if let Some(q_job) = queue.get_mut(&job.id) {
+            q_job.manifest_path = Some(manifest_path.to_string_lossy().to_string());
         }
     }
 
@@ -451,21 +474,46 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
     }
 }
 
+/// Core logic for getting delivery queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
+pub async fn get_delivery_queue_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
+) -> Result<Vec<DeliveryJob>, String> {
+    let queue = delivery_queue.lock().await;
+    Ok(queue.values().cloned().collect())
+}
+
 /// Get delivery queue
 #[tauri::command]
-pub async fn get_delivery_queue() -> Result<Vec<DeliveryJob>, String> {
-    let queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
-    Ok(queue.values().cloned().collect())
+pub async fn get_delivery_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<DeliveryJob>, String> {
+    get_delivery_queue_impl(&state.delivery_queue).await
+}
+
+/// Core logic for removing a delivery job (testable)
+///
+/// # Errors
+///
+/// Returns error if job is in progress or cannot be removed
+pub async fn remove_delivery_job_impl(
+    delivery_queue: &crate::state::DeliveryQueue,
+    job_id: String,
+) -> Result<(), String> {
+    delivery_queue.lock().await.remove(&job_id);
+    Ok(())
 }
 
 /// Remove a delivery job from queue
 #[tauri::command]
-pub async fn remove_delivery_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = DELIVERY_QUEUE.lock().map_err(|e| e.to_string())?;
-        queue.remove(&job_id);
-    }
-    Ok(())
+pub async fn remove_delivery_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    remove_delivery_job_impl(&state.delivery_queue, job_id).await
 }
 
 #[allow(clippy::wildcard_imports)]
@@ -588,6 +636,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test1.jpg");
         let file2 = temp_dir.path().join("test2.jpg");
@@ -598,7 +647,8 @@ mod tests {
         let mut f2 = std::fs::File::create(&file2).unwrap();
         f2.write_all(b"test data 2").unwrap();
 
-        let result = create_delivery(
+        let result = create_delivery_impl(
+            &state.delivery_queue,
             "proj-123".to_owned(),
             "Test Project".to_owned(),
             vec![
@@ -625,13 +675,15 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
         f1.write_all(b"test").unwrap();
 
         // Create a delivery job
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-456".to_owned(),
             "Queue Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -642,11 +694,13 @@ mod tests {
         .unwrap();
 
         // Get queue
-        let queue = get_delivery_queue().await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
         // Clean up
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[tokio::test]
@@ -654,13 +708,15 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
         f1.write_all(b"test").unwrap();
 
         // Create and remove
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-789".to_owned(),
             "Remove Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -670,11 +726,13 @@ mod tests {
         .await
         .unwrap();
 
-        let result = remove_delivery_job(job.id.clone()).await;
+        let result = remove_delivery_job_impl(&state.delivery_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
         // Verify removed
-        let queue = get_delivery_queue().await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 
@@ -683,12 +741,14 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("large.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
         f1.write_all(&vec![0_u8; 1024]).unwrap(); // 1KB file
 
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-size".to_owned(),
             "Size Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -699,7 +759,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(job.total_bytes, 1024);
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[test]
@@ -821,6 +881,7 @@ mod tests {
     async fn test_create_delivery_job() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let project = temp_dir.path().join("project");
         std::fs::create_dir(&project).unwrap();
@@ -830,7 +891,8 @@ mod tests {
         let delivery_path = temp_dir.path().join("delivery");
         std::fs::create_dir(&delivery_path).unwrap();
 
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-del".to_owned(),
             "Delivery Test".to_owned(),
             vec![file.to_string_lossy().to_string()],
@@ -844,13 +906,15 @@ mod tests {
         assert_eq!(job.total_files, 1);
         assert!(job.total_bytes > 0);
 
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_nonexistent_delivery_job() {
+        let state = crate::state::AppState::default();
         // remove_delivery_job returns Ok even for nonexistent jobs
-        let result = remove_delivery_job("nonexistent-id".to_owned()).await;
+        let result =
+            remove_delivery_job_impl(&state.delivery_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 
@@ -889,6 +953,7 @@ mod tests {
     async fn test_delivery_job_with_naming_template() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let project = temp_dir.path().join("project");
         std::fs::create_dir(&project).unwrap();
@@ -898,7 +963,8 @@ mod tests {
         let delivery_path = temp_dir.path().join("delivery");
         std::fs::create_dir(&delivery_path).unwrap();
 
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-template".to_owned(),
             "Template Test".to_owned(),
             vec![file.to_string_lossy().to_string()],
@@ -911,7 +977,7 @@ mod tests {
         assert!(job.naming_template.is_some());
         assert_eq!(job.naming_template.unwrap(), "{name}_{index}");
 
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[test]
@@ -983,6 +1049,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("large1.bin");
         let file2 = temp_dir.path().join("large2.bin");
@@ -997,7 +1064,8 @@ mod tests {
         let mut f3 = std::fs::File::create(&file3).unwrap();
         f3.write_all(b"test").unwrap();
 
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "proj-size".to_owned(),
             "Size Test".to_owned(),
             vec![
@@ -1016,7 +1084,7 @@ mod tests {
         assert_eq!(job.bytes_transferred, 0);
         assert_eq!(job.files_copied, 0);
 
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[tokio::test]
@@ -1056,12 +1124,14 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("test.jpg");
         let mut f1 = std::fs::File::create(&file1).unwrap();
         f1.write_all(b"data").unwrap();
 
-        let job = create_delivery(
+        let job = create_delivery_impl(
+            &state.delivery_queue,
             "status-test".to_owned(),
             "Status Test".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -1075,7 +1145,7 @@ mod tests {
         assert!(job.started_at.is_none());
         assert!(job.completed_at.is_none());
 
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[tokio::test]
@@ -1083,6 +1153,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let file1 = temp_dir.path().join("f1.jpg");
         let file2 = temp_dir.path().join("f2.jpg");
@@ -1097,7 +1168,8 @@ mod tests {
             .unwrap();
 
         // Create two jobs
-        let job1 = create_delivery(
+        let job1 = create_delivery_impl(
+            &state.delivery_queue,
             "q1".to_owned(),
             "Queue1".to_owned(),
             vec![file1.to_string_lossy().to_string()],
@@ -1107,7 +1179,8 @@ mod tests {
         .await
         .unwrap();
 
-        let job2 = create_delivery(
+        let job2 = create_delivery_impl(
+            &state.delivery_queue,
             "q2".to_owned(),
             "Queue2".to_owned(),
             vec![file2.to_string_lossy().to_string()],
@@ -1121,16 +1194,20 @@ mod tests {
         let job2_id = job2.id.clone();
 
         // Get queue
-        let queue = get_delivery_queue().await.unwrap();
+        let queue = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(queue.len() >= 2);
         assert!(queue.iter().any(|j| j.id == job1_id));
         assert!(queue.iter().any(|j| j.id == job2_id));
 
         // Remove jobs
-        let _ = remove_delivery_job(job1.id).await;
-        let _ = remove_delivery_job(job2.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job1.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job2.id).await;
 
-        let queue_after = get_delivery_queue().await.unwrap();
+        let queue_after = get_delivery_queue_impl(&state.delivery_queue)
+            .await
+            .unwrap();
         assert!(!queue_after.iter().any(|j| j.id == job1_id));
         assert!(!queue_after.iter().any(|j| j.id == job2_id));
     }
@@ -1178,7 +1255,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_delivery_with_nonexistent_files() {
-        let result = create_delivery(
+        let state = crate::state::AppState::default();
+        let result = create_delivery_impl(
+            &state.delivery_queue,
             "nonexist".to_owned(),
             "Nonexistent".to_owned(),
             vec!["/nonexistent/file.jpg".to_owned()],
@@ -1193,7 +1272,7 @@ mod tests {
         // Should create job with 0 bytes since file doesn't exist
         assert_eq!(job.total_bytes, 0);
 
-        let _ = remove_delivery_job(job.id).await;
+        let _ = remove_delivery_job_impl(&state.delivery_queue, job.id).await;
     }
 
     #[test]

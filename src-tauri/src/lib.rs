@@ -4,6 +4,21 @@
 
 mod error;
 mod modules;
+pub mod state;
+
+// Re-export _impl functions for testing
+#[doc(hidden)]
+pub use modules::archive::{create_archive_impl, get_archive_queue_impl, remove_archive_job_impl};
+#[doc(hidden)]
+pub use modules::backup::{
+    cancel_backup_impl, get_backup_queue_impl, queue_backup_impl, remove_backup_job_impl,
+};
+#[doc(hidden)]
+pub use modules::delivery::{
+    create_delivery_impl, get_delivery_queue_impl, remove_delivery_job_impl,
+};
+#[doc(hidden)]
+pub use modules::file_copy::cancel_import_impl;
 
 /// Result type for application-level operations
 pub type AppResult = Result<(), Box<dyn std::error::Error>>;
@@ -54,8 +69,12 @@ pub fn run() -> AppResult {
     let db =
         modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
 
+    // Initialize application state
+    let app_state = state::AppState::default();
+
     tauri::Builder::default()
         .manage(db)
+        .manage(app_state)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())

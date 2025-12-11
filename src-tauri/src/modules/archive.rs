@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tauri::Emitter;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -50,16 +50,13 @@ pub struct ArchiveProgress {
     pub total_bytes: u64,
 }
 
-// Global archive queue state
-type ArchiveQueue = Arc<Mutex<HashMap<String, ArchiveJob>>>;
-
-lazy_static::lazy_static! {
-    static ref ARCHIVE_QUEUE: ArchiveQueue = Arc::new(Mutex::new(HashMap::new()));
-}
-
-/// Create an archive job
-#[tauri::command]
-pub async fn create_archive(
+/// Core logic for creating an archive job (testable)
+///
+/// # Errors
+///
+/// Returns error if source path doesn't exist or job creation fails
+pub async fn create_archive_impl(
+    archive_queue: &crate::state::ArchiveQueue,
     project_id: String,
     project_name: String,
     source_path: String,
@@ -97,19 +94,46 @@ pub async fn create_archive(
 
     // Add to queue
     {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = archive_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
     Ok(job)
 }
 
+/// Create an archive job
+#[tauri::command]
+pub async fn create_archive(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_id: String,
+    project_name: String,
+    source_path: String,
+    archive_location: String,
+    compress: bool,
+    compression_format: Option<String>,
+) -> Result<ArchiveJob, String> {
+    create_archive_impl(
+        &state.archive_queue,
+        project_id,
+        project_name,
+        source_path,
+        archive_location,
+        compress,
+        compression_format,
+    )
+    .await
+}
+
 /// Start an archive job
 #[tauri::command]
-pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Result<(), String> {
+pub async fn start_archive(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
     // Get job from queue
     let job = {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
+        let mut queue = state.archive_queue.lock().await;
         let job = queue.get_mut(&job_id).ok_or("Job not found")?;
 
         if job.status != ArchiveStatus::Pending {
@@ -124,22 +148,22 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
     };
 
     // Spawn background task
+    let archive_queue = state.archive_queue.clone();
     tokio::spawn(async move {
-        let result = process_archive(job.clone(), &app_handle);
+        let result = process_archive(job.clone(), &app_handle, archive_queue.clone()).await;
 
         // Update job status
-        if let Ok(mut queue) = ARCHIVE_QUEUE.lock() {
-            if let Some(job) = queue.get_mut(&job_id) {
-                match result {
-                    Ok(()) => {
-                        job.status = ArchiveStatus::Completed;
-                        job.completed_at = Some(get_timestamp());
-                    }
-                    Err(e) => {
-                        job.status = ArchiveStatus::Failed;
-                        job.error_message = Some(e);
-                        job.completed_at = Some(get_timestamp());
-                    }
+        let mut queue = archive_queue.lock().await;
+        if let Some(job) = queue.get_mut(&job_id) {
+            match result {
+                Ok(()) => {
+                    job.status = ArchiveStatus::Completed;
+                    job.completed_at = Some(get_timestamp());
+                }
+                Err(e) => {
+                    job.status = ArchiveStatus::Failed;
+                    job.error_message = Some(e);
+                    job.completed_at = Some(get_timestamp());
                 }
             }
         }
@@ -148,7 +172,12 @@ pub async fn start_archive(job_id: String, app_handle: tauri::AppHandle) -> Resu
     Ok(())
 }
 
-fn process_archive(mut job: ArchiveJob, app_handle: &tauri::AppHandle) -> Result<(), String> {
+#[allow(clippy::type_complexity)]
+async fn process_archive(
+    mut job: ArchiveJob,
+    app_handle: &tauri::AppHandle,
+    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
+) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
     let source_path = Path::new(&source_path_str);
@@ -160,16 +189,25 @@ fn process_archive(mut job: ArchiveJob, app_handle: &tauri::AppHandle) -> Result
         return Err("Compression not yet implemented".to_owned());
     }
     // Move entire directory to archive location
-    move_directory_recursive(source_path, archive_path, &mut job, app_handle)?;
+    move_directory_recursive(
+        source_path,
+        archive_path,
+        &mut job,
+        app_handle,
+        archive_queue,
+    )
+    .await?;
 
     Ok(())
 }
 
-fn move_directory_recursive(
+#[allow(clippy::type_complexity, clippy::needless_pass_by_value)]
+async fn move_directory_recursive(
     source: &Path,
     dest: &Path,
     job: &mut ArchiveJob,
     app_handle: &tauri::AppHandle,
+    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
 ) -> Result<(), String> {
     // Create destination directory
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
@@ -195,11 +233,10 @@ fn move_directory_recursive(
 
             // Update queue
             {
-                if let Ok(mut queue) = ARCHIVE_QUEUE.lock() {
-                    if let Some(q_job) = queue.get_mut(&job.id) {
-                        q_job.files_archived = job.files_archived;
-                        q_job.bytes_transferred = job.bytes_transferred;
-                    }
+                let mut queue = archive_queue.lock().await;
+                if let Some(q_job) = queue.get_mut(&job.id) {
+                    q_job.files_archived = job.files_archived;
+                    q_job.bytes_transferred = job.bytes_transferred;
                 }
             }
 
@@ -229,21 +266,46 @@ fn move_directory_recursive(
     Ok(())
 }
 
+/// Core logic for getting archive queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
+pub async fn get_archive_queue_impl(
+    archive_queue: &crate::state::ArchiveQueue,
+) -> Result<Vec<ArchiveJob>, String> {
+    let queue = archive_queue.lock().await;
+    Ok(queue.values().cloned().collect())
+}
+
 /// Get archive queue
 #[tauri::command]
-pub async fn get_archive_queue() -> Result<Vec<ArchiveJob>, String> {
-    let queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
-    Ok(queue.values().cloned().collect())
+pub async fn get_archive_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<ArchiveJob>, String> {
+    get_archive_queue_impl(&state.archive_queue).await
+}
+
+/// Core logic for removing an archive job (testable)
+///
+/// # Errors
+///
+/// Returns error if job cannot be removed from queue
+pub async fn remove_archive_job_impl(
+    archive_queue: &crate::state::ArchiveQueue,
+    job_id: String,
+) -> Result<(), String> {
+    archive_queue.lock().await.remove(&job_id);
+    Ok(())
 }
 
 /// Remove an archive job from queue
 #[tauri::command]
-pub async fn remove_archive_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = ARCHIVE_QUEUE.lock().map_err(|e| e.to_string())?;
-        queue.remove(&job_id);
-    }
-    Ok(())
+pub async fn remove_archive_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    remove_archive_job_impl(&state.archive_queue, job_id).await
 }
 
 #[allow(clippy::wildcard_imports)]
@@ -344,6 +406,7 @@ mod tests {
     async fn test_create_archive() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -352,7 +415,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let result = create_archive(
+        let result = create_archive_impl(
+            &state.archive_queue,
             "proj-123".to_owned(),
             "Archive Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -372,13 +436,14 @@ mod tests {
         assert!(!job.compress);
 
         // Clean up
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_create_archive_with_compression() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -387,7 +452,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let result = create_archive(
+        let result = create_archive_impl(
+            &state.archive_queue,
             "proj-456".to_owned(),
             "Compressed Archive".to_owned(),
             source.to_string_lossy().to_string(),
@@ -402,13 +468,14 @@ mod tests {
         assert!(job.compress);
         assert_eq!(job.compression_format, Some("zip".to_owned()));
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_get_archive_queue() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -417,7 +484,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-789".to_owned(),
             "Queue Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -428,16 +496,17 @@ mod tests {
         .await
         .unwrap();
 
-        let queue = get_archive_queue().await.unwrap();
+        let queue = get_archive_queue_impl(&state.archive_queue).await.unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_archive_job() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -446,7 +515,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-remove".to_owned(),
             "Remove Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -457,11 +527,11 @@ mod tests {
         .await
         .unwrap();
 
-        let result = remove_archive_job(job.id.clone()).await;
+        let result = remove_archive_job_impl(&state.archive_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
         // Verify removed
-        let queue = get_archive_queue().await.unwrap();
+        let queue = get_archive_queue_impl(&state.archive_queue).await.unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 
@@ -470,6 +540,7 @@ mod tests {
         use std::io::Write;
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -481,7 +552,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-size".to_owned(),
             "Size Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -493,13 +565,14 @@ mod tests {
         .unwrap();
 
         assert_eq!(job.total_bytes, 2048);
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_archive_counts_multiple_files() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
@@ -510,7 +583,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-multi".to_owned(),
             "Multi File Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -522,7 +596,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(job.total_files, 3);
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[test]
@@ -629,6 +703,7 @@ mod tests {
     async fn test_create_archive_with_subdirectories() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         let subdir = source.join("subdir");
@@ -639,7 +714,8 @@ mod tests {
         let archive_location = temp_dir.path().join("archives");
         std::fs::create_dir(&archive_location).unwrap();
 
-        let job = create_archive(
+        let job = create_archive_impl(
+            &state.archive_queue,
             "proj-subdir".to_owned(),
             "Subdir Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -653,13 +729,15 @@ mod tests {
         assert_eq!(job.total_files, 2);
         assert!(job.total_bytes > 0);
 
-        let _ = remove_archive_job(job.id).await;
+        let _ = remove_archive_job_impl(&state.archive_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_nonexistent_archive_job() {
+        let state = crate::state::AppState::default();
         // remove_archive_job returns Ok even for nonexistent jobs
-        let result = remove_archive_job("nonexistent-id".to_owned()).await;
+        let result =
+            remove_archive_job_impl(&state.archive_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 }

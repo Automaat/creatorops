@@ -3,7 +3,6 @@ use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -79,16 +78,13 @@ pub struct BackupHistory {
     pub error_message: Option<String>,
 }
 
-// Global backup queue state
-type BackupQueue = Arc<Mutex<HashMap<String, BackupJob>>>;
-
-lazy_static::lazy_static! {
-    static ref BACKUP_QUEUE: BackupQueue = Arc::new(Mutex::new(HashMap::new()));
-}
-
-/// Add a backup job to the queue
-#[tauri::command]
-pub async fn queue_backup(
+/// Core logic for queuing a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if source path doesn't exist or job creation fails
+pub async fn queue_backup_impl(
+    backup_queue: &crate::state::BackupQueue,
     project_id: String,
     project_name: String,
     source_path: String,
@@ -123,22 +119,45 @@ pub async fn queue_backup(
     };
 
     {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = backup_queue.lock().await;
         queue.insert(id, job.clone());
     }
 
     Ok(job)
 }
 
-/// Get all backup jobs in the queue
 #[tauri::command]
-pub async fn get_backup_queue() -> Result<Vec<BackupJob>, String> {
+pub async fn queue_backup(
+    state: tauri::State<'_, crate::state::AppState>,
+    project_id: String,
+    project_name: String,
+    source_path: String,
+    destination_id: String,
+    destination_name: String,
+    destination_path: String,
+) -> Result<BackupJob, String> {
+    queue_backup_impl(
+        &state.backup_queue,
+        project_id,
+        project_name,
+        source_path,
+        destination_id,
+        destination_name,
+        destination_path,
+    )
+    .await
+}
+
+/// Core logic for getting backup queue (testable)
+///
+/// # Errors
+///
+/// Returns error if queue cannot be accessed
+pub async fn get_backup_queue_impl(
+    backup_queue: &crate::state::BackupQueue,
+) -> Result<Vec<BackupJob>, String> {
     let mut jobs: Vec<BackupJob> = {
-        let queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let queue = backup_queue.lock().await;
         queue.values().cloned().collect()
     };
     jobs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -146,14 +165,24 @@ pub async fn get_backup_queue() -> Result<Vec<BackupJob>, String> {
     Ok(jobs)
 }
 
+/// Get all backup jobs in the queue
+#[tauri::command]
+pub async fn get_backup_queue(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<Vec<BackupJob>, String> {
+    get_backup_queue_impl(&state.backup_queue).await
+}
+
 /// Start a backup job
 #[tauri::command]
-pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<BackupJob, String> {
+pub async fn start_backup(
+    state: tauri::State<'_, crate::state::AppState>,
+    window: tauri::Window,
+    job_id: String,
+) -> Result<BackupJob, String> {
     // Get job from queue
     let job = {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = state.backup_queue.lock().await;
         let job = queue
             .get_mut(&job_id)
             .ok_or("Backup job not found")?
@@ -170,9 +199,7 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
 
     // Update status to in-progress
     {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
+        let mut queue = state.backup_queue.lock().await;
         if let Some(j) = queue.get_mut(&job_id) {
             j.status = BackupStatus::InProgress;
             j.started_at = Some(get_timestamp());
@@ -182,54 +209,54 @@ pub async fn start_backup(window: tauri::Window, job_id: String) -> Result<Backu
     // Perform backup in background
     let job_id_clone = job_id.clone();
     let window_clone = window;
+    let backup_queue = state.backup_queue.clone();
     tokio::spawn(async move {
         let result = perform_backup(&window_clone, &job_id_clone, &job).await;
 
         // Update job status
-        let queue_result = BACKUP_QUEUE.lock();
-        if let Ok(mut queue) = queue_result {
-            if let Some(j) = queue.get_mut(&job_id_clone) {
-                match result {
-                    Ok((files_copied, files_skipped, bytes_transferred)) => {
-                        j.status = BackupStatus::Completed;
-                        j.files_copied = files_copied;
-                        j.files_skipped = files_skipped;
-                        j.bytes_transferred = bytes_transferred;
-                        j.completed_at = Some(get_timestamp());
+        let mut queue = backup_queue.lock().await;
+        if let Some(j) = queue.get_mut(&job_id_clone) {
+            match result {
+                Ok((files_copied, files_skipped, bytes_transferred)) => {
+                    j.status = BackupStatus::Completed;
+                    j.files_copied = files_copied;
+                    j.files_skipped = files_skipped;
+                    j.bytes_transferred = bytes_transferred;
+                    j.completed_at = Some(get_timestamp());
 
-                        // Save to history
-                        let _ = save_backup_to_history(j);
-                    }
-                    Err(e) => {
-                        j.status = BackupStatus::Failed;
-                        j.error_message = Some(e);
-                        j.completed_at = Some(get_timestamp());
-                    }
+                    // Save to history
+                    let _ = save_backup_to_history(j);
                 }
-
-                // Emit job update
-                let _ = window_clone.emit("backup-job-updated", j.clone());
+                Err(e) => {
+                    j.status = BackupStatus::Failed;
+                    j.error_message = Some(e);
+                    j.completed_at = Some(get_timestamp());
+                }
             }
+
+            // Emit job update
+            let _ = window_clone.emit("backup-job-updated", j.clone());
         }
-        // Queue lock failed - continue without updating
     });
 
     // Return immediately with in-progress status
-    let queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
+    let queue = state.backup_queue.lock().await;
     queue
         .get(&job_id)
         .cloned()
         .ok_or_else(|| "Backup job not found".to_owned())
 }
 
-/// Cancel a backup job
-#[tauri::command]
-pub async fn cancel_backup(job_id: String) -> Result<(), String> {
-    let mut queue = BACKUP_QUEUE
-        .lock()
-        .map_err(|e| format!("Failed to lock queue: {e}"))?;
+/// Core logic for canceling a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if job not found or not in pending state
+pub async fn cancel_backup_impl(
+    backup_queue: &crate::state::BackupQueue,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = backup_queue.lock().await;
 
     if let Some(job) = queue.get_mut(&job_id) {
         if job.status == BackupStatus::Pending {
@@ -244,23 +271,44 @@ pub async fn cancel_backup(job_id: String) -> Result<(), String> {
     }
 }
 
+/// Cancel a backup job
+#[tauri::command]
+pub async fn cancel_backup(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    cancel_backup_impl(&state.backup_queue, job_id).await
+}
+
+/// Core logic for removing a backup job (testable)
+///
+/// # Errors
+///
+/// Returns error if job is in progress or cannot be removed
+pub async fn remove_backup_job_impl(
+    backup_queue: &crate::state::BackupQueue,
+    job_id: String,
+) -> Result<(), String> {
+    let mut queue = backup_queue.lock().await;
+
+    if let Some(job) = queue.get(&job_id) {
+        if job.status == BackupStatus::InProgress {
+            return Err("Cannot remove in-progress backup".to_owned());
+        }
+    }
+
+    queue.remove(&job_id);
+    drop(queue);
+    Ok(())
+}
+
 /// Remove a completed/failed/cancelled backup job from queue
 #[tauri::command]
-pub async fn remove_backup_job(job_id: String) -> Result<(), String> {
-    {
-        let mut queue = BACKUP_QUEUE
-            .lock()
-            .map_err(|e| format!("Failed to lock queue: {e}"))?;
-
-        if let Some(job) = queue.get(&job_id) {
-            if job.status == BackupStatus::InProgress {
-                return Err("Cannot remove in-progress backup".to_owned());
-            }
-        }
-
-        queue.remove(&job_id);
-    }
-    Ok(())
+pub async fn remove_backup_job(
+    state: tauri::State<'_, crate::state::AppState>,
+    job_id: String,
+) -> Result<(), String> {
+    remove_backup_job_impl(&state.backup_queue, job_id).await
 }
 
 /// Get backup history
@@ -636,12 +684,14 @@ mod tests {
     async fn test_queue_backup() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file1.txt"), "test data").unwrap();
 
-        let result = queue_backup(
+        let result = queue_backup_impl(
+            &state.backup_queue,
             "proj-123".to_owned(),
             "Backup Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -659,19 +709,21 @@ mod tests {
         assert!(job.total_bytes > 0);
 
         // Clean up
-        let _ = remove_backup_job(job.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_get_backup_queue() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "proj-789".to_owned(),
             "Queue Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -682,22 +734,24 @@ mod tests {
         .await
         .unwrap();
 
-        let queue = get_backup_queue().await.unwrap();
+        let queue = get_backup_queue_impl(&state.backup_queue).await.unwrap();
         assert!(queue.iter().any(|j| j.id == job.id));
 
-        let _ = remove_backup_job(job.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_cancel_backup() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "proj-cancel".to_owned(),
             "Cancel Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -708,27 +762,29 @@ mod tests {
         .await
         .unwrap();
 
-        let result = cancel_backup(job.id.clone()).await;
+        let result = cancel_backup_impl(&state.backup_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
         // Verify cancelled
-        let queue = get_backup_queue().await.unwrap();
+        let queue = get_backup_queue_impl(&state.backup_queue).await.unwrap();
         let cancelled_job = queue.iter().find(|j| j.id == job.id).unwrap();
         assert_eq!(cancelled_job.status, BackupStatus::Cancelled);
 
-        let _ = remove_backup_job(job.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_cancel_backup_not_pending() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "proj-not-pending".to_owned(),
             "Not Pending Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -740,26 +796,28 @@ mod tests {
         .unwrap();
 
         // Cancel once (should succeed)
-        let _ = cancel_backup(job.id.clone()).await;
+        let _ = cancel_backup_impl(&state.backup_queue, job.id.clone()).await;
 
         // Try to cancel again (should fail)
-        let result = cancel_backup(job.id.clone()).await;
+        let result = cancel_backup_impl(&state.backup_queue, job.id.clone()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Can only cancel pending"));
 
-        let _ = remove_backup_job(job.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_backup_job() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "proj-remove".to_owned(),
             "Remove Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -770,11 +828,11 @@ mod tests {
         .await
         .unwrap();
 
-        let result = remove_backup_job(job.id.clone()).await;
+        let result = remove_backup_job_impl(&state.backup_queue, job.id.clone()).await;
         assert!(result.is_ok());
 
         // Verify removed
-        let queue = get_backup_queue().await.unwrap();
+        let queue = get_backup_queue_impl(&state.backup_queue).await.unwrap();
         assert!(!queue.iter().any(|j| j.id == job.id));
     }
 
@@ -799,12 +857,14 @@ mod tests {
         use tempfile::TempDir;
         use tokio::time::{sleep, Duration};
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job1 = queue_backup(
+        let job1 = queue_backup_impl(
+            &state.backup_queue,
             "proj-first".to_owned(),
             "First".to_owned(),
             source.to_string_lossy().to_string(),
@@ -817,7 +877,8 @@ mod tests {
 
         sleep(Duration::from_millis(100)).await;
 
-        let job2 = queue_backup(
+        let job2 = queue_backup_impl(
+            &state.backup_queue,
             "proj-second".to_owned(),
             "Second".to_owned(),
             source.to_string_lossy().to_string(),
@@ -828,7 +889,7 @@ mod tests {
         .await
         .unwrap();
 
-        let queue = get_backup_queue().await.unwrap();
+        let queue = get_backup_queue_impl(&state.backup_queue).await.unwrap();
 
         // Verify both jobs are in queue
         assert!(queue.iter().any(|j| j.id == job1.id));
@@ -839,8 +900,8 @@ mod tests {
         let job2_entry = queue.iter().find(|j| j.id == job2.id).unwrap();
         assert!(job2_entry.created_at >= job1_entry.created_at);
 
-        let _ = remove_backup_job(job1.id).await;
-        let _ = remove_backup_job(job2.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job1.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job2.id).await;
     }
 
     #[test]
@@ -935,12 +996,14 @@ mod tests {
     async fn test_queue_backup_creates_job() {
         use tempfile::TempDir;
 
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "proj-create".to_owned(),
             "Create Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -957,13 +1020,14 @@ mod tests {
         assert_eq!(job.files_copied, 0);
         assert_eq!(job.bytes_transferred, 0);
 
-        let _ = remove_backup_job(job.id).await;
+        let _ = remove_backup_job_impl(&state.backup_queue, job.id).await;
     }
 
     #[tokio::test]
     async fn test_remove_nonexistent_backup_job() {
         // remove_backup_job returns Ok even for nonexistent jobs
-        let result = remove_backup_job("nonexistent-id".to_owned()).await;
+        let state = crate::state::AppState::default();
+        let result = remove_backup_job_impl(&state.backup_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_ok());
     }
 
@@ -995,7 +1059,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancel_nonexistent_backup() {
-        let result = cancel_backup("nonexistent-id".to_owned()).await;
+        let state = crate::state::AppState::default();
+        let result = cancel_backup_impl(&state.backup_queue, "nonexistent-id".to_owned()).await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Backup job not found");
     }
@@ -1003,12 +1068,15 @@ mod tests {
     #[tokio::test]
     async fn test_backup_job_fields() {
         use tempfile::TempDir;
+
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "test data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "test-fields".to_owned(),
             "Test Fields".to_owned(),
             source.to_string_lossy().to_string(),
@@ -1297,6 +1365,8 @@ mod tests {
         use tempfile::TempDir;
         let temp_dir = TempDir::new().unwrap();
 
+        let state = crate::state::AppState::default();
+
         // Setup HOME in locked scope, then drop lock but keep HOME set
         let (source, original_home) = {
             let _lock = HOME_TEST_MUTEX.lock().unwrap();
@@ -1311,7 +1381,8 @@ mod tests {
         }; // Lock dropped here, but HOME still set
 
         // Queue and complete a backup (no lock held during await)
-        let _job = queue_backup(
+        let _job = queue_backup_impl(
+            &state.backup_queue,
             "proj-hist".to_owned(),
             "History Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -1367,12 +1438,15 @@ mod tests {
     #[tokio::test]
     async fn test_backup_job_timestamps() {
         use tempfile::TempDir;
+
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("project");
         std::fs::create_dir(&source).unwrap();
         std::fs::write(source.join("file.txt"), "data").unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "time-test".to_owned(),
             "Timestamp Test".to_owned(),
             source.to_string_lossy().to_string(),
@@ -1391,11 +1465,14 @@ mod tests {
     #[tokio::test]
     async fn test_backup_empty_source() {
         use tempfile::TempDir;
+
+        let state = crate::state::AppState::default();
         let temp_dir = TempDir::new().unwrap();
         let source = temp_dir.path().join("empty_project");
         std::fs::create_dir(&source).unwrap();
 
-        let job = queue_backup(
+        let job = queue_backup_impl(
+            &state.backup_queue,
             "empty-test".to_owned(),
             "Empty Test".to_owned(),
             source.to_string_lossy().to_string(),

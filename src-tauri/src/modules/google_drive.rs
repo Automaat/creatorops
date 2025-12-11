@@ -1437,6 +1437,11 @@ mod tests {
     use super::*;
     use uuid::Uuid;
 
+    // Global mutex to serialize tests that manipulate HOME environment variable
+    lazy_static::lazy_static! {
+        static ref HOME_TEST_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
+    }
+
     #[test]
     fn test_timestamp_format() {
         let timestamp = get_current_timestamp();
@@ -2041,6 +2046,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_store_and_retrieve_tokens() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
+
         let test_email = format!("test-{}@example.com", Uuid::new_v4());
         let token_data = TokenData {
             access_token: "test_access".to_owned(),
@@ -2057,10 +2068,9 @@ mod tests {
                 assert_eq!(tokens.access_token, "test_access");
                 assert_eq!(tokens.refresh_token, "test_refresh");
             }
-
-            let entry = keyring::Entry::new("com.creatorops.google-drive", &test_email).unwrap();
-            let _ = entry.delete_credential();
         }
+
+        std::env::remove_var("HOME");
     }
 
     #[tokio::test]
@@ -2424,6 +2434,12 @@ mod tests {
 
     #[test]
     fn test_store_and_get_tokens_roundtrip() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
+
         let email = format!("test-{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
             access_token: "test-access-token-12345".to_owned(),
@@ -2451,13 +2467,17 @@ mod tests {
         assert_eq!(retrieved.access_token, tokens.access_token);
         assert_eq!(retrieved.refresh_token, tokens.refresh_token);
 
-        // Clean up
-        let token_file = get_token_file_path(&email).unwrap();
-        let _ = std::fs::remove_file(token_file);
+        std::env::remove_var("HOME");
     }
 
     #[test]
     fn test_store_tokens_creates_directory() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
+
         let email = format!("test-dir-{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
             access_token: "test-token".to_owned(),
@@ -2473,9 +2493,7 @@ mod tests {
         let token_dir = format!("{home}/.creatorops");
         assert!(std::path::Path::new(&token_dir).exists());
 
-        // Clean up
-        let token_file = get_token_file_path(&email).unwrap();
-        let _ = std::fs::remove_file(token_file);
+        std::env::remove_var("HOME");
     }
 
     #[test]
@@ -2575,6 +2593,12 @@ mod tests {
 
     #[test]
     fn test_token_file_path_sanitization() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
+
         // Test that email addresses are properly sanitized for file paths
         let email1 = "user@example.com";
         let email2 = "USER@EXAMPLE.COM";
@@ -2605,10 +2629,18 @@ mod tests {
             filename.contains("_at_"),
             "Filename should replace @ with _at_"
         );
+
+        std::env::remove_var("HOME");
     }
 
     #[test]
     fn test_store_tokens_with_special_characters() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        std::env::set_var("HOME", temp_dir.path());
+
         let email = format!("test+special.chars{}@example.com", Uuid::new_v4());
         let tokens = TokenData {
             access_token: "token-with-special-chars!@#$%^&*()".to_owned(),
@@ -2623,9 +2655,7 @@ mod tests {
         assert_eq!(retrieved.access_token, tokens.access_token);
         assert_eq!(retrieved.refresh_token, tokens.refresh_token);
 
-        // Clean up
-        let token_file = get_token_file_path(&email).unwrap();
-        let _ = std::fs::remove_file(token_file);
+        std::env::remove_var("HOME");
     }
 
     #[test]
