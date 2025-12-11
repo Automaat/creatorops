@@ -4,7 +4,9 @@
 
 mod error;
 mod modules;
+mod progress;
 pub mod state;
+mod utils;
 
 // Re-export _impl functions for testing
 #[doc(hidden)]
