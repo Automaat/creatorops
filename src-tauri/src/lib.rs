@@ -17,6 +17,8 @@ pub use modules::backup::{
 pub use modules::delivery::{
     create_delivery_impl, get_delivery_queue_impl, remove_delivery_job_impl,
 };
+#[doc(hidden)]
+pub use modules::file_copy::cancel_import_impl;
 
 /// Result type for application-level operations
 pub type AppResult = Result<(), Box<dyn std::error::Error>>;

@@ -236,13 +236,16 @@ async fn copy_file_with_retry(
     .await
 }
 
-/// Cancel an ongoing import
-#[tauri::command]
-pub async fn cancel_import(
-    state: tauri::State<'_, crate::state::AppState>,
+/// Core logic for canceling an import (testable)
+///
+/// # Errors
+///
+/// Returns error if import not found or already completed
+pub async fn cancel_import_impl(
+    import_tokens: &crate::state::ImportTokens,
     import_id: String,
 ) -> Result<(), String> {
-    let tokens = state.import_tokens.lock().await;
+    let tokens = import_tokens.lock().await;
     tokens.get(&import_id).map_or_else(
         || Err("Import not found or already completed".to_owned()),
         |token| {
@@ -250,6 +253,15 @@ pub async fn cancel_import(
             Ok(())
         },
     )
+}
+
+/// Cancel an ongoing import
+#[tauri::command]
+pub async fn cancel_import(
+    state: tauri::State<'_, crate::state::AppState>,
+    import_id: String,
+) -> Result<(), String> {
+    cancel_import_impl(&state.import_tokens, import_id).await
 }
 
 #[allow(clippy::wildcard_imports)]
