@@ -2,6 +2,7 @@
 use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
 };
+use crate::utils::file_ops;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -448,11 +449,11 @@ async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
             Ok(true) => Ok(size),
             Ok(false) => {
                 // Checksum mismatch - retry
-                let _ = tokio::fs::remove_file(dest).await;
+                let _ = file_ops::remove_file(dest).await;
                 Err("Checksum verification failed".to_owned())
             }
             Err(e) => {
-                let _ = tokio::fs::remove_file(dest).await;
+                let _ = file_ops::remove_file(dest).await;
                 Err(format!("Checksum calculation failed: {e}"))
             }
         }

@@ -1,4 +1,5 @@
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::utils::file_ops;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -230,8 +231,8 @@ async fn copy_file_with_retry(
         if cancel_token.is_cancelled() {
             return Err("Import cancelled".to_owned());
         }
-        // Use fast native copy instead of manual chunking
-        tokio::fs::copy(src, dest).await.map_err(|e| e.to_string())
+        // Use spawn_blocking for efficient sync file copy (Phase 3 optimization)
+        file_ops::copy_file(src, dest).await
     })
     .await
 }
