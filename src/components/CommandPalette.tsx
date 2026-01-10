@@ -112,8 +112,8 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   }
 
   return (
-    <div className="command-palette-overlay" onClick={onClose}>
-      <div className="command-palette" onClick={(e) => e.stopPropagation()}>
+    <div className="command-palette-overlay" onClick={onClose} role="presentation">
+      <div className="command-palette" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()} role="dialog">
         <div className="command-palette-header">
           <input
             ref={inputRef}
@@ -134,6 +134,8 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
                 className={`command-palette-item ${index === selectedIndex ? 'selected' : ''}`}
                 onClick={() => handleSelectProject(project.id)}
                 onMouseEnter={() => setSelectedIndex(index)}
+                role="button"
+                tabIndex={0}
               >
                 <div className="command-palette-item-content">
                   <div className="command-palette-item-header">

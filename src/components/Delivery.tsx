@@ -341,6 +341,8 @@ export function Delivery() {
                         setSelectedProject(project)
                         setShowProjectSelect(false)
                       }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="project-select-header">
                         <h4>{project.name}</h4>
@@ -388,6 +390,9 @@ export function Delivery() {
                     key={file.path}
                     className={`file-item ${selectedFiles.has(file.path) ? 'selected' : ''}`}
                     onClick={() => toggleFileSelection(file.path)}
+                    role="checkbox"
+                    tabIndex={0}
+                    aria-checked={selectedFiles.has(file.path)}
                   >
                     <input
                       type="checkbox"
