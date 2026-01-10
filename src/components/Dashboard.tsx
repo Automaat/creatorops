@@ -136,8 +136,17 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       </div>
 
       {showCreateProject && (
-        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)} role="presentation">
-          <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setShowCreateProject(false)} role="dialog">
+        <div
+          className="dialog-overlay"
+          onClick={() => setShowCreateProject(false)}
+          role="presentation"
+        >
+          <div
+            className="dialog"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === 'Escape' && setShowCreateProject(false)}
+            role="dialog"
+          >
             <h2>Create New Project</h2>
             <CreateProject
               onProjectCreated={handleProjectCreated}

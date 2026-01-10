@@ -384,7 +384,12 @@ function SDCardItem({
   // Collapsed card view - click to expand
   if (!isActive) {
     return (
-      <div className="project-list-item clickable" onClick={handleImportClick} role="button" tabIndex={0}>
+      <div
+        className="project-list-item clickable"
+        onClick={handleImportClick}
+        role="button"
+        tabIndex={0}
+      >
         <div className="project-list-content">
           <div>
             <h3>{card.name}</h3>
@@ -533,8 +538,17 @@ function SDCardItem({
         </div>
 
         {showCreateNew && (
-          <div className="dialog-overlay" onClick={() => setShowCreateNew(false)} role="presentation">
-            <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setShowCreateNew(false)} role="dialog">
+          <div
+            className="dialog-overlay"
+            onClick={() => setShowCreateNew(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && setShowCreateNew(false)}
+              role="dialog"
+            >
               <h2>Create New Project</h2>
               <CreateProject
                 onProjectCreated={handleProjectCreated}

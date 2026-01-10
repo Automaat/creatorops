@@ -127,7 +127,12 @@ function NavItem({
   const currentIcon = active && iconSrcSelected ? iconSrcSelected : iconSrc
 
   return (
-    <div className={`nav-item ${active ? 'active' : ''}`} onClick={onClick} role="button" tabIndex={0}>
+    <div
+      className={`nav-item ${active ? 'active' : ''}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+    >
       {currentIcon ? (
         <img src={currentIcon} alt={label} className="nav-item-icon" />
       ) : (

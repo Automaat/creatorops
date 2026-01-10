@@ -113,7 +113,12 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
 
   return (
     <div className="command-palette-overlay" onClick={onClose} role="presentation">
-      <div className="command-palette" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && onClose()} role="dialog">
+      <div
+        className="command-palette"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === 'Escape' && onClose()}
+        role="dialog"
+      >
         <div className="command-palette-header">
           <input
             ref={inputRef}

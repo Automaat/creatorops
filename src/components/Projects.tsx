@@ -690,8 +690,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         </section>
 
         {showArchiveDialog && (
-          <div className="dialog-overlay" onClick={() => setShowArchiveDialog(false)} role="presentation">
-            <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setShowArchiveDialog(false)} role="dialog">
+          <div
+            className="dialog-overlay"
+            onClick={() => setShowArchiveDialog(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && setShowArchiveDialog(false)}
+              role="dialog"
+            >
               <h2>Archive Project</h2>
               <p>
                 This will move the project to the archive location and update its status to
@@ -726,8 +735,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         )}
 
         {showDeleteDialog && (
-          <div className="dialog-overlay" onClick={() => !isDeleting && setShowDeleteDialog(false)} role="presentation">
-            <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && !isDeleting && setShowDeleteDialog(false)} role="dialog">
+          <div
+            className="dialog-overlay"
+            onClick={() => !isDeleting && setShowDeleteDialog(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && !isDeleting && setShowDeleteDialog(false)}
+              role="dialog"
+            >
               {isDeleting ? (
                 <>
                   <h2>Deleting Project</h2>
@@ -767,7 +785,12 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
             onClick={() => !isImporting && setShowImportDialog(false)}
             role="presentation"
           >
-            <div className="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && !isImporting && setShowImportDialog(false)} role="dialog">
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && !isImporting && setShowImportDialog(false)}
+              role="dialog"
+            >
               {!isImporting && !importResult ? (
                 <>
                   <h2>Import from SD Card</h2>
