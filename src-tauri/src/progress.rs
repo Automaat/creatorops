@@ -81,4 +81,43 @@ mod tests {
         assert!(json.contains("bytesProcessed"));
         assert!(json.contains("currentFile"));
     }
+
+    #[test]
+    fn test_progress_update_with_none_values() {
+        let update = ProgressUpdate {
+            job_id: "test-456".to_owned(),
+            current: 0,
+            total: 100,
+            bytes_processed: 0,
+            total_bytes: 10240,
+            current_file: None,
+            speed_bps: None,
+            eta_seconds: None,
+        };
+
+        let json = serde_json::to_string(&update).unwrap();
+        assert!(json.contains("jobId"));
+        assert!(json.contains("\"currentFile\":null"));
+        assert!(json.contains("\"speedBps\":null"));
+        assert!(json.contains("\"etaSeconds\":null"));
+    }
+
+    #[test]
+    fn test_progress_update_clone() {
+        let update = ProgressUpdate {
+            job_id: "clone-test".to_owned(),
+            current: 3,
+            total: 10,
+            bytes_processed: 512,
+            total_bytes: 1024,
+            current_file: Some("file.txt".to_owned()),
+            speed_bps: Some(500_000),
+            eta_seconds: Some(10),
+        };
+
+        let cloned = update.clone();
+        assert_eq!(update.job_id, cloned.job_id);
+        assert_eq!(update.current, cloned.current);
+        assert_eq!(update.total, cloned.total);
+    }
 }
