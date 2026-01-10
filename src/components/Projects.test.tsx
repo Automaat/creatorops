@@ -241,6 +241,64 @@ describe('projects', () => {
         expect(screen.getByText('Create New Project')).toBeTruthy()
       })
     })
+
+    it('closes create project dialog when overlay clicked', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Project')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Create Project'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Project')).toBeTruthy()
+      })
+
+      const overlay = screen.getByText('Create New Project').closest('.dialog-overlay')
+      expect(overlay).toBeTruthy()
+
+      await user.click(overlay!)
+
+      await waitFor(() => {
+        expect(screen.queryByText('Create New Project')).toBeNull()
+      })
+    })
+
+    it('does not close dialog when clicking inside dialog content', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Create Project')).toBeTruthy()
+      })
+
+      await user.click(screen.getByText('Create Project'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Project')).toBeTruthy()
+      })
+
+      const dialogContent = screen.getByText('Create New Project').closest('.dialog')
+      expect(dialogContent).toBeTruthy()
+
+      await user.click(dialogContent!)
+
+      await waitFor(() => {
+        expect(screen.getByText('Create New Project')).toBeTruthy()
+      })
+    })
   })
 
   describe('project Selection and Detail View', () => {
