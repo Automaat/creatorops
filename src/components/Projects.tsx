@@ -554,6 +554,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                 className={`metadata-value metadata-value-link${isOverdue(selectedProject.deadline) ? ' text-overdue' : ''}`}
                 onClick={() => setIsEditingDeadline(true)}
                 title="Click to edit deadline"
+                role="button"
+                tabIndex={0}
               >
                 {selectedProject.deadline ? formatDisplayDate(selectedProject.deadline) : 'Not set'}
               </span>
@@ -568,6 +570,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               className="folder-path info-row-clickable"
               onClick={() => void invoke('reveal_in_finder', { path: selectedProject.folderPath })}
               title="Click to show in Finder"
+              role="button"
+              tabIndex={0}
             >
               {replaceHomeWithTilde(selectedProject.folderPath)}
             </span>
@@ -686,8 +690,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         </section>
 
         {showArchiveDialog && (
-          <div className="dialog-overlay" onClick={() => setShowArchiveDialog(false)}>
-            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="dialog-overlay"
+            onClick={() => setShowArchiveDialog(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && setShowArchiveDialog(false)}
+              role="dialog"
+            >
               <h2>Archive Project</h2>
               <p>
                 This will move the project to the archive location and update its status to
@@ -722,8 +735,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         )}
 
         {showDeleteDialog && (
-          <div className="dialog-overlay" onClick={() => !isDeleting && setShowDeleteDialog(false)}>
-            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="dialog-overlay"
+            onClick={() => !isDeleting && setShowDeleteDialog(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && !isDeleting && setShowDeleteDialog(false)}
+              role="dialog"
+            >
               {isDeleting ? (
                 <>
                   <h2>Deleting Project</h2>
@@ -761,8 +783,14 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           <div
             className="dialog-overlay"
             onClick={() => !isImporting && setShowImportDialog(false)}
+            role="presentation"
           >
-            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && !isImporting && setShowImportDialog(false)}
+              role="dialog"
+            >
               {!isImporting && !importResult ? (
                 <>
                   <h2>Import from SD Card</h2>
@@ -788,6 +816,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                             setSelectedSDCard(card)
                           }}
                           style={{ cursor: 'pointer' }}
+                          role="button"
+                          tabIndex={0}
                         >
                           <span className="destination-name">{card.name}</span>
                           <span className="destination-path">
@@ -915,6 +945,8 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                   isInternalSelection.current = true
                   setSelectedProject(project)
                 }}
+                role="button"
+                tabIndex={0}
               >
                 <div className="project-card-header">
                   <h3>{project.name}</h3>
@@ -965,12 +997,15 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
           onClick={() => {
             setShowCreateProject(false)
           }}
+          role="presentation"
         >
           <div
             className="dialog"
             onClick={(e) => {
               e.stopPropagation()
             }}
+            onKeyDown={(e) => e.key === 'Escape' && setShowCreateProject(false)}
+            role="dialog"
           >
             <h2>Create New Project</h2>
             <CreateProject

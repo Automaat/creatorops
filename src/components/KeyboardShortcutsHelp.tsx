@@ -12,8 +12,13 @@ export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelp
   }
 
   return (
-    <div className="shortcuts-overlay" onClick={onClose}>
-      <div className="shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="shortcuts-overlay" onClick={onClose} role="presentation">
+      <div
+        className="shortcuts-modal"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === 'Escape' && onClose()}
+        role="dialog"
+      >
         <div className="shortcuts-header">
           <h2>Keyboard Shortcuts</h2>
           <button className="btn-icon" onClick={onClose} aria-label="Close">

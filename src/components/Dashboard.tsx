@@ -91,6 +91,8 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
                     key={project.id}
                     className={`project-list-item ${onProjectClick ? 'clickable' : ''}`}
                     onClick={() => onProjectClick?.(project.id)}
+                    role="button"
+                    tabIndex={0}
                   >
                     <div className="project-list-content">
                       <div>
@@ -134,8 +136,17 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       </div>
 
       {showCreateProject && (
-        <div className="dialog-overlay" onClick={() => setShowCreateProject(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="dialog-overlay"
+          onClick={() => setShowCreateProject(false)}
+          role="presentation"
+        >
+          <div
+            className="dialog"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === 'Escape' && setShowCreateProject(false)}
+            role="dialog"
+          >
             <h2>Create New Project</h2>
             <CreateProject
               onProjectCreated={handleProjectCreated}

@@ -384,7 +384,12 @@ function SDCardItem({
   // Collapsed card view - click to expand
   if (!isActive) {
     return (
-      <div className="project-list-item clickable" onClick={handleImportClick}>
+      <div
+        className="project-list-item clickable"
+        onClick={handleImportClick}
+        role="button"
+        tabIndex={0}
+      >
         <div className="project-list-content">
           <div>
             <h3>{card.name}</h3>
@@ -461,6 +466,8 @@ function SDCardItem({
                               setSelectedProject(project.id)
                               setShowProjectSelect(false)
                             }}
+                            role="button"
+                            tabIndex={0}
                           >
                             <div className="project-select-header">
                               <h4>{project.name}</h4>
@@ -481,6 +488,8 @@ function SDCardItem({
                             handleProjectSelect('__new__')
                             setShowProjectSelect(false)
                           }}
+                          role="button"
+                          tabIndex={0}
                         >
                           <div className="project-select-header">
                             <h4>+ Create New Project</h4>
@@ -529,8 +538,17 @@ function SDCardItem({
         </div>
 
         {showCreateNew && (
-          <div className="dialog-overlay" onClick={() => setShowCreateNew(false)}>
-            <div className="dialog" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="dialog-overlay"
+            onClick={() => setShowCreateNew(false)}
+            role="presentation"
+          >
+            <div
+              className="dialog"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && setShowCreateNew(false)}
+              role="dialog"
+            >
               <h2>Create New Project</h2>
               <CreateProject
                 onProjectCreated={handleProjectCreated}
