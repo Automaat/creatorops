@@ -223,7 +223,7 @@ mod tests {
         let db_path = temp_dir.path().join("test.db");
         let db = Database::new_with_path(&db_path).unwrap();
 
-        let count: usize = db
+        let count: i64 = db
             .execute(|conn| {
                 Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
             })
@@ -268,7 +268,7 @@ mod tests {
         })
         .unwrap();
 
-        let count: usize = db
+        let count: i64 = db
             .execute(|conn| {
                 Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
             })
@@ -303,7 +303,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify both records were committed
-        let count: usize = db
+        let count: i64 = db
             .execute(|conn| {
                 Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
             })
@@ -340,7 +340,7 @@ mod tests {
         assert!(result.is_err());
 
         // Verify no records were committed
-        let count: usize = db
+        let count: i64 = db
             .execute(|conn| {
                 Ok(conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?)
             })
