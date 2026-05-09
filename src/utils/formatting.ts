@@ -56,9 +56,17 @@ function formatDate(dateString: string): string {
   }
 }
 
+function parseLocalDate(dateString: string): Date {
+  const isoMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]))
+  }
+  return new Date(dateString)
+}
+
 function formatDateShort(dateString: string): string {
   try {
-    const date = new Date(dateString)
+    const date = parseLocalDate(dateString)
     if (Number.isNaN(date.getTime())) {
       return dateString
     }
@@ -107,7 +115,7 @@ function formatDisplayDate(date: Date | string | undefined): string {
   if (!date) {
     return ''
   }
-  const d = typeof date === 'string' ? new Date(date) : date
+  const d = typeof date === 'string' ? parseLocalDate(date) : date
   if (Number.isNaN(d.getTime())) {
     return typeof date === 'string' ? date : ''
   }
@@ -121,6 +129,7 @@ export {
   formatDate,
   formatDateShort,
   formatDisplayDate,
+  parseLocalDate,
   MONTH_NAMES_SHORT,
   MONTH_NAMES_FULL,
 }

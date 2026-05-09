@@ -1,5 +1,5 @@
 import { ProjectStatus, type Project } from '../types'
-import { formatDateShort } from './formatting'
+import { formatDateShort, parseLocalDate } from './formatting'
 
 export function formatProjectInfo(project: Project): string {
   const parts = [
@@ -20,7 +20,10 @@ export function isOverdue(deadline?: string): boolean {
   }
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const deadlineDate = new Date(deadline)
+  const deadlineDate = parseLocalDate(deadline)
+  if (Number.isNaN(deadlineDate.getTime())) {
+    return false
+  }
   deadlineDate.setHours(0, 0, 0, 0)
   return deadlineDate < today
 }

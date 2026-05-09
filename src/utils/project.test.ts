@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { isOverdue, sortProjects, sortProjectsByStatus } from './project'
+import { formatProjectInfo, isOverdue, sortProjects, sortProjectsByStatus } from './project'
 import { ProjectStatus, type Project } from '../types'
+
+describe('formatProjectInfo', () => {
+  it('formats project with both date and deadline', () => {
+    const project = createMockProject({ date: '2024-01-15', deadline: '2024-06-30' })
+    expect(formatProjectInfo(project)).toBe('15 Jan 2024 · Due 30 Jun 2024')
+  })
+
+  it('formats project with only date (no deadline)', () => {
+    const project = createMockProject({ date: '2024-01-15', deadline: undefined })
+    expect(formatProjectInfo(project)).toBe('15 Jan 2024')
+  })
+
+  it('formats project with only deadline (empty date)', () => {
+    const project = createMockProject({ date: '', deadline: '2024-06-30' })
+    expect(formatProjectInfo(project)).toBe('Due 30 Jun 2024')
+  })
+
+  it('returns empty string when date and deadline are both absent', () => {
+    const project = createMockProject({ date: '', deadline: undefined })
+    expect(formatProjectInfo(project)).toBe('')
+  })
+})
 
 describe('isOverdue', () => {
   it('returns false when no deadline provided', () => {
@@ -36,6 +58,10 @@ describe('isOverdue', () => {
 
     expect(isOverdue(pastDate)).toBe(true)
     expect(isOverdue(futureDate)).toBe(false)
+  })
+
+  it('returns false for invalid date string', () => {
+    expect(isOverdue('not-a-date')).toBe(false)
   })
 })
 
@@ -120,6 +146,52 @@ describe('sortProjects', () => {
     expect(sorted[0]).toBe(projectA)
     expect(sorted[1]).toBe(projectB)
   })
+
+  it('sorts by status when deadlines are equal', () => {
+    const editing = createMockProject({
+      name: 'A',
+      deadline: '2024-12-31',
+      status: ProjectStatus.Editing,
+    })
+    const importing = createMockProject({
+      name: 'B',
+      deadline: '2024-12-31',
+      status: ProjectStatus.Importing,
+    })
+
+    const sorted = sortProjects([editing, importing])
+
+    expect(sorted[0]).toBe(importing)
+    expect(sorted[1]).toBe(editing)
+  })
+
+  it('sorts New and Archived projects after active statuses when no deadlines', () => {
+    const newProject = createMockProject({ name: 'A', status: ProjectStatus.New })
+    const editing = createMockProject({ name: 'B', status: ProjectStatus.Editing })
+
+    const sorted = sortProjects([newProject, editing])
+
+    expect(sorted[0]).toBe(editing)
+    expect(sorted[1]).toBe(newProject)
+  })
+
+  it('returns empty array for empty input', () => {
+    expect(sortProjects([])).toEqual([])
+  })
+
+  it('returns single project unchanged', () => {
+    const project = createMockProject({ name: 'Solo' })
+    expect(sortProjects([project])).toEqual([project])
+  })
+
+  it('does not mutate the original array', () => {
+    const projectB = createMockProject({ name: 'B' })
+    const projectA = createMockProject({ name: 'A' })
+    const original = [projectB, projectA]
+    sortProjects(original)
+    expect(original[0]).toBe(projectB)
+    expect(original[1]).toBe(projectA)
+  })
 })
 
 describe('sortProjectsByStatus', () => {
@@ -143,5 +215,34 @@ describe('sortProjectsByStatus', () => {
 
     expect(sorted[0]).toBe(projectA)
     expect(sorted[1]).toBe(projectB)
+  })
+
+  it('orders all five statuses correctly', () => {
+    const archived = createMockProject({ name: 'E', status: ProjectStatus.Archived })
+    const delivered = createMockProject({ name: 'D', status: ProjectStatus.Delivered })
+    const editing = createMockProject({ name: 'C', status: ProjectStatus.Editing })
+    const importing = createMockProject({ name: 'B', status: ProjectStatus.Importing })
+    const newProject = createMockProject({ name: 'A', status: ProjectStatus.New })
+
+    const sorted = sortProjectsByStatus([archived, delivered, editing, importing, newProject])
+
+    expect(sorted[0]).toBe(newProject)
+    expect(sorted[1]).toBe(importing)
+    expect(sorted[2]).toBe(editing)
+    expect(sorted[3]).toBe(delivered)
+    expect(sorted[4]).toBe(archived)
+  })
+
+  it('returns empty array for empty input', () => {
+    expect(sortProjectsByStatus([])).toEqual([])
+  })
+
+  it('does not mutate the original array', () => {
+    const projectB = createMockProject({ name: 'B', status: ProjectStatus.Archived })
+    const projectA = createMockProject({ name: 'A', status: ProjectStatus.New })
+    const original = [projectB, projectA]
+    sortProjectsByStatus(original)
+    expect(original[0]).toBe(projectB)
+    expect(original[1]).toBe(projectA)
   })
 })
