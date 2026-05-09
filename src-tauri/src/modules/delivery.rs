@@ -5,6 +5,7 @@
 //! the `delivery-progress` Tauri event.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::DeliveryError;
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
 use serde::{Deserialize, Serialize};
@@ -115,27 +116,25 @@ fn collect_project_files(
     base_path: &Path,
     current_path: &Path,
     files: &mut Vec<ProjectFile>,
-) -> Result<(), String> {
-    for entry in fs::read_dir(current_path).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+) -> Result<(), DeliveryError> {
+    for entry in fs::read_dir(current_path)? {
+        let entry = entry?;
         let path = entry.path();
-        let metadata = entry.metadata().map_err(|e| e.to_string())?;
+        let metadata = entry.metadata()?;
 
         if metadata.is_dir() {
-            // Skip project.json metadata file directory
             if path.file_name().and_then(|n| n.to_str()) == Some("project.json") {
                 continue;
             }
             collect_project_files(base_path, &path, files)?;
         } else if metadata.is_file() {
-            // Skip project.json metadata file
             if path.file_name().and_then(|n| n.to_str()) == Some("project.json") {
                 continue;
             }
 
             let relative_path = path
                 .strip_prefix(base_path)
-                .map_err(|e| e.to_string())?
+                .map_err(|e| DeliveryError::PathError(e.to_string()))?
                 .to_string_lossy()
                 .to_string();
 
@@ -281,7 +280,7 @@ pub async fn start_delivery(
                 }
                 Err(e) => {
                     job.status = DeliveryStatus::Failed;
-                    job.error_message = Some(e);
+                    job.error_message = Some(e.to_string());
                     job.completed_at = Some(get_timestamp());
                 }
             }
@@ -296,10 +295,9 @@ async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
     delivery_queue: Arc<tokio::sync::Mutex<HashMap<String, DeliveryJob>>>,
-) -> Result<(), String> {
-    // Create delivery directory
+) -> Result<(), DeliveryError> {
     let delivery_path = Path::new(&job.delivery_path);
-    fs::create_dir_all(delivery_path).map_err(|e| e.to_string())?;
+    fs::create_dir_all(delivery_path)?;
 
     let start_time = std::time::Instant::now();
     let mut manifest_entries = Vec::new();
@@ -308,11 +306,10 @@ async fn process_delivery(
         let source_path = Path::new(source_file);
         let file_name = source_path
             .file_name()
-            .ok_or("Invalid file name")?
+            .ok_or(DeliveryError::InvalidFileName)?
             .to_string_lossy()
             .to_string();
 
-        // Apply naming template if provided
         let dest_name = job.naming_template.as_ref().map_or_else(
             || file_name.clone(),
             |template| apply_naming_template(template, &file_name, index),
@@ -320,7 +317,7 @@ async fn process_delivery(
 
         let dest_path = delivery_path.join(&dest_name);
 
-        let file_size = fs::metadata(source_path).map_err(|e| e.to_string())?.len();
+        let file_size = fs::metadata(source_path)?.len();
 
         copy_file_with_progress(
             source_path,
@@ -367,7 +364,7 @@ async fn process_delivery(
         manifest_entries.join("\n")
     );
 
-    fs::write(&manifest_path, manifest_content).map_err(|e| e.to_string())?;
+    fs::write(&manifest_path, manifest_content)?;
 
     // Update job with manifest path
     {
@@ -398,14 +395,9 @@ async fn copy_file_with_progress(
     total_bytes: u64,
     start_time: std::time::Instant,
     app_handle: &tauri::AppHandle,
-) -> Result<(), String> {
-    let mut source_file = tokio::fs::File::open(source)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut dest_file = tokio::fs::File::create(dest)
-        .await
-        .map_err(|e| e.to_string())?;
+) -> Result<(), DeliveryError> {
+    let mut source_file = tokio::fs::File::open(source).await?;
+    let mut dest_file = tokio::fs::File::create(dest).await?;
 
     let mut buffer = vec![0_u8; CHUNK_SIZE];
     let file_name = source
@@ -415,19 +407,13 @@ async fn copy_file_with_progress(
         .to_string();
 
     loop {
-        let bytes_read = source_file
-            .read(&mut buffer)
-            .await
-            .map_err(|e| e.to_string())?;
+        let bytes_read = source_file.read(&mut buffer).await?;
 
         if bytes_read == 0 {
             break;
         }
 
-        dest_file
-            .write_all(&buffer[..bytes_read])
-            .await
-            .map_err(|e| e.to_string())?;
+        dest_file.write_all(&buffer[..bytes_read]).await?;
 
         *bytes_transferred += bytes_read as u64;
 
@@ -469,7 +455,7 @@ async fn copy_file_with_progress(
         let _ = app_handle.emit("delivery-progress", &progress);
     }
 
-    dest_file.flush().await.map_err(|e| e.to_string())?;
+    dest_file.flush().await?;
 
     Ok(())
 }

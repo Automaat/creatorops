@@ -4,8 +4,9 @@
 
 use creatorops_lib::{
     cancel_backup_impl, cancel_import_impl, create_archive_impl, create_delivery_impl,
-    get_archive_queue_impl, get_backup_queue_impl, get_delivery_queue_impl, queue_backup_impl,
-    remove_archive_job_impl, remove_backup_job_impl, remove_delivery_job_impl, state::AppState,
+    error::ImportError, get_archive_queue_impl, get_backup_queue_impl, get_delivery_queue_impl,
+    queue_backup_impl, remove_archive_job_impl, remove_backup_job_impl, remove_delivery_job_impl,
+    state::AppState,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -304,7 +305,7 @@ mod file_copy_integration_tests {
 
         let result = cancel_import_impl(&state.import_tokens, "nonexistent-id".to_owned()).await;
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Import not found or already completed");
+        assert!(matches!(result.unwrap_err(), ImportError::NotFound));
     }
 
     #[tokio::test]

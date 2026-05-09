@@ -5,6 +5,7 @@
 //! completion record to `~/CreatorOps/backup_history.json`.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::BackupError;
 use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
 };
@@ -241,7 +242,7 @@ pub async fn start_backup(
                 }
                 Err(e) => {
                     j.status = BackupStatus::Failed;
-                    j.error_message = Some(e);
+                    j.error_message = Some(e.to_string());
                     j.completed_at = Some(get_timestamp());
                 }
             }
@@ -358,19 +359,18 @@ async fn perform_backup(
     window: &tauri::Window,
     job_id: &str,
     job: &BackupJob,
-) -> Result<(usize, usize, u64), String> {
+) -> Result<(usize, usize, u64), BackupError> {
     let src_path = Path::new(&job.source_path);
     let dest_base = Path::new(&job.destination_path);
 
-    // Create destination with project folder name
     let project_folder_name = src_path
         .file_name()
-        .ok_or("Invalid source path")?
+        .ok_or(BackupError::InvalidPath)?
         .to_string_lossy();
     let dest_path = dest_base.join(project_folder_name.as_ref());
 
-    // Collect all files to copy
-    let files_to_copy = collect_files_recursive(src_path)?;
+    let files_to_copy =
+        collect_files_recursive(src_path).map_err(|e| BackupError::CollectFailed(e.to_string()))?;
 
     let total_files = files_to_copy.len();
     let start_time = std::time::Instant::now();
@@ -379,12 +379,13 @@ async fn perform_backup(
     let mut files_skipped = 0;
 
     for (index, src_file) in files_to_copy.iter().enumerate() {
-        let relative_path = src_file.strip_prefix(src_path).map_err(|e| e.to_string())?;
+        let relative_path = src_file
+            .strip_prefix(src_path)
+            .map_err(|e| BackupError::PathError(e.to_string()))?;
         let dest_file = dest_path.join(relative_path);
 
-        // Create parent directory
         if let Some(parent) = dest_file.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            fs::create_dir_all(parent)?;
         }
 
         let file_name = src_file
@@ -446,64 +447,49 @@ async fn perform_backup(
     Ok((files_copied, files_skipped, bytes_transferred))
 }
 
-async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, String> {
+async fn copy_file_with_retry(src: &Path, dest: &Path) -> Result<u64, BackupError> {
     let retry_strategy = ExponentialBackoff::from_millis(10)
         .map(jitter)
         .take(MAX_RETRY_ATTEMPTS);
 
     Retry::spawn(retry_strategy, || async {
-        // Copy file
         let size = copy_file(src, dest).await?;
 
-        // Verify checksum
         match verify_checksum(src, dest).await {
             Ok(true) => Ok(size),
             Ok(false) => {
-                // Checksum mismatch - retry
                 let _ = file_ops::remove_file(dest).await;
-                Err("Checksum verification failed".to_owned())
+                Err(BackupError::ChecksumMismatch)
             }
             Err(e) => {
                 let _ = file_ops::remove_file(dest).await;
-                Err(format!("Checksum calculation failed: {e}"))
+                Err(BackupError::ChecksumFailed(e.to_string()))
             }
         }
     })
     .await
 }
 
-async fn copy_file(src: &Path, dest: &Path) -> Result<u64, String> {
-    let mut src_file = tokio::fs::File::open(src)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let mut dest_file = tokio::fs::File::create(dest)
-        .await
-        .map_err(|e| e.to_string())?;
+async fn copy_file(src: &Path, dest: &Path) -> Result<u64, BackupError> {
+    let mut src_file = tokio::fs::File::open(src).await?;
+    let mut dest_file = tokio::fs::File::create(dest).await?;
 
     let mut buffer = vec![0_u8; CHUNK_SIZE];
     let mut total_bytes = 0_u64;
 
     loop {
-        let bytes_read = src_file
-            .read(&mut buffer)
-            .await
-            .map_err(|e| e.to_string())?;
+        let bytes_read = src_file.read(&mut buffer).await?;
 
         if bytes_read == 0 {
             break;
         }
 
-        dest_file
-            .write_all(&buffer[..bytes_read])
-            .await
-            .map_err(|e| e.to_string())?;
+        dest_file.write_all(&buffer[..bytes_read]).await?;
 
         total_bytes += bytes_read as u64;
     }
 
-    // Ensure all data is written to disk
-    dest_file.sync_all().await.map_err(|e| e.to_string())?;
+    dest_file.sync_all().await?;
 
     Ok(total_bytes)
 }
@@ -513,23 +499,19 @@ lazy_static::lazy_static! {
     static ref HISTORY_MUTEX: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 }
 
-fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
-    // Acquire lock to prevent race conditions when multiple backups complete
+fn save_backup_to_history(job: &BackupJob) -> Result<(), BackupError> {
     let _lock = HISTORY_MUTEX
         .lock()
-        .map_err(|e| format!("Failed to lock history mutex: {e}"))?;
-    let home_dir = get_home_dir()?;
+        .map_err(|e| BackupError::LockFailed(e.to_string()))?;
+    let home_dir = get_home_dir().map_err(|e| BackupError::Config(e.to_string()))?;
     let history_dir = home_dir.join("CreatorOps");
-    fs::create_dir_all(&history_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&history_dir)?;
 
     let history_path = history_dir.join("backup_history.json");
 
     let mut history: Vec<BackupHistory> = if history_path.exists() {
-        let data = fs::read_to_string(&history_path).map_err(|e| e.to_string())?;
-        serde_json::from_str(&data).map_err(|e| {
-            // Failed to deserialize - return empty history
-            e.to_string()
-        })?
+        let data = fs::read_to_string(&history_path)?;
+        serde_json::from_str(&data)?
     } else {
         Vec::new()
     };
@@ -551,13 +533,11 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), String> {
 
     history.push(entry);
 
-    let json_data = serde_json::to_string_pretty(&history).map_err(|e| e.to_string())?;
+    let json_data = serde_json::to_string_pretty(&history)?;
 
-    // Write and sync file to ensure data is persisted immediately
-    let mut file = fs::File::create(&history_path).map_err(|e| e.to_string())?;
-    file.write_all(json_data.as_bytes())
-        .map_err(|e| e.to_string())?;
-    file.sync_all().map_err(|e| e.to_string())?;
+    let mut file = fs::File::create(&history_path)?;
+    file.write_all(json_data.as_bytes())?;
+    file.sync_all()?;
 
     Ok(())
 }

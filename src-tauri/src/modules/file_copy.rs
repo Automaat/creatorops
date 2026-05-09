@@ -6,6 +6,7 @@
 //! exponential back-off; persistent failures are counted as skipped.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::ImportError;
 use crate::utils::file_ops;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -134,11 +135,13 @@ pub async fn copy_files(
         let app_clone = app.clone();
 
         let task = tokio::spawn(async move {
-            let _permit = semaphore_clone.acquire().await.map_err(|e| e.to_string())?;
+            let _permit = semaphore_clone
+                .acquire()
+                .await
+                .map_err(|e| ImportError::SemaphoreError(e.to_string()))?;
 
-            // Check if cancelled before starting work
             if cancel_token_clone.is_cancelled() {
-                return Err("Import cancelled".to_owned());
+                return Err(ImportError::Cancelled);
             }
 
             match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
@@ -148,7 +151,6 @@ pub async fn copy_files(
                     #[allow(clippy::cast_possible_truncation)]
                     total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
 
-                    // Track photo/video counts
                     match file_type {
                         Some("photo") => {
                             photos_copied_clone.fetch_add(1, Ordering::SeqCst);
@@ -159,7 +161,6 @@ pub async fn copy_files(
                         _ => {}
                     }
 
-                    // Emit progress event
                     let _ = app_clone.emit(
                         "import-progress",
                         ImportProgress {
@@ -171,11 +172,8 @@ pub async fn copy_files(
 
                     Ok(())
                 }
+                Err(ImportError::Cancelled) => Err(ImportError::Cancelled),
                 Err(e) => {
-                    if cancel_token_clone.is_cancelled() {
-                        return Err("Import cancelled".to_owned());
-                    }
-                    // Copy failed after retries - track as skipped
                     files_skipped_clone.fetch_add(1, Ordering::SeqCst);
                     skipped_files_clone.lock().await.push(file_name);
                     Err(e)
@@ -186,16 +184,13 @@ pub async fn copy_files(
         tasks.push(task);
     }
 
-    // Wait for all tasks and handle errors
     let mut cancelled = false;
     for result in futures::future::join_all(tasks).await {
-        #[allow(clippy::match_same_arms)] // Different semantics: success vs failure
         match result {
-            Ok(Ok(())) => {} // Success
-            Ok(Err(e)) if e == "Import cancelled" => {
+            Ok(Err(ImportError::Cancelled)) => {
                 cancelled = true;
             }
-            Ok(Err(_)) => {} // File copy failed, already counted as skipped
+            Ok(Ok(()) | Err(_)) => {}
             Err(e) => return Err(format!("Task failed: {e}")),
         }
     }
@@ -236,17 +231,18 @@ async fn copy_file_with_retry(
     src: &Path,
     dest: &Path,
     cancel_token: &CancellationToken,
-) -> Result<u64, String> {
+) -> Result<u64, ImportError> {
     let retry_strategy = ExponentialBackoff::from_millis(10)
         .map(jitter)
         .take(MAX_RETRY_ATTEMPTS);
 
     Retry::spawn(retry_strategy, || async {
         if cancel_token.is_cancelled() {
-            return Err("Import cancelled".to_owned());
+            return Err(ImportError::Cancelled);
         }
-        // Use spawn_blocking for efficient sync file copy (Phase 3 optimization)
-        file_ops::copy_file(src, dest).await
+        file_ops::copy_file(src, dest)
+            .await
+            .map_err(ImportError::CopyFailed)
     })
     .await
 }
@@ -259,10 +255,10 @@ async fn copy_file_with_retry(
 pub async fn cancel_import_impl(
     import_tokens: &crate::state::ImportTokens,
     import_id: String,
-) -> Result<(), String> {
+) -> Result<(), ImportError> {
     let tokens = import_tokens.lock().await;
     tokens.get(&import_id).map_or_else(
-        || Err("Import not found or already completed".to_owned()),
+        || Err(ImportError::NotFound),
         |token| {
             token.cancel();
             Ok(())
@@ -276,7 +272,9 @@ pub async fn cancel_import(
     state: tauri::State<'_, crate::state::AppState>,
     import_id: String,
 ) -> Result<(), String> {
-    cancel_import_impl(&state.import_tokens, import_id).await
+    cancel_import_impl(&state.import_tokens, import_id)
+        .await
+        .map_err(String::from)
 }
 
 #[allow(clippy::wildcard_imports)]
@@ -394,7 +392,7 @@ mod tests {
         let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Import cancelled");
+        assert!(matches!(result.unwrap_err(), ImportError::Cancelled));
     }
 
     #[tokio::test]
@@ -744,7 +742,7 @@ mod tests {
         let result = copy_file_with_retry(&src, &dest, &cancel_token).await;
 
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Import cancelled");
+        assert!(matches!(result.unwrap_err(), ImportError::Cancelled));
     }
 
     #[tokio::test]
