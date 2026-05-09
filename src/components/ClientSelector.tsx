@@ -58,9 +58,10 @@ export function ClientSelector({ value, clientId, onChange, required }: ClientSe
     const val = e.target.value
     setQuery(val)
     setIsOpen(true)
-    // If user clears the field or types something that doesn't match selected client,
-    // clear the clientId association
-    if (!clientId || val !== value) {
+    const exactMatch = clients.find((c) => c.name.toLowerCase() === val.trim().toLowerCase())
+    if (exactMatch) {
+      onChange(exactMatch.name, exactMatch.id)
+    } else {
       onChange(val, null)
     }
   }

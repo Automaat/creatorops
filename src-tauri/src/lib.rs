@@ -31,7 +31,7 @@ use modules::backup::{
 };
 use modules::client::{
     create_client, delete_client, get_client, list_clients, migrate_clients_from_projects,
-    search_clients, update_client, update_client_status,
+    run_client_migration, search_clients, update_client, update_client_status,
 };
 use modules::delivery::{
     create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
@@ -73,6 +73,12 @@ pub fn run() -> AppResult {
     // Initialize database with dependency injection
     let db =
         modules::db::Database::new().map_err(|e| format!("Failed to initialize database: {e}"))?;
+
+    // Link any unlinked projects to client records — idempotent, runs on every startup
+    // so restored databases and new legacy rows are always covered.
+    if let Err(e) = run_client_migration(&db) {
+        log::warn!("Client migration failed: {e}");
+    }
 
     // Initialize application state
     let app_state = state::AppState::default();

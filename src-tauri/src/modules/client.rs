@@ -401,11 +401,9 @@ pub async fn search_clients(
     .map_err(|e| format!("Database error: {e}"))
 }
 
-/// One-time migration: extract unique client names from projects and create client records.
-/// Updates `projects.client_id` to reference the newly created clients.
+/// Link unlinked projects to client records by matching `client_name`.
 /// Safe to call multiple times — skips projects that already have `client_id` set.
-#[tauri::command]
-pub async fn migrate_clients_from_projects(db: tauri::State<'_, Database>) -> Result<(), String> {
+pub fn run_client_migration(db: &Database) -> Result<(), AppError> {
     let now = chrono::Utc::now().to_rfc3339();
 
     db.execute(|conn| {
@@ -447,9 +445,12 @@ pub async fn migrate_clients_from_projects(db: tauri::State<'_, Database>) -> Re
 
         Ok(())
     })
-    .map_err(|e| format!("Migration failed: {e}"))?;
+}
 
-    Ok(())
+/// Tauri command wrapper — delegates to `run_client_migration`.
+#[tauri::command]
+pub async fn migrate_clients_from_projects(db: tauri::State<'_, Database>) -> Result<(), String> {
+    run_client_migration(&db).map_err(|e| format!("Migration failed: {e}"))
 }
 
 #[cfg(test)]

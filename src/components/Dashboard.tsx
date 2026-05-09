@@ -39,20 +39,6 @@ export function Dashboard({ isActive, onProjectClick }: DashboardProps) {
     void loadData()
   }, [loadData])
 
-  // One-time migration: extract clients from existing projects
-  useEffect(() => {
-    const MIGRATION_KEY = 'clients_migrated_v1'
-    if (localStorage.getItem(MIGRATION_KEY)) return
-
-    invoke('migrate_clients_from_projects')
-      .then(() => {
-        localStorage.setItem(MIGRATION_KEY, '1')
-      })
-      .catch((err: unknown) => {
-        console.error('Client migration failed:', err)
-      })
-  }, [])
-
   function getStatusColor(status: string): string {
     switch (status) {
       case 'Importing': {
