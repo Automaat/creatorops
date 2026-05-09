@@ -54,7 +54,7 @@ pub struct OAuthState {
     pub server_port: u16,
 }
 
-#[allow(dead_code)]
+/// Token payload returned by Google OAuth and used by the local token store functions.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TokenData {
@@ -763,7 +763,7 @@ fn decrypt_data(encrypted: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to decrypt data: {e}"))
 }
 
-#[allow(dead_code)]
+/// Persist OAuth tokens to an encrypted file in `~/.creatorops/tokens/`.
 fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), String> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -814,7 +814,7 @@ fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), Strin
     Ok(())
 }
 
-#[allow(dead_code)]
+/// Load OAuth tokens from the encrypted file written by `store_tokens_in_keychain`.
 fn get_tokens_from_keychain(email: &str) -> Result<TokenData, String> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -850,7 +850,7 @@ struct RefreshResponse {
     expires_in: i64,
 }
 
-#[allow(dead_code)]
+/// Exchange a refresh token for a new access token via the Google OAuth endpoint.
 async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> {
     let client_id = std::env::var("GOOGLE_CLIENT_ID")
         .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
@@ -927,7 +927,7 @@ struct UploadProgress {
 
 // Helper Functions
 
-#[allow(dead_code)]
+/// Return the current UTC time as an RFC 3339 string.
 fn get_current_timestamp() -> String {
     Utc::now().to_rfc3339()
 }

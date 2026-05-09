@@ -29,8 +29,11 @@ pub async fn remove_file(path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Remove failed: {e}"))
 }
 
-/// Get file metadata using `spawn_blocking`
-#[allow(dead_code)] // Created for future use in Phase 3
+/// Get file metadata using `spawn_blocking` to avoid blocking the async runtime.
+///
+/// Phase 3 async I/O refactor will adopt this instead of calling `fs::metadata`
+/// directly on the Tokio thread pool.
+#[allow(dead_code)]
 pub async fn metadata(path: &Path) -> Result<std::fs::Metadata, String> {
     let path = path.to_path_buf();
 
@@ -40,8 +43,11 @@ pub async fn metadata(path: &Path) -> Result<std::fs::Metadata, String> {
         .map_err(|e| format!("Metadata failed: {e}"))
 }
 
-/// Create directory using `spawn_blocking`
-#[allow(dead_code)] // Created for future use in Phase 3
+/// Create directories using `spawn_blocking` to avoid blocking the async runtime.
+///
+/// Phase 3 async I/O refactor will adopt this instead of calling `fs::create_dir_all`
+/// directly on the Tokio thread pool.
+#[allow(dead_code)]
 pub async fn create_dir_all(path: &Path) -> Result<(), String> {
     let path = path.to_path_buf();
 

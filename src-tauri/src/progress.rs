@@ -2,17 +2,23 @@
 use serde::Serialize;
 use tauri::{Emitter, Window};
 
-/// Progress reporter trait for operations with progress tracking
-#[allow(dead_code)] // Created for future use in Phase 3
+/// Progress reporter trait for operations with progress tracking.
+///
+/// Phase 3 will adopt this to replace the duplicated `window.emit` calls in
+/// `backup.rs` and `delivery.rs` with a single injectable abstraction.
+#[allow(dead_code)]
 pub trait ProgressReporter: Send + Sync {
     fn report(&self, update: ProgressUpdate);
     fn report_error(&self, error: &str);
 }
 
-/// Standard progress update structure
+/// Standard progress update structure.
+///
+/// Phase 3 will replace the ad-hoc progress payloads in backup and delivery with
+/// this unified type so the frontend can handle a single event schema.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // Created for future use in Phase 3
+#[allow(dead_code)]
 pub struct ProgressUpdate {
     pub job_id: String,
     pub current: usize,
@@ -24,15 +30,20 @@ pub struct ProgressUpdate {
     pub eta_seconds: Option<u64>,
 }
 
-/// Tauri-based progress reporter (emits events to frontend)
-#[allow(dead_code)] // Created for future use in Phase 3
+/// Tauri-based progress reporter that emits events to the frontend.
+///
+/// Concrete `ProgressReporter` for Tauri. Phase 3 will wire this into backup and
+/// delivery to replace their inline `window.emit` call sites.
+#[allow(dead_code)]
 pub struct TauriProgressReporter {
     window: Window,
     event_name: String,
     job_id: String,
 }
 
-#[allow(dead_code)] // Created for future use in Phase 3
+// Phase 3: unused until `TauriProgressReporter` replaces inline emit calls in
+// backup and delivery modules.
+#[allow(dead_code)]
 impl TauriProgressReporter {
     pub const fn new(window: Window, event_name: String, job_id: String) -> Self {
         Self {

@@ -380,6 +380,13 @@ async fn process_delivery(
     Ok(())
 }
 
+/// Copy a single file and emit live progress events to the frontend.
+///
+/// Argument count exceeds the lint default because progress tracking requires
+/// independent counters (`current_file`, `total_files`), a shared byte accumulator
+/// (`bytes_transferred`), a total for percentage (`total_bytes`), `start_time` for
+/// speed and ETA, and `app_handle` for event emission. Callers already own each value
+/// independently so grouping them into a struct would not reduce coupling.
 #[allow(clippy::too_many_arguments)]
 async fn copy_file_with_progress(
     source: &Path,
