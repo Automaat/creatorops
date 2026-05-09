@@ -1,29 +1,10 @@
-/* eslint-disable react-refresh/only-export-components */
 import type { ReactNode } from 'react'
-import { createContext, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
+
+import type { Notification, NotificationType } from './notification-context'
+import { NotificationContext } from './notification-context'
 
 const DEFAULT_NOTIFICATION_DURATION = 5000
-
-export type NotificationType = 'success' | 'error' | 'warning' | 'info'
-
-export interface Notification {
-  id: string
-  type: NotificationType
-  message: string
-  duration?: number
-}
-
-interface NotificationContextType {
-  notifications: Notification[]
-  addNotification: (type: NotificationType, message: string, duration?: number) => void
-  removeNotification: (id: string) => void
-  success: (message: string, duration?: number) => void
-  error: (message: string, duration?: number) => void
-  warning: (message: string, duration?: number) => void
-  info: (message: string, duration?: number) => void
-}
-
-export const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])

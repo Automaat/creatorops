@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -28,7 +28,115 @@ export function Settings() {
   )
   const [connectingDrive, setConnectingDrive] = useState(false)
 
+  const loadDriveAccount = useCallback(async () => {
+    try {
+      const account = await invoke<GoogleDriveAccount | null>('get_google_drive_account')
+      setDriveAccount(account)
+    } catch (error) {
+      console.error('Failed to load Google Drive account:', error)
+    }
+  }, [])
+
   useEffect(() => {
+    function loadDestinations() {
+      try {
+        const stored = localStorage.getItem('backup_destinations')
+        if (stored) {
+          const parsed: unknown = JSON.parse(stored)
+          if (
+            Array.isArray(parsed) &&
+            parsed.every(
+              (item): item is BackupDestination =>
+                typeof item === 'object' &&
+                item !== null &&
+                'id' in item &&
+                'name' in item &&
+                'path' in item
+            )
+          ) {
+            setDestinations(parsed)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load destinations:', error)
+      }
+    }
+
+    function loadDeliveryDestinations() {
+      try {
+        const stored = localStorage.getItem('delivery_destinations')
+        if (stored) {
+          const parsed: unknown = JSON.parse(stored)
+          const migrated = migrateDeliveryDestinations(parsed)
+          localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+          setDeliveryDestinations(migrated)
+        }
+      } catch (error) {
+        console.error('Failed to load delivery destinations:', error)
+      }
+    }
+
+    function loadDefaultImportLocation() {
+      try {
+        const stored = localStorage.getItem('default_import_location')
+        if (stored) {
+          setDefaultImportLocation(stored)
+        }
+      } catch (error) {
+        console.error('Failed to load default import location:', error)
+      }
+    }
+
+    function loadArchiveLocation() {
+      try {
+        const stored = localStorage.getItem('archive_location')
+        if (stored) {
+          setArchiveLocation(stored)
+        }
+      } catch (error) {
+        console.error('Failed to load archive location:', error)
+      }
+    }
+
+    function loadTemplates() {
+      try {
+        const storedFolderTemplate = localStorage.getItem('folder_template')
+        const storedFileTemplate = localStorage.getItem('file_rename_template')
+        if (storedFolderTemplate) {
+          setFolderTemplate(storedFolderTemplate)
+        }
+        if (storedFileTemplate) {
+          setFileRenameTemplate(storedFileTemplate)
+        }
+      } catch (error) {
+        console.error('Failed to load templates:', error)
+        showError('Failed to load template settings')
+      }
+    }
+
+    function loadAutoEject() {
+      try {
+        const stored = localStorage.getItem('auto_eject')
+        if (stored) {
+          setAutoEject(stored === 'true')
+        }
+      } catch (error) {
+        console.error('Failed to load auto-eject setting:', error)
+        showError('Failed to load auto-eject setting')
+      }
+    }
+
+    function loadDriveConflictMode() {
+      try {
+        const stored = localStorage.getItem('drive_conflict_mode')
+        if (stored && (stored === 'overwrite' || stored === 'rename' || stored === 'skip')) {
+          setDriveConflictMode(stored)
+        }
+      } catch (error) {
+        console.error('Failed to load conflict mode:', error)
+      }
+    }
+
     loadDestinations()
     loadDeliveryDestinations()
     loadDefaultImportLocation()
@@ -37,32 +145,7 @@ export function Settings() {
     loadAutoEject()
     loadDriveAccount().catch(console.error)
     loadDriveConflictMode()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function loadDestinations() {
-    try {
-      const stored = localStorage.getItem('backup_destinations')
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored)
-        if (
-          Array.isArray(parsed) &&
-          parsed.every(
-            (item): item is BackupDestination =>
-              typeof item === 'object' &&
-              item !== null &&
-              'id' in item &&
-              'name' in item &&
-              'path' in item
-          )
-        ) {
-          setDestinations(parsed)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load destinations:', error)
-    }
-  }
+  }, [loadDriveAccount, showError])
 
   function saveDestinations(dests: BackupDestination[]) {
     localStorage.setItem('backup_destinations', JSON.stringify(dests))
@@ -105,42 +188,6 @@ export function Settings() {
 
   function removeDestination(id: string) {
     saveDestinations(destinations.filter((d) => d.id !== id))
-  }
-
-  function loadDeliveryDestinations() {
-    try {
-      const stored = localStorage.getItem('delivery_destinations')
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored)
-        const migrated = migrateDeliveryDestinations(parsed)
-        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
-        setDeliveryDestinations(migrated)
-      }
-    } catch (error) {
-      console.error('Failed to load delivery destinations:', error)
-    }
-  }
-
-  function loadDefaultImportLocation() {
-    try {
-      const stored = localStorage.getItem('default_import_location')
-      if (stored) {
-        setDefaultImportLocation(stored)
-      }
-    } catch (error) {
-      console.error('Failed to load default import location:', error)
-    }
-  }
-
-  function loadArchiveLocation() {
-    try {
-      const stored = localStorage.getItem('archive_location')
-      if (stored) {
-        setArchiveLocation(stored)
-      }
-    } catch (error) {
-      console.error('Failed to load archive location:', error)
-    }
   }
 
   function saveDeliveryDestinations(dests: DeliveryDestination[]) {
@@ -212,34 +259,6 @@ export function Settings() {
     await selectStorageLocation('archive_location', setArchiveLocation)
   }
 
-  function loadTemplates() {
-    try {
-      const storedFolderTemplate = localStorage.getItem('folder_template')
-      const storedFileTemplate = localStorage.getItem('file_rename_template')
-      if (storedFolderTemplate) {
-        setFolderTemplate(storedFolderTemplate)
-      }
-      if (storedFileTemplate) {
-        setFileRenameTemplate(storedFileTemplate)
-      }
-    } catch (error) {
-      console.error('Failed to load templates:', error)
-      showError('Failed to load template settings')
-    }
-  }
-
-  function loadAutoEject() {
-    try {
-      const stored = localStorage.getItem('auto_eject')
-      if (stored) {
-        setAutoEject(stored === 'true')
-      }
-    } catch (error) {
-      console.error('Failed to load auto-eject setting:', error)
-      showError('Failed to load auto-eject setting')
-    }
-  }
-
   function saveFolderTemplate(template: string) {
     localStorage.setItem('folder_template', template)
     setFolderTemplate(template)
@@ -259,26 +278,6 @@ export function Settings() {
   function resetTemplates() {
     saveFolderTemplate(DEFAULT_FOLDER_TEMPLATE)
     saveFileRenameTemplate(DEFAULT_FILE_TEMPLATE)
-  }
-
-  async function loadDriveAccount() {
-    try {
-      const account = await invoke<GoogleDriveAccount | null>('get_google_drive_account')
-      setDriveAccount(account)
-    } catch (error) {
-      console.error('Failed to load Google Drive account:', error)
-    }
-  }
-
-  function loadDriveConflictMode() {
-    try {
-      const stored = localStorage.getItem('drive_conflict_mode')
-      if (stored && (stored === 'overwrite' || stored === 'rename' || stored === 'skip')) {
-        setDriveConflictMode(stored)
-      }
-    } catch (error) {
-      console.error('Failed to load conflict mode:', error)
-    }
   }
 
   function saveDriveConflictMode(mode: 'overwrite' | 'rename' | 'skip') {

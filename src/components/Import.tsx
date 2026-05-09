@@ -23,8 +23,7 @@ export function Import({ sdCards, isScanning, onImportComplete }: ImportProps) {
     if (activeCardPath && !sdCards.some((card) => card.path === activeCardPath)) {
       setActiveCardPath(undefined)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sdCards.length, activeCardPath])
+  }, [sdCards, activeCardPath])
 
   // Handle clicks outside the list to collapse active card
   useEffect(() => {
