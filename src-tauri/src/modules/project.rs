@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use uuid::Uuid;
 
+use crate::error::AppError;
 use crate::modules::db::Database;
 use crate::modules::file_utils::get_home_dir;
 
@@ -251,7 +252,7 @@ pub async fn update_project_status(
     .map_err(|e| format!("Failed to update project status: {e}"))?;
 
     // Fetch and return updated project
-    get_project_by_id(&db, &project_id)
+    get_project_by_id(&db, &project_id).map_err(String::from)
 }
 
 /// Update a project's delivery deadline (pass `None` or empty string to clear).
@@ -275,20 +276,23 @@ pub async fn update_project_deadline(
     .map_err(|e| format!("Failed to update project deadline: {e}"))?;
 
     // Fetch and return updated project
-    get_project_by_id(&db, &project_id)
+    get_project_by_id(&db, &project_id).map_err(String::from)
 }
 
 /// Helper function to get project by ID
-fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, String> {
+fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, AppError> {
     db.execute(|conn| {
         let mut stmt = conn
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
 
-        let project = stmt.query_row(params![project_id], map_project_row)?;
-
-        Ok(project)
+        stmt.query_row(params![project_id], map_project_row).map_err(|e| {
+            if e == rusqlite::Error::QueryReturnedNoRows {
+                AppError::ProjectNotFound { id: project_id.to_owned() }
+            } else {
+                AppError::from(e)
+            }
+        })
     })
-    .map_err(|e| format!("Database error: {e}"))
 }
 
 /// Fetch a single project by ID.
@@ -297,7 +301,7 @@ pub async fn get_project(
     db: tauri::State<'_, Database>,
     project_id: String,
 ) -> Result<Project, String> {
-    get_project_by_id(&db, &project_id)
+    get_project_by_id(&db, &project_id).map_err(String::from)
 }
 
 #[allow(clippy::wildcard_imports)]

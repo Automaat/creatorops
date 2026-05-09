@@ -4,6 +4,7 @@
 //! resolution (cross-platform), and timestamp helpers.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::AppError;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,16 +13,14 @@ use tokio::io::AsyncReadExt;
 const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
 /// Calculate SHA-256 hash of a file
-pub async fn calculate_file_hash(path: &Path) -> Result<String, String> {
-    let mut file = tokio::fs::File::open(path)
-        .await
-        .map_err(|e| e.to_string())?;
+pub async fn calculate_file_hash(path: &Path) -> Result<String, AppError> {
+    let mut file = tokio::fs::File::open(path).await?;
 
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; CHUNK_SIZE];
 
     loop {
-        let bytes_read = file.read(&mut buffer).await.map_err(|e| e.to_string())?;
+        let bytes_read = file.read(&mut buffer).await?;
 
         if bytes_read == 0 {
             break;
@@ -34,21 +33,21 @@ pub async fn calculate_file_hash(path: &Path) -> Result<String, String> {
 }
 
 /// Verify file integrity using SHA-256 checksum
-pub async fn verify_checksum(src: &Path, dest: &Path) -> Result<bool, String> {
+pub async fn verify_checksum(src: &Path, dest: &Path) -> Result<bool, AppError> {
     let src_hash = calculate_file_hash(src).await?;
     let dest_hash = calculate_file_hash(dest).await?;
     Ok(src_hash == dest_hash)
 }
 
 /// Recursively collect all files in a directory
-pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
+pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, AppError> {
     let mut files = Vec::new();
 
     if path.is_file() {
         files.push(path.to_path_buf());
     } else if path.is_dir() {
-        for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
             let entry_path = entry.path();
 
             if entry_path.is_file() {
@@ -64,7 +63,7 @@ pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 /// Count files and calculate total size in bytes under a directory path.
-type FileSizeResult = Result<(usize, u64), String>;
+type FileSizeResult = Result<(usize, u64), AppError>;
 
 pub fn count_files_and_size(path: &str) -> FileSizeResult {
     let files = collect_files_recursive(Path::new(path))?;
@@ -80,13 +79,13 @@ pub fn count_files_and_size(path: &str) -> FileSizeResult {
 }
 
 /// Get home directory (cross-platform)
-pub fn get_home_dir() -> Result<PathBuf, String> {
+pub fn get_home_dir() -> Result<PathBuf, AppError> {
     #[cfg(unix)]
     {
         std::env::var_os("HOME")
             .and_then(|h| if h.is_empty() { None } else { Some(h) })
             .map(PathBuf::from)
-            .ok_or_else(|| "Failed to get home directory".to_owned())
+            .ok_or_else(|| AppError::Config("Failed to get home directory".to_owned()))
     }
 
     #[cfg(windows)]
@@ -104,12 +103,14 @@ pub fn get_home_dir() -> Result<PathBuf, String> {
             })
             .and_then(|h| if h.is_empty() { None } else { Some(h) })
             .map(PathBuf::from)
-            .ok_or_else(|| "Failed to get home directory".to_owned())
+            .ok_or_else(|| AppError::Config("Failed to get home directory".to_owned()))
     }
 
     #[cfg(not(any(unix, windows)))]
     {
-        Err("Unsupported platform for home directory detection".to_owned())
+        Err(AppError::Config(
+            "Unsupported platform for home directory detection".to_owned(),
+        ))
     }
 }
 
