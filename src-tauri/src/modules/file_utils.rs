@@ -1,3 +1,8 @@
+//! Shared file-system utilities used across multiple modules.
+//!
+//! Provides SHA-256 hashing, recursive directory traversal, home-directory
+//! resolution (cross-platform), and timestamp helpers.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -58,7 +63,7 @@ pub fn collect_files_recursive(path: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-/// Count files and calculate total size
+/// Count files and calculate total size in bytes under a directory path.
 type FileSizeResult = Result<(usize, u64), String>;
 
 pub fn count_files_and_size(path: &str) -> FileSizeResult {
@@ -117,6 +122,7 @@ pub fn get_timestamp() -> String {
         .to_string()
 }
 
+/// Expose the home directory path to the frontend as a string.
 #[tauri::command]
 pub fn get_home_directory() -> Result<String, String> {
     get_home_dir()?

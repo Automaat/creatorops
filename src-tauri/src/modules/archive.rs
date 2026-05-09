@@ -1,3 +1,9 @@
+//! Archive module for moving completed projects to long-term storage.
+//!
+//! Provides job queue management and background processing for archiving project
+//! directories. Supports optional compression (planned) and emits progress events
+//! via Tauri for real-time UI updates.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
 use serde::{Deserialize, Serialize};
@@ -9,6 +15,7 @@ use tauri::Emitter;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
+/// Represents a queued or running archive operation for a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveJob {
@@ -30,6 +37,7 @@ pub struct ArchiveJob {
     pub error_message: Option<String>,
 }
 
+/// Lifecycle state of an archive job.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ArchiveStatus {
@@ -39,6 +47,7 @@ pub enum ArchiveStatus {
     Failed,
 }
 
+/// Per-file progress payload emitted as the `archive-progress` Tauri event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveProgress {

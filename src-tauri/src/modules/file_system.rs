@@ -1,3 +1,9 @@
+//! File-system integration for opening project folders in external applications.
+//!
+//! Provides Tauri commands for revealing files in the OS file manager and
+//! launching third-party editors (Lightroom, `AfterShoot`, `DaVinci` Resolve,
+//! Final Cut Pro). All launch calls are fire-and-forget background processes.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use std::process::Command;
 
@@ -106,6 +112,7 @@ fn open_in_external_app(
     Ok(())
 }
 
+/// Reveal a file or folder in the OS file manager (Finder / Explorer / xdg-open).
 #[tauri::command]
 pub fn reveal_in_finder(path: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -142,6 +149,7 @@ pub fn reveal_in_finder(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Open the project's `RAW/Photos` folder in Adobe Lightroom Classic.
 #[tauri::command]
 pub fn open_in_lightroom(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -152,6 +160,7 @@ pub fn open_in_lightroom(path: &str) -> Result<(), String> {
     open_in_external_app(path, "Photos", "Adobe Lightroom Classic", paths, None)
 }
 
+/// Open the project's `RAW/Photos` folder in `AfterShoot`.
 #[tauri::command]
 pub fn open_in_aftershoot(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -162,6 +171,7 @@ pub fn open_in_aftershoot(path: &str) -> Result<(), String> {
     open_in_external_app(path, "Photos", "AfterShoot", paths, None)
 }
 
+/// Open the project's `RAW/Videos` folder in `DaVinci` Resolve.
 #[tauri::command]
 pub fn open_in_davinci_resolve(path: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -178,6 +188,7 @@ pub fn open_in_davinci_resolve(path: &str) -> Result<(), String> {
     )
 }
 
+/// Open the project's `RAW/Videos` folder in Final Cut Pro (macOS only).
 #[tauri::command]
 pub fn open_in_final_cut_pro(path: &str) -> Result<(), String> {
     open_in_external_app(

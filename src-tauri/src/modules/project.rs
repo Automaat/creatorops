@@ -1,3 +1,9 @@
+//! Project management module — CRUD for photography projects.
+//!
+//! Each project maps to a folder under `~/CreatorOps/Projects/` with the
+//! structure `YYYY-MM-DD_ClientName[_ShootType]/{RAW,Selects,Delivery}`.
+//! Project metadata is persisted in `SQLite` via the `Database` wrapper.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 #![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 use rusqlite::params;
@@ -8,6 +14,7 @@ use uuid::Uuid;
 use crate::modules::db::Database;
 use crate::modules::file_utils::get_home_dir;
 
+/// Core project entity stored in `SQLite` and serialised to the frontend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
@@ -24,6 +31,7 @@ pub struct Project {
     pub deadline: Option<String>,
 }
 
+/// Workflow stage of a project from creation through archiving.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub enum ProjectStatus {
@@ -62,6 +70,7 @@ impl std::str::FromStr for ProjectStatus {
     }
 }
 
+/// Strip spaces and non-alphanumeric characters for safe folder name components.
 fn sanitize_path_component(s: &str) -> String {
     s.split_whitespace()
         .collect::<Vec<&str>>()
@@ -96,6 +105,7 @@ fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
     })
 }
 
+/// Create a new project, building its folder structure and inserting the DB record.
 #[tauri::command]
 pub async fn create_project(
     db: tauri::State<'_, Database>,
@@ -168,6 +178,7 @@ pub async fn create_project(
     Ok(project)
 }
 
+/// List all projects ordered by most recently updated.
 #[tauri::command]
 pub async fn list_projects(db: tauri::State<'_, Database>) -> Result<Vec<Project>, String> {
     db.execute(|conn| {
@@ -189,6 +200,7 @@ pub async fn refresh_projects(db: tauri::State<'_, Database>) -> Result<Vec<Proj
     list_projects(db).await
 }
 
+/// Delete a project: remove its folder from disk then delete the DB record.
 #[tauri::command]
 pub async fn delete_project(
     db: tauri::State<'_, Database>,
@@ -219,6 +231,7 @@ pub async fn delete_project(
     Ok(())
 }
 
+/// Update a project's workflow status and return the updated record.
 #[tauri::command]
 pub async fn update_project_status(
     db: tauri::State<'_, Database>,
@@ -241,6 +254,7 @@ pub async fn update_project_status(
     get_project_by_id(&db, &project_id)
 }
 
+/// Update a project's delivery deadline (pass `None` or empty string to clear).
 #[tauri::command]
 pub async fn update_project_deadline(
     db: tauri::State<'_, Database>,
@@ -277,6 +291,7 @@ fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, String>
     .map_err(|e| format!("Database error: {e}"))
 }
 
+/// Fetch a single project by ID.
 #[tauri::command]
 pub async fn get_project(
     db: tauri::State<'_, Database>,

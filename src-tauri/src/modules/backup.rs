@@ -1,3 +1,9 @@
+//! Backup module for copying project media to external drives.
+//!
+//! Manages an in-memory job queue, performs chunked file copies with SHA-256
+//! checksum verification and exponential-backoff retries, and persists a
+//! completion record to `~/CreatorOps/backup_history.json`.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
@@ -17,6 +23,7 @@ use uuid::Uuid;
 const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 const MAX_RETRY_ATTEMPTS: usize = 3;
 
+/// Represents a queued or running backup operation for a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupJob {
@@ -39,6 +46,7 @@ pub struct BackupJob {
     pub error_message: Option<String>,
 }
 
+/// Lifecycle state of a backup job.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BackupStatus {
@@ -49,6 +57,7 @@ pub enum BackupStatus {
     Cancelled,
 }
 
+/// Per-file progress payload emitted as the `backup-progress` Tauri event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupProgress {
@@ -62,6 +71,7 @@ pub struct BackupProgress {
     pub eta: u64,
 }
 
+/// Completed backup record persisted to `~/CreatorOps/backup_history.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackupHistory {
@@ -127,6 +137,7 @@ pub async fn queue_backup_impl(
     Ok(job)
 }
 
+/// Queue a backup job for the given project source and destination.
 #[tauri::command]
 pub async fn queue_backup(
     state: tauri::State<'_, crate::state::AppState>,
