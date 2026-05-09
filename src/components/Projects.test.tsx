@@ -1282,7 +1282,10 @@ describe('projects', () => {
   })
 
   describe('import Dialog', () => {
-    const setupProjectDetail = (project: Project, extraInvokes?: (cmd: string) => Promise<unknown> | undefined) => {
+    const setupProjectDetail = (
+      project: Project,
+      extraInvokes?: (cmd: string) => Promise<unknown> | undefined
+    ) => {
       mockInvoke.mockImplementation((cmd: string) => {
         if (cmd === 'get_project') return Promise.resolve(project)
         if (cmd === 'get_project_import_history') return Promise.resolve([])
