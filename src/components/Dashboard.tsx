@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { ProjectStatus } from '../types'
 import type { Project } from '../types'
@@ -8,11 +8,16 @@ import { useNotification } from '../hooks/useNotification'
 import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
+  isActive?: boolean
   onProjectClick?: (projectId: string) => void
 }
 
-export function Dashboard({ onProjectClick }: DashboardProps) {
+export function Dashboard({ isActive, onProjectClick }: DashboardProps) {
   const { error: showError } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateProject, setShowCreateProject] = useState(false)
@@ -28,7 +33,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       setProjects(projectList)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
-      showError('Failed to load dashboard data')
+      if (isActiveRef.current) showError('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }

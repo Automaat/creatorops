@@ -13,8 +13,16 @@ import type {
   ProjectFile,
 } from '../types'
 
-export function Delivery() {
+interface DeliveryProps {
+  isActive?: boolean
+}
+
+export function Delivery({ isActive }: DeliveryProps) {
   const { error: showError, success: showSuccess } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>()
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
@@ -127,7 +135,7 @@ export function Delivery() {
       setProjects(sortedProjects)
     } catch (error) {
       console.error('Failed to load projects:', error)
-      showError('Failed to load projects')
+      if (isActiveRef.current) showError('Failed to load projects')
     } finally {
       setLoading(false)
     }
@@ -155,7 +163,7 @@ export function Delivery() {
       }
     } catch (error) {
       console.error('Failed to load destinations:', error)
-      showError('Failed to load destinations')
+      if (isActiveRef.current) showError('Failed to load destinations')
     }
   }
 
@@ -165,7 +173,7 @@ export function Delivery() {
       setDeliveryJobs(queue)
     } catch (error) {
       console.error('Failed to load delivery queue:', error)
-      showError('Failed to load delivery queue')
+      if (isActiveRef.current) showError('Failed to load delivery queue')
     }
   }
 

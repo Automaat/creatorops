@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes, formatETA, formatSpeed } from '../utils/formatting'
@@ -7,8 +7,17 @@ import type { BackupJob, BackupProgress } from '../types'
 
 const QUEUE_REFRESH_INTERVAL = 30_000
 
-export function BackupQueue() {
+interface BackupQueueProps {
+  isActive?: boolean
+}
+
+export function BackupQueue({ isActive }: BackupQueueProps) {
   const { error: showError } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
+  const hasShownQueueError = useRef(false)
   const [jobs, setJobs] = useState<BackupJob[]>([])
   const [progress, setProgress] = useState<Map<string, BackupProgress>>(new Map())
 
@@ -37,9 +46,13 @@ export function BackupQueue() {
     try {
       const data = await invoke<BackupJob[]>('get_backup_queue')
       setJobs(data)
+      hasShownQueueError.current = false
     } catch (error) {
       console.error('Failed to load backup queue:', error)
-      showError('Failed to load backup queue')
+      if (isActiveRef.current && !hasShownQueueError.current) {
+        showError('Failed to load backup queue')
+        hasShownQueueError.current = true
+      }
     }
   }
 

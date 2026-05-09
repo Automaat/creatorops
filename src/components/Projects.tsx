@@ -19,10 +19,11 @@ import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
   initialSelectedProjectId?: string | null
+  isActive?: boolean
   onBackFromProject?: () => void
 }
 
-export function Projects({ initialSelectedProjectId, onBackFromProject }: ProjectsProps) {
+export function Projects({ initialSelectedProjectId, isActive, onBackFromProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>()
@@ -44,6 +45,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
   const { error: showError } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
 
   const replaceHomeWithTilde = (path: string): string => {
     if (!homeDir) {
@@ -80,7 +85,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       return data
     } catch (error) {
       console.error('Failed to load projects:', error)
-      showError('Failed to load projects')
+      if (isActiveRef.current) showError('Failed to load projects')
       return []
     } finally {
       setLoading(false)
@@ -100,7 +105,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       setHomeDir(dir)
     } catch (error) {
       console.error('Failed to load home directory:', error)
-      showError('Failed to load home directory')
+      if (isActiveRef.current) showError('Failed to load home directory')
     }
   }
 

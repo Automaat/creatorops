@@ -188,7 +188,7 @@ function App() {
         projectsCount={projectsCount}
       >
         <ViewWrapper isActive={currentView === 'dashboard'} name="Dashboard">
-          <Dashboard onProjectClick={handleNavigateToProject} />
+          <Dashboard isActive={currentView === 'dashboard'} onProjectClick={handleNavigateToProject} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'import'} name="Import">
           <Import
@@ -201,20 +201,21 @@ function App() {
           <Projects
             key={`${selectedProjectId ?? 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
+            isActive={currentView === 'projects'}
             onBackFromProject={handleBackFromProject}
           />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'backup'} name="Backup Queue">
-          <BackupQueue />
+          <BackupQueue isActive={currentView === 'backup'} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'delivery'} name="Delivery">
-          <Delivery />
+          <Delivery isActive={currentView === 'delivery'} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'history'} name="History">
           <History />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'settings'} name="Settings">
-          <Settings />
+          <Settings isActive={currentView === 'settings'} />
         </ViewWrapper>
       </Layout>
       <NotificationToast />

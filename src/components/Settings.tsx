@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -10,9 +10,17 @@ import type { BackupDestination, DeliveryDestination, GoogleDriveAccount } from 
 const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
 const DEFAULT_FILE_TEMPLATE = '{original}'
 
-export function Settings() {
+interface SettingsProps {
+  isActive?: boolean
+}
+
+export function Settings({ isActive }: SettingsProps) {
   const { theme, setTheme } = useTheme()
   const { error: showError, success: showSuccess, warning: showWarning } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
@@ -34,7 +42,7 @@ export function Settings() {
       setDriveAccount(account)
     } catch (error) {
       console.error('Failed to load Google Drive account:', error)
-      showError('Failed to load Google Drive account')
+      if (isActiveRef.current) showError('Failed to load Google Drive account')
     }
   }, [showError])
 
@@ -60,7 +68,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load destinations:', error)
-        showError('Failed to load destinations')
+        if (isActiveRef.current) showError('Failed to load destinations')
       }
     }
 
@@ -75,7 +83,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load delivery destinations:', error)
-        showError('Failed to load delivery destinations')
+        if (isActiveRef.current) showError('Failed to load delivery destinations')
       }
     }
 
@@ -87,7 +95,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load default import location:', error)
-        showError('Failed to load default import location')
+        if (isActiveRef.current) showError('Failed to load default import location')
       }
     }
 
@@ -99,7 +107,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load archive location:', error)
-        showError('Failed to load archive location')
+        if (isActiveRef.current) showError('Failed to load archive location')
       }
     }
 
@@ -115,7 +123,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load templates:', error)
-        showError('Failed to load template settings')
+        if (isActiveRef.current) showError('Failed to load template settings')
       }
     }
 
@@ -127,7 +135,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load auto-eject setting:', error)
-        showError('Failed to load auto-eject setting')
+        if (isActiveRef.current) showError('Failed to load auto-eject setting')
       }
     }
 
@@ -139,7 +147,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load conflict mode:', error)
-        showError('Failed to load drive conflict mode')
+        if (isActiveRef.current) showError('Failed to load drive conflict mode')
       }
     }
 
