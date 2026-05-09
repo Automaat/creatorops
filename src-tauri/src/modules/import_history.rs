@@ -1,3 +1,9 @@
+//! Import history module for persisting SD card import records.
+//!
+//! Saves completed import metadata to `~/CreatorOps/import_history.json`
+//! and provides query commands for the full history or a single project's
+//! history. At most 100 records are kept; older entries are pruned on write.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
@@ -5,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 use uuid::Uuid;
 
+/// Record of a completed SD card import operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportHistory {
@@ -24,6 +31,7 @@ pub struct ImportHistory {
     pub error_message: Option<String>,
 }
 
+/// Outcome of an import: all copied, some skipped, or fully failed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ImportStatus {
@@ -32,6 +40,7 @@ pub enum ImportStatus {
     Failed,
 }
 
+/// Record a completed import and persist it to the history file.
 #[tauri::command(rename_all = "camelCase")]
 #[allow(clippy::too_many_arguments)]
 pub async fn save_import_history(
@@ -91,6 +100,7 @@ pub async fn save_import_history(
     Ok(history)
 }
 
+/// Return recent import history, newest first. Defaults to 50 records.
 #[tauri::command]
 pub async fn get_import_history(limit: Option<usize>) -> Result<Vec<ImportHistory>, String> {
     let histories = load_all_histories()?;
@@ -98,6 +108,7 @@ pub async fn get_import_history(limit: Option<usize>) -> Result<Vec<ImportHistor
     Ok(histories.into_iter().take(limit).collect())
 }
 
+/// Return all import history records for a specific project.
 #[tauri::command]
 pub async fn get_project_import_history(project_id: String) -> Result<Vec<ImportHistory>, String> {
     let histories = load_all_histories()?;

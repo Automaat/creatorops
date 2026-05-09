@@ -1,3 +1,10 @@
+//! Google Drive integration for uploading delivered project files.
+//!
+//! Implements the OAuth 2.0 PKCE flow: starts a temporary local HTTP server to
+//! receive the redirect, exchanges the authorisation code for tokens, and stores
+//! credentials in the `SQLite` database. Uploaded files are placed in a
+//! user-configurable parent folder on Google Drive.
+
 #![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
@@ -23,6 +30,7 @@ const HTTP_TIMEOUT_SECONDS: u64 = 60; // HTTP client timeout
 
 // Data Structures
 
+/// Persisted Google Drive account credentials and configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoogleDriveAccount {
     pub id: String,
@@ -34,6 +42,7 @@ pub struct GoogleDriveAccount {
     pub last_authenticated: String,
 }
 
+/// Returned to the frontend to initiate the OAuth browser flow.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthState {
@@ -300,6 +309,7 @@ async fn get_user_info(access_token: &str) -> Result<UserInfo, String> {
 
 // OAuth Tauri Commands
 
+/// Begin the Google Drive OAuth 2.0 PKCE flow and return the auth URL and callback port.
 #[tauri::command]
 pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     // 1. Generate PKCE challenge
@@ -390,6 +400,7 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
     })
 }
 
+/// Wait for the OAuth callback, exchange the code for tokens, and persist the account.
 #[tauri::command]
 #[allow(clippy::too_many_lines)]
 pub async fn complete_google_drive_auth(
@@ -536,6 +547,7 @@ pub async fn complete_google_drive_auth(
     Ok(account)
 }
 
+/// Retrieve the stored Google Drive account, refreshing tokens if nearly expired.
 #[tauri::command]
 pub async fn get_google_drive_account(
     db: tauri::State<'_, Database>,
@@ -565,6 +577,7 @@ pub async fn get_google_drive_account(
     .map_err(|e| format!("Failed to get account: {e}"))
 }
 
+/// Update the Google Drive parent folder used as the upload root.
 #[tauri::command]
 pub async fn set_drive_parent_folder(
     db: tauri::State<'_, Database>,
@@ -588,6 +601,7 @@ pub async fn set_drive_parent_folder(
     )
 }
 
+/// Remove the stored Google Drive account and revoke its keychain credentials.
 #[tauri::command]
 pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Result<(), String> {
     // First get the email to remove from keychain
@@ -616,6 +630,7 @@ pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Resu
     Ok(())
 }
 
+/// Verify the stored Google Drive account can reach the API (connectivity check).
 #[tauri::command]
 pub async fn test_google_drive_connection(db: tauri::State<'_, Database>) -> Result<(), String> {
     let account = get_google_drive_account(db)
@@ -1281,6 +1296,7 @@ async fn upload_file_to_drive(
 
 // Upload Tauri Commands
 
+/// Upload a set of files from a delivery path to Google Drive, emitting progress events.
 #[tauri::command]
 #[allow(clippy::too_many_lines)]
 pub async fn upload_to_google_drive(

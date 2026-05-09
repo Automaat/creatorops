@@ -1,3 +1,10 @@
+//! SD card import module for copying media files to the active project.
+//!
+//! Routes files into `Photos/` or `Videos/` subdirectories based on extension,
+//! runs up to `MAX_CONCURRENT_COPIES` parallel tasks, and supports cancellation
+//! via a per-import `CancellationToken`. Failed copies are retried with
+//! exponential back-off; persistent failures are counted as skipped.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::utils::file_ops;
 use serde::{Deserialize, Serialize};
@@ -14,13 +21,13 @@ use tokio_util::sync::CancellationToken;
 const MAX_RETRY_ATTEMPTS: usize = 3;
 const MAX_CONCURRENT_COPIES: usize = 4; // Parallel file copies
 
-// Photo extensions
+/// File extensions recognised as still-image formats.
 const PHOTO_EXTENSIONS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "raw", "cr2", "nef", "arw", "dng", "orf",
     "rw2", "pef", "srw", "heic", "heif", "webp",
 ];
 
-// Video extensions
+/// File extensions recognised as video formats.
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v", "mpg", "mpeg", "3gp", "mts", "m2ts",
 ];
@@ -37,6 +44,7 @@ fn get_file_type(path: &Path) -> Option<&'static str> {
     }
 }
 
+/// Summary returned to the frontend after an import operation completes or is cancelled.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopyResult {
@@ -50,6 +58,7 @@ pub struct CopyResult {
     pub videos_copied: usize,
 }
 
+/// Per-file progress payload emitted as the `import-progress` Tauri event.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportProgress {

@@ -1,3 +1,8 @@
+//! Application modules for `CreatorOps`.
+//!
+//! Each module handles a distinct domain: project management, media import,
+//! backup, delivery, archiving, and external integrations.
+
 pub mod archive;
 pub mod backup;
 pub mod db;

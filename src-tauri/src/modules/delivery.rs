@@ -1,3 +1,9 @@
+//! Delivery module for copying selected project files to a client handoff folder.
+//!
+//! Supports optional naming templates (`{index}`, `{name}`, `{ext}`) and generates
+//! a `delivery_manifest.txt` summarising the operation. Progress is emitted as
+//! the `delivery-progress` Tauri event.
+
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
@@ -12,6 +18,7 @@ use uuid::Uuid;
 
 const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
+/// Represents a queued or running delivery operation for a set of project files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeliveryJob {
@@ -33,6 +40,7 @@ pub struct DeliveryJob {
     pub manifest_path: Option<String>,
 }
 
+/// Lifecycle state of a delivery job.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DeliveryStatus {
@@ -42,6 +50,7 @@ pub enum DeliveryStatus {
     Failed,
 }
 
+/// Per-file progress payload emitted as the `delivery-progress` Tauri event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeliveryProgress {
@@ -55,6 +64,7 @@ pub struct DeliveryProgress {
     pub eta: u64,
 }
 
+/// Metadata for a single file within a project directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectFile {
@@ -211,7 +221,7 @@ pub async fn create_delivery_impl(
     Ok(job)
 }
 
-/// Create a delivery job
+/// Create a delivery job from a set of selected project files.
 #[tauri::command]
 pub async fn create_delivery(
     state: tauri::State<'_, crate::state::AppState>,
