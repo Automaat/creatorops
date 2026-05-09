@@ -79,16 +79,19 @@ export function Delivery({ isActive }: DeliveryProps) {
     }
   }, [showError])
 
-  const loadProjectFiles = useCallback(async (projectId: string) => {
-    try {
-      const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
-      setProjectFiles(files)
-      setSelectedFiles(new Set())
-    } catch (error) {
-      console.error('Failed to load project files:', error)
-      showError('Failed to load project files')
-    }
-  }, [showError])
+  const loadProjectFiles = useCallback(
+    async (projectId: string) => {
+      try {
+        const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
+        setProjectFiles(files)
+        setSelectedFiles(new Set())
+      } catch (error) {
+        console.error('Failed to load project files:', error)
+        showError('Failed to load project files')
+      }
+    },
+    [showError]
+  )
 
   useEffect(() => {
     void loadProjects()

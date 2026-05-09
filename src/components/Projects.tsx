@@ -139,15 +139,18 @@ export function Projects({ initialSelectedProjectId, isActive, onBackFromProject
     }
   }, [showError])
 
-  const loadProjectImportHistory = useCallback(async (projectId: string) => {
-    try {
-      const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
-      setImportHistory(history)
-    } catch (error) {
-      console.error('Failed to load import history:', error)
-      showError('Failed to load import history')
-    }
-  }, [showError])
+  const loadProjectImportHistory = useCallback(
+    async (projectId: string) => {
+      try {
+        const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
+        setImportHistory(history)
+      } catch (error) {
+        console.error('Failed to load import history:', error)
+        showError('Failed to load import history')
+      }
+    },
+    [showError]
+  )
 
   useEffect(() => {
     void loadProjects()
