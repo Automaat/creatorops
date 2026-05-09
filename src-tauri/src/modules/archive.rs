@@ -4,13 +4,10 @@
 //! directories. Supports optional compression (planned) and emits progress events
 //! via Tauri for real-time UI updates.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::modules::file_utils::{count_files_and_size, get_timestamp};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 use tauri::Emitter;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -181,11 +178,10 @@ pub async fn start_archive(
     Ok(())
 }
 
-#[allow(clippy::type_complexity)]
 async fn process_archive(
     mut job: ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
+    archive_queue: crate::state::ArchiveQueue,
 ) -> Result<(), String> {
     let source_path_str = job.source_path.clone();
     let archive_path_str = job.archive_path.clone();
@@ -203,20 +199,19 @@ async fn process_archive(
         archive_path,
         &mut job,
         app_handle,
-        archive_queue,
+        &archive_queue,
     )
     .await?;
 
     Ok(())
 }
 
-#[allow(clippy::type_complexity, clippy::needless_pass_by_value)]
 async fn move_directory_recursive(
     source: &Path,
     dest: &Path,
     job: &mut ArchiveJob,
     app_handle: &tauri::AppHandle,
-    archive_queue: Arc<tokio::sync::Mutex<HashMap<String, ArchiveJob>>>,
+    archive_queue: &crate::state::ArchiveQueue,
 ) -> Result<(), String> {
     // Create destination directory
     fs::create_dir_all(dest).map_err(|e| e.to_string())?;
@@ -317,7 +312,6 @@ pub async fn remove_archive_job(
     remove_archive_job_impl(&state.archive_queue, job_id).await
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -696,13 +690,8 @@ mod tests {
             bytes_transferred: 512_000,
             total_bytes: 1_024_000,
         };
-
-        // Safe cast: small test values well within f64 mantissa precision
-        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert!((progress_percent - 50.0).abs() < f64::EPSILON);
-
-        #[allow(clippy::cast_precision_loss)]
         let bytes_percent =
             (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
         assert!((bytes_percent - 50.0).abs() < f64::EPSILON);

@@ -4,7 +4,6 @@
 //! launching third-party editors (Lightroom, `AfterShoot`, `DaVinci` Resolve,
 //! Final Cut Pro). All launch calls are fire-and-forget background processes.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::AppError;
 use std::process::Command;
 
@@ -209,7 +208,6 @@ pub fn open_in_final_cut_pro(path: &str) -> Result<(), String> {
     .map_err(String::from)
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

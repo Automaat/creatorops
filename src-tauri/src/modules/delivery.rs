@@ -4,15 +4,12 @@
 //! a `delivery_manifest.txt` summarising the operation. Progress is emitted as
 //! the `delivery-progress` Tauri event.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::DeliveryError;
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use crate::modules::project::Project;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tauri::Emitter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
@@ -290,11 +287,10 @@ pub async fn start_delivery(
     Ok(())
 }
 
-#[allow(clippy::type_complexity)]
 async fn process_delivery(
     mut job: DeliveryJob,
     app_handle: tauri::AppHandle,
-    delivery_queue: Arc<tokio::sync::Mutex<HashMap<String, DeliveryJob>>>,
+    delivery_queue: crate::state::DeliveryQueue,
 ) -> Result<(), DeliveryError> {
     let delivery_path = Path::new(&job.delivery_path);
     fs::create_dir_all(delivery_path)?;
@@ -419,8 +415,6 @@ async fn copy_file_with_progress(
 
         // Calculate speed and ETA
         let elapsed = start_time.elapsed().as_secs_f64();
-        // Safe cast: bytes_transferred used for progress display, precision loss acceptable
-        #[allow(clippy::cast_precision_loss)]
         let speed = if elapsed > 0.0 {
             *bytes_transferred as f64 / elapsed
         } else {
@@ -428,13 +422,7 @@ async fn copy_file_with_progress(
         };
 
         let remaining_bytes = total_bytes.saturating_sub(*bytes_transferred);
-        #[allow(
-            clippy::cast_precision_loss,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss
-        )]
         let eta = if speed > 0.0 {
-            // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64
         } else {
             0
@@ -460,6 +448,10 @@ async fn copy_file_with_progress(
     Ok(())
 }
 
+const PLACEHOLDER_INDEX: &str = "{index}";
+const PLACEHOLDER_NAME: &str = "{name}";
+const PLACEHOLDER_EXT: &str = "{ext}";
+
 fn apply_naming_template(template: &str, original_name: &str, index: usize) -> String {
     // Simple template replacement
     // Supports: {index}, {name}, {ext}
@@ -468,13 +460,10 @@ fn apply_naming_template(template: &str, original_name: &str, index: usize) -> S
     let ext = path.extension().unwrap_or_default().to_string_lossy();
     let index_str = format!("{:03}", index + 1);
 
-    #[allow(clippy::literal_string_with_formatting_args)] // Template placeholders, not format args
-    {
-        template
-            .replace("{index}", &index_str)
-            .replace("{name}", &name_without_ext)
-            .replace("{ext}", &ext)
-    }
+    template
+        .replace(PLACEHOLDER_INDEX, &index_str)
+        .replace(PLACEHOLDER_NAME, &name_without_ext)
+        .replace(PLACEHOLDER_EXT, &ext)
 }
 
 /// Core logic for getting delivery queue (testable)
@@ -519,7 +508,6 @@ pub async fn remove_delivery_job(
     remove_delivery_job_impl(&state.delivery_queue, job_id).await
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -868,9 +856,6 @@ mod tests {
             speed: 102_400.0,
             eta: 7,
         };
-
-        // Safe cast: small test values well within f64 mantissa precision
-        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert!((progress_percent - 30.0).abs() < f64::EPSILON);
     }

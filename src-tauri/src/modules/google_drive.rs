@@ -7,8 +7,6 @@
 //! files under `~/.creatorops/google_tokens_*.enc` (owner-only permissions, 0o600).
 //! Uploaded files are placed in a user-configurable parent folder on Google Drive.
 
-#![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
-
 use crate::error::GoogleDriveError;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{DateTime, Utc};
@@ -412,7 +410,6 @@ pub async fn start_google_drive_auth() -> Result<OAuthState, String> {
 
 /// Wait for the OAuth callback, exchange the code for tokens, and persist the account.
 #[tauri::command]
-#[allow(clippy::too_many_lines)]
 pub async fn complete_google_drive_auth(
     db: tauri::State<'_, Database>,
 ) -> Result<GoogleDriveAccount, String> {
@@ -691,8 +688,7 @@ fn get_token_file_path(email: &str) -> Result<String, GoogleDriveError> {
 }
 
 /// Generate a machine-specific encryption key
-#[allow(clippy::unnecessary_wraps)]
-fn get_encryption_key() -> Result<[u8; 32], GoogleDriveError> {
+fn get_encryption_key() -> [u8; 32] {
     use sha2::{Digest, Sha256};
 
     // Combine multiple machine-specific values for the key
@@ -719,7 +715,7 @@ fn get_encryption_key() -> Result<[u8; 32], GoogleDriveError> {
     let result = hasher.finalize();
     let mut key = [0_u8; 32];
     key.copy_from_slice(&result);
-    Ok(key)
+    key
 }
 
 /// Encrypt data using AES-256-GCM for secure token storage
@@ -793,7 +789,7 @@ fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), Googl
     let token_json = serde_json::to_string(&tokens)
         .map_err(|e| GoogleDriveError::InvalidData(format!("Failed to serialize tokens: {e}")))?;
 
-    let key = get_encryption_key()?;
+    let key = get_encryption_key();
     let encrypted = encrypt_data(token_json.as_bytes(), &key)?;
     let encoded = general_purpose::STANDARD.encode(&encrypted);
 
@@ -832,7 +828,7 @@ fn get_tokens_from_keychain(email: &str) -> Result<TokenData, GoogleDriveError> 
     let encrypted = general_purpose::STANDARD
         .decode(&encoded)
         .map_err(|e| GoogleDriveError::InvalidData(format!("Failed to decode token data: {e}")))?;
-    let key = get_encryption_key()?;
+    let key = get_encryption_key();
     let decrypted = decrypt_data(&encrypted, &key)?;
     let token_json = String::from_utf8(decrypted).map_err(|e| {
         GoogleDriveError::InvalidData(format!("Failed to decode decrypted data: {e}"))
@@ -1085,7 +1081,6 @@ fn generate_unique_filename(base_name: &str, extension: &str, attempt: u32) -> S
 
 /// Upload single file to Google Drive with progress tracking using REST API
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_lines)]
 async fn upload_file_to_drive(
     email: &str,
     file_path: &str,
@@ -1301,7 +1296,6 @@ async fn upload_file_to_drive(
 
 /// Upload a set of files from a delivery path to Google Drive, emitting progress events.
 #[tauri::command]
-#[allow(clippy::too_many_lines)]
 pub async fn upload_to_google_drive(
     window: tauri::Window,
     db: tauri::State<'_, Database>,
@@ -2560,20 +2554,20 @@ mod tests {
     #[test]
     fn test_encryption_key_consistency() {
         // The encryption key should be consistent for the same machine
-        let key1 = get_encryption_key().unwrap();
-        let key2 = get_encryption_key().unwrap();
+        let key1 = get_encryption_key();
+        let key2 = get_encryption_key();
         assert_eq!(key1, key2, "Encryption key should be consistent");
     }
 
     #[test]
     fn test_encryption_key_length() {
-        let key = get_encryption_key().unwrap();
+        let key = get_encryption_key();
         assert_eq!(key.len(), 32, "Encryption key must be 32 bytes for AES-256");
     }
 
     #[test]
     fn test_encrypt_decrypt_empty_data() {
-        let key = get_encryption_key().unwrap();
+        let key = get_encryption_key();
         let data = b"";
 
         let encrypted = encrypt_data(data, &key).unwrap();
@@ -2588,7 +2582,7 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_large_data() {
-        let key = get_encryption_key().unwrap();
+        let key = get_encryption_key();
         let data = vec![42_u8; 10000]; // 10KB of data
 
         let encrypted = encrypt_data(&data, &key).unwrap();
@@ -2676,7 +2670,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::significant_drop_tightening)]
     fn test_concurrent_token_storage() {
         use std::sync::Arc;
         use std::sync::Mutex;
@@ -2708,13 +2701,11 @@ mod tests {
             handle.join().unwrap();
         }
 
-        {
+        let all_succeeded = {
             let all_results = results.lock().unwrap();
-            assert!(
-                all_results.iter().all(|&r| r),
-                "All concurrent stores should succeed"
-            );
-        } // Drop the lock guard here
+            all_results.iter().all(|&r| r)
+        };
+        assert!(all_succeeded, "All concurrent stores should succeed");
 
         // Verify we can still read tokens
         let final_tokens = get_tokens_from_keychain(&email);

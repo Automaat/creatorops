@@ -4,7 +4,6 @@
 //! checksum verification and exponential-backoff retries, and persists a
 //! completion record to `~/CreatorOps/backup_history.json`.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::BackupError;
 use crate::modules::file_utils::{
     collect_files_recursive, count_files_and_size, get_home_dir, get_timestamp, verify_checksum,
@@ -410,7 +409,6 @@ async fn perform_backup(
         let elapsed = start_time.elapsed().as_secs_f64();
         // Safe cast: bytes_transferred and remaining_bytes used for progress calculation
         // Precision loss acceptable for display purposes
-        #[allow(clippy::cast_precision_loss)]
         let speed = if elapsed > 0.0 {
             bytes_transferred as f64 / elapsed
         } else {
@@ -418,13 +416,7 @@ async fn perform_backup(
         };
 
         let remaining_bytes = job.total_bytes - bytes_transferred;
-        #[allow(
-            clippy::cast_precision_loss,
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss
-        )]
         let eta = if speed > 0.0 {
-            // Safe: ETA calculation for display, truncation acceptable
             (remaining_bytes as f64 / speed) as u64
         } else {
             0
@@ -542,7 +534,6 @@ fn save_backup_to_history(job: &BackupJob) -> Result<(), BackupError> {
     Ok(())
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -966,13 +957,8 @@ mod tests {
             speed: 128_000.0,
             eta: 6,
         };
-
-        // Safe cast: small test values well within f64 mantissa precision
-        #[allow(clippy::cast_precision_loss)]
         let progress_percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert!((progress_percent - 25.0).abs() < f64::EPSILON);
-
-        #[allow(clippy::cast_precision_loss)]
         let bytes_percent =
             (progress.bytes_transferred as f64 / progress.total_bytes as f64) * 100.0;
         assert!((bytes_percent - 25.0).abs() < f64::EPSILON);
@@ -1498,9 +1484,6 @@ mod tests {
         assert_eq!(progress.bytes_transferred, 512);
         assert_eq!(progress.total_bytes, 1024);
         assert!((progress.speed - 100.5).abs() < f64::EPSILON);
-
-        // Safe cast: small test values well within f64 mantissa precision
-        #[allow(clippy::cast_precision_loss)]
         let percent = (progress.current_file as f64 / progress.total_files as f64) * 100.0;
         assert!((percent - 50.0).abs() < f64::EPSILON);
     }
