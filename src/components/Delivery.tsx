@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes } from '../utils/formatting'
@@ -13,8 +13,16 @@ import type {
   ProjectFile,
 } from '../types'
 
-export function Delivery() {
+interface DeliveryProps {
+  isActive?: boolean
+}
+
+export function Delivery({ isActive }: DeliveryProps) {
   const { error: showError, success: showSuccess } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>()
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([])
@@ -32,10 +40,63 @@ export function Delivery() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  const loadProjects = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await invoke<Project[]>('list_projects')
+      const sortedProjects = sortProjectsByStatus(data)
+      setProjects(sortedProjects)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      if (isActiveRef.current) showError('Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }, [showError])
+
+  const loadDestinations = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('delivery_destinations')
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored)
+        const migrated = migrateDeliveryDestinations(parsed)
+        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+        setDestinations(migrated)
+      }
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
+      if (isActiveRef.current) showError('Failed to load destinations')
+    }
+  }, [showError])
+
+  const loadDeliveryQueue = useCallback(async () => {
+    try {
+      const queue = await invoke<DeliveryJob[]>('get_delivery_queue')
+      setDeliveryJobs(queue)
+    } catch (error) {
+      console.error('Failed to load delivery queue:', error)
+      if (isActiveRef.current) showError('Failed to load delivery queue')
+    }
+  }, [showError])
+
+  const loadProjectFiles = useCallback(
+    async (projectId: string) => {
+      try {
+        const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
+        setProjectFiles(files)
+        setSelectedFiles(new Set())
+      } catch (error) {
+        console.error('Failed to load project files:', error)
+        showError('Failed to load project files')
+      }
+    },
+    [showError]
+  )
+
   useEffect(() => {
-    loadProjects().catch(console.error)
+    void loadProjects()
     loadDestinations()
-    loadDeliveryQueue().catch(console.error)
+    void loadDeliveryQueue()
 
     const unlistenDelivery = listen<DeliveryProgress>('delivery-progress', (event) => {
       const progress = event.payload
@@ -71,13 +132,13 @@ export function Delivery() {
       void unlistenDelivery.then((fn) => fn()).catch(() => {})
       void unlistenDrive.then((fn) => fn()).catch(() => {})
     }
-  }, [])
+  }, [loadProjects, loadDestinations, loadDeliveryQueue])
 
   useEffect(() => {
     if (selectedProject) {
       void loadProjectFiles(selectedProject.id)
     }
-  }, [selectedProject])
+  }, [selectedProject, loadProjectFiles])
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -116,52 +177,6 @@ export function Delivery() {
         top: rect.bottom + 8,
         width: rect.width,
       })
-    }
-  }
-
-  async function loadProjects() {
-    try {
-      setLoading(true)
-      const data = await invoke<Project[]>('list_projects')
-      const sortedProjects = sortProjectsByStatus(data)
-      setProjects(sortedProjects)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadProjectFiles(projectId: string) {
-    try {
-      const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
-      setProjectFiles(files)
-      setSelectedFiles(new Set())
-    } catch (error) {
-      console.error('Failed to load project files:', error)
-    }
-  }
-
-  function loadDestinations() {
-    try {
-      const stored = localStorage.getItem('delivery_destinations')
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored)
-        const migrated = migrateDeliveryDestinations(parsed)
-        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
-        setDestinations(migrated)
-      }
-    } catch (error) {
-      console.error('Failed to load destinations:', error)
-    }
-  }
-
-  async function loadDeliveryQueue() {
-    try {
-      const queue = await invoke<DeliveryJob[]>('get_delivery_queue')
-      setDeliveryJobs(queue)
-    } catch (error) {
-      console.error('Failed to load delivery queue:', error)
     }
   }
 
@@ -215,6 +230,7 @@ export function Delivery() {
       setDeliveryJobs((prev) => [...prev, job])
     } catch (error) {
       console.error('Failed to create delivery:', error)
+      showError('Failed to create delivery')
     }
   }
 
@@ -224,6 +240,7 @@ export function Delivery() {
       setDeliveryJobs((prev) => prev.filter((j) => j.id !== jobId))
     } catch (error) {
       console.error('Failed to remove job:', error)
+      showError('Failed to remove job')
     }
   }
 

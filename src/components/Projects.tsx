@@ -19,10 +19,11 @@ import folderIcon from '../assets/icons/dir_selected.png'
 
 interface ProjectsProps {
   initialSelectedProjectId?: string | null
+  isActive?: boolean
   onBackFromProject?: () => void
 }
 
-export function Projects({ initialSelectedProjectId, onBackFromProject }: ProjectsProps) {
+export function Projects({ initialSelectedProjectId, isActive, onBackFromProject }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [selectedProject, setSelectedProject] = useState<Project | null>()
@@ -44,6 +45,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   const containerRef = useRef<HTMLDivElement>(null)
   const { sdCards, isScanning } = useSDCardScanner()
   const { error: showError } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
 
   const replaceHomeWithTilde = (path: string): string => {
     if (!homeDir) {
@@ -80,27 +85,79 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       return data
     } catch (error) {
       console.error('Failed to load projects:', error)
+      if (isActiveRef.current) showError('Failed to load projects')
       return []
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showError])
 
-  useEffect(() => {
-    loadProjects().catch(console.error)
-    loadDestinations()
-    loadArchiveLocation()
-    loadHomeDirectory().catch(console.error)
-  }, [loadProjects])
-
-  async function loadHomeDirectory() {
+  const loadHomeDirectory = useCallback(async () => {
     try {
       const dir = await invoke<string>('get_home_directory')
       setHomeDir(dir)
     } catch (error) {
       console.error('Failed to load home directory:', error)
+      if (isActiveRef.current) showError('Failed to load home directory')
     }
-  }
+  }, [showError])
+
+  const loadDestinations = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('backup_destinations')
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored)
+        if (
+          Array.isArray(parsed) &&
+          parsed.every(
+            (item): item is BackupDestination =>
+              typeof item === 'object' &&
+              item !== null &&
+              'id' in item &&
+              'name' in item &&
+              'path' in item
+          )
+        ) {
+          setDestinations(parsed)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
+      showError('Failed to load destinations')
+    }
+  }, [showError])
+
+  const loadArchiveLocation = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('archive_location')
+      if (stored) {
+        setArchiveLocation(stored)
+      }
+    } catch (error) {
+      console.error('Failed to load archive location:', error)
+      showError('Failed to load archive location')
+    }
+  }, [showError])
+
+  const loadProjectImportHistory = useCallback(
+    async (projectId: string) => {
+      try {
+        const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
+        setImportHistory(history)
+      } catch (error) {
+        console.error('Failed to load import history:', error)
+        showError('Failed to load import history')
+      }
+    },
+    [showError]
+  )
+
+  useEffect(() => {
+    void loadProjects()
+    loadDestinations()
+    loadArchiveLocation()
+    void loadHomeDirectory()
+  }, [loadProjects, loadDestinations, loadArchiveLocation, loadHomeDirectory])
 
   // Handle initial project selection from navigation
   useEffect(() => {
@@ -114,12 +171,13 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         })
         .catch((error: unknown) => {
           console.error('Failed to load project:', error)
+          showError('Failed to load project')
         })
     } else {
       // Clear selection when navigating to projects list
       setSelectedProject(undefined)
     }
-  }, [initialSelectedProjectId])
+  }, [initialSelectedProjectId, showError])
 
   // Load import history when project is selected and scroll to top
   useEffect(() => {
@@ -127,7 +185,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       void loadProjectImportHistory(selectedProject.id)
       scrollToTop()
     }
-  }, [selectedProject, scrollToTop])
+  }, [selectedProject, scrollToTop, loadProjectImportHistory])
 
   const handleBackToList = useCallback(() => {
     // If internal selection (clicked from Projects list), just clear selection
@@ -172,50 +230,6 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedProject])
 
-  function loadDestinations() {
-    try {
-      const stored = localStorage.getItem('backup_destinations')
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored)
-        if (
-          Array.isArray(parsed) &&
-          parsed.every(
-            (item): item is BackupDestination =>
-              typeof item === 'object' &&
-              item !== null &&
-              'id' in item &&
-              'name' in item &&
-              'path' in item
-          )
-        ) {
-          setDestinations(parsed)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load destinations:', error)
-    }
-  }
-
-  function loadArchiveLocation() {
-    try {
-      const stored = localStorage.getItem('archive_location')
-      if (stored) {
-        setArchiveLocation(stored)
-      }
-    } catch (error) {
-      console.error('Failed to load archive location:', error)
-    }
-  }
-
-  async function loadProjectImportHistory(projectId: string) {
-    try {
-      const history = await invoke<ImportHistory[]>('get_project_import_history', { projectId })
-      setImportHistory(history)
-    } catch (error) {
-      console.error('Failed to load import history:', error)
-    }
-  }
-
   async function queueBackup(project: Project, destination: BackupDestination) {
     try {
       await invoke('queue_backup', {
@@ -228,6 +242,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       })
     } catch (error) {
       console.error('Failed to queue backup:', error)
+      showError('Failed to queue backup')
     }
   }
 
@@ -441,6 +456,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       }
     } catch (error) {
       console.error('Import failed:', error)
+      showError('Import failed')
       setImportResult(createEmptyResult(String(error)))
 
       try {
@@ -459,6 +475,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         })
       } catch (error) {
         console.error('Failed to save import history:', error)
+        showError('Failed to save import history')
       }
     } finally {
       setIsImporting(false)
@@ -475,6 +492,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       await invoke('cancel_import', { importId })
     } catch (error) {
       console.error('Failed to cancel import:', error)
+      showError('Failed to cancel import')
     }
   }
 

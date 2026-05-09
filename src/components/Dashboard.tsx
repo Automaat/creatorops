@@ -1,35 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { ProjectStatus } from '../types'
 import type { Project } from '../types'
 import { isOverdue, sortProjects } from '../utils/project'
 import { formatDisplayDate } from '../utils/formatting'
+import { useNotification } from '../hooks/useNotification'
 import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
+  isActive?: boolean
   onProjectClick?: (projectId: string) => void
 }
 
-export function Dashboard({ onProjectClick }: DashboardProps) {
+export function Dashboard({ isActive, onProjectClick }: DashboardProps) {
+  const { error: showError } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateProject, setShowCreateProject] = useState(false)
 
-  useEffect(() => {
-    void loadData()
-  }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true)
       const projectList = await invoke<Project[]>('list_projects')
       setProjects(projectList)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
+      if (isActiveRef.current) showError('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
-  }
+  }, [showError])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   function getStatusColor(status: string): string {
     switch (status) {

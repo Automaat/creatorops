@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -15,6 +15,7 @@ import { NotificationToast } from './components/NotificationToast'
 import { Projects } from './components/Projects'
 import { Settings } from './components/Settings'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useNotification } from './hooks/useNotification'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 import { useTheme } from './hooks/useTheme'
 import type { Project } from './types'
@@ -53,22 +54,25 @@ function App() {
   const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
   const [projectsResetKey, setProjectsResetKey] = useState<number>(0)
 
+  const { error: showError } = useNotification()
+
   // Apply theme on app load
   useTheme()
 
   // Load and refresh project count for badge
-  const loadProjectCount = async () => {
+  const loadProjectCount = useCallback(async () => {
     try {
       const projects = await invoke<Project[]>('list_projects')
       setProjectsCount(projects.length)
     } catch (error) {
       console.error('Failed to load project count:', error)
+      showError('Failed to load project count')
     }
-  }
+  }, [showError])
 
   useEffect(() => {
     void loadProjectCount()
-  }, [])
+  }, [loadProjectCount])
 
   // Global SD card scanner - runs in background across all pages
   const { sdCards, isScanning, scanForSDCards } = useSDCardScanner({
@@ -184,7 +188,10 @@ function App() {
         projectsCount={projectsCount}
       >
         <ViewWrapper isActive={currentView === 'dashboard'} name="Dashboard">
-          <Dashboard onProjectClick={handleNavigateToProject} />
+          <Dashboard
+            isActive={currentView === 'dashboard'}
+            onProjectClick={handleNavigateToProject}
+          />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'import'} name="Import">
           <Import
@@ -197,20 +204,21 @@ function App() {
           <Projects
             key={`${selectedProjectId ?? 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
+            isActive={currentView === 'projects'}
             onBackFromProject={handleBackFromProject}
           />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'backup'} name="Backup Queue">
-          <BackupQueue />
+          <BackupQueue isActive={currentView === 'backup'} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'delivery'} name="Delivery">
-          <Delivery />
+          <Delivery isActive={currentView === 'delivery'} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'history'} name="History">
           <History />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'settings'} name="Settings">
-          <Settings />
+          <Settings isActive={currentView === 'settings'} />
         </ViewWrapper>
       </Layout>
       <NotificationToast />

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { Settings } from './Settings'
 import { NotificationProvider } from '../contexts/NotificationContext'
+import { NotificationToast } from './NotificationToast'
 import { open } from '@tauri-apps/plugin-dialog'
 
 // Mock Tauri API
@@ -79,12 +80,12 @@ describe('settings', () => {
   })
 
   it('does not add destination with empty name', async () => {
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const user = userEvent.setup()
 
     render(
       <NotificationProvider>
         <Settings />
+        <NotificationToast />
       </NotificationProvider>
     )
 
@@ -92,8 +93,9 @@ describe('settings', () => {
     await user.click(addButton)
 
     expect(mockOpen).not.toHaveBeenCalled()
-    expect(consoleWarn).toHaveBeenCalledWith('Destination name is required')
-    consoleWarn.mockRestore()
+    await waitFor(() => {
+      expect(screen.getByText('Destination name is required')).toBeTruthy()
+    })
   })
 
   it('toggles backup destination', async () => {

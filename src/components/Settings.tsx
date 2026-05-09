@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -10,9 +10,17 @@ import type { BackupDestination, DeliveryDestination, GoogleDriveAccount } from 
 const DEFAULT_FOLDER_TEMPLATE = '{YYYY}-{MM}-{DD}_{ClientName}_{Type}'
 const DEFAULT_FILE_TEMPLATE = '{original}'
 
-export function Settings() {
+interface SettingsProps {
+  isActive?: boolean
+}
+
+export function Settings({ isActive }: SettingsProps) {
   const { theme, setTheme } = useTheme()
-  const { error: showError, success: showSuccess } = useNotification()
+  const { error: showError, success: showSuccess, warning: showWarning } = useNotification()
+  const isActiveRef = useRef(isActive ?? false)
+  useEffect(() => {
+    isActiveRef.current = isActive ?? false
+  }, [isActive])
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
@@ -34,8 +42,9 @@ export function Settings() {
       setDriveAccount(account)
     } catch (error) {
       console.error('Failed to load Google Drive account:', error)
+      if (isActiveRef.current) showError('Failed to load Google Drive account')
     }
-  }, [])
+  }, [showError])
 
   useEffect(() => {
     function loadDestinations() {
@@ -59,6 +68,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load destinations:', error)
+        if (isActiveRef.current) showError('Failed to load destinations')
       }
     }
 
@@ -73,6 +83,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load delivery destinations:', error)
+        if (isActiveRef.current) showError('Failed to load delivery destinations')
       }
     }
 
@@ -84,6 +95,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load default import location:', error)
+        if (isActiveRef.current) showError('Failed to load default import location')
       }
     }
 
@@ -95,6 +107,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load archive location:', error)
+        if (isActiveRef.current) showError('Failed to load archive location')
       }
     }
 
@@ -110,7 +123,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load templates:', error)
-        showError('Failed to load template settings')
+        if (isActiveRef.current) showError('Failed to load template settings')
       }
     }
 
@@ -122,7 +135,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load auto-eject setting:', error)
-        showError('Failed to load auto-eject setting')
+        if (isActiveRef.current) showError('Failed to load auto-eject setting')
       }
     }
 
@@ -134,6 +147,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load conflict mode:', error)
+        if (isActiveRef.current) showError('Failed to load drive conflict mode')
       }
     }
 
@@ -143,7 +157,7 @@ export function Settings() {
     loadArchiveLocation()
     loadTemplates()
     loadAutoEject()
-    loadDriveAccount().catch(console.error)
+    void loadDriveAccount()
     loadDriveConflictMode()
   }, [loadDriveAccount, showError])
 
@@ -154,7 +168,7 @@ export function Settings() {
 
   async function addDestination() {
     if (!newDestName.trim()) {
-      console.warn('Destination name is required')
+      showWarning('Destination name is required')
       return
     }
 
@@ -178,6 +192,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to add destination:', error)
+      showError('Failed to add destination')
     }
   }
 
@@ -221,6 +236,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to add delivery destination:', error)
+      showError('Failed to add delivery destination')
     }
   }
 
@@ -248,6 +264,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error(`Failed to select ${storageKey}:`, error)
+      showError('Failed to select location')
     }
   }
 
@@ -291,6 +308,7 @@ export function Settings() {
       const { authUrl } = await invoke<{ authUrl: string }>('start_google_drive_auth')
       await openUrl(authUrl).catch((err: unknown) => {
         console.error('Failed to open auth URL:', err)
+        showError('Failed to open authentication URL')
       })
 
       // Poll for authentication completion

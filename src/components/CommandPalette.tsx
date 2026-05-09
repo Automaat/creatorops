@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { useNotification } from '../hooks/useNotification'
 import type { Project } from '../types'
 
 interface CommandPaletteProps {
@@ -9,11 +10,22 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPaletteProps) {
+  const { error: showError } = useNotification()
   const [projects, setProjects] = useState<Project[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
+
+  const loadProjects = useCallback(async () => {
+    try {
+      const projectList = await invoke<Project[]>('list_projects')
+      setProjects(projectList)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
+    }
+  }, [showError])
 
   useEffect(() => {
     if (isOpen) {
@@ -23,16 +35,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
       // Focus input after render
       setTimeout(() => inputRef.current?.focus(), 0)
     }
-  }, [isOpen])
-
-  const loadProjects = async () => {
-    try {
-      const projectList = await invoke<Project[]>('list_projects')
-      setProjects(projectList)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-    }
-  }
+  }, [isOpen, loadProjects])
 
   const filteredProjects = projects.filter((project) => {
     const query = searchQuery.toLowerCase()

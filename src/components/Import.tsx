@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { CopyResult, ImportProgress, Project, SDCard } from '../types'
 import { ProjectStatus } from '../types'
+import { useNotification } from '../hooks/useNotification'
 import { CreateProject } from './CreateProject'
 import { sortProjectsByStatus } from '../utils/project'
 
@@ -93,6 +94,7 @@ function SDCardItem({
   onActivate,
   onDeactivate,
 }: SDCardItemProps) {
+  const { error: showError, warning: showWarning } = useNotification()
   const [showProjectSelect, setShowProjectSelect] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
@@ -139,8 +141,9 @@ function SDCardItem({
       setProjects(sortedProjects)
     } catch (error) {
       console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
     }
-  }, [])
+  }, [showError])
 
   const updateDropdownPosition = () => {
     if (triggerRef.current) {
@@ -326,6 +329,7 @@ function SDCardItem({
             await invoke('eject_sd_card', { volumePath: card.path })
           } catch (error) {
             console.error('Failed to eject SD card:', error)
+            showWarning('Failed to eject SD card')
           }
         }
 
@@ -333,6 +337,7 @@ function SDCardItem({
       }
     } catch (error) {
       console.error('Import failed:', error)
+      showError('Import failed')
       setImportResult({
         error: String(error),
         filesCopied: 0,
@@ -361,6 +366,7 @@ function SDCardItem({
         })
       } catch (error) {
         console.error('Failed to save import history:', error)
+        showError('Failed to save import history')
       }
     } finally {
       setIsImporting(false)
@@ -377,6 +383,7 @@ function SDCardItem({
       await invoke('cancel_import', { importId })
     } catch (error) {
       console.error('Failed to cancel import:', error)
+      showError('Failed to cancel import')
     }
   }
 
