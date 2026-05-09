@@ -790,7 +790,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "rand 0.9.2",
+ "rand 0.10.1",
  "reqwest",
  "rusqlite",
  "serde",

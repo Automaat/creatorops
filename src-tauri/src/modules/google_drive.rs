@@ -85,17 +85,12 @@ impl Drop for SessionCleanup {
 // OAuth Helper Functions
 
 fn generate_random_alphanumeric(length: usize) -> String {
-    use rand::Rng;
-    let mut rng = rand::rng();
-    (0..length)
-        .map(|_| {
-            let idx = rng.random_range(0..62);
-            match idx {
-                0..=25 => (b'A' + idx) as char,
-                26..=51 => (b'a' + (idx - 26)) as char,
-                _ => (b'0' + (idx - 52)) as char,
-            }
-        })
+    use rand::distr::Alphanumeric;
+    use rand::RngExt;
+    rand::rng()
+        .sample_iter(Alphanumeric)
+        .take(length)
+        .map(char::from)
         .collect()
 }
 
