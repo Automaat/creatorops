@@ -37,7 +37,9 @@ function ViewWrapper({ isActive, name, children }: ViewWrapperProps) {
   const className = isActive ? 'view-active' : 'view-hidden'
   return (
     <div className={className}>
-      <ErrorBoundary name={name}>{children}</ErrorBoundary>
+      <ErrorBoundary name={name} isActive={isActive}>
+        {children}
+      </ErrorBoundary>
     </div>
   )
 }

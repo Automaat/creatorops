@@ -70,6 +70,49 @@ describe('error boundary', () => {
     spy.mockRestore()
   })
 
+  it('resets when isActive flips from inactive to active while in error', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { rerender } = render(
+      <ErrorBoundary isActive={true}>
+        <AlwaysThrows />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText('Something went wrong')).toBeTruthy()
+
+    rerender(
+      <ErrorBoundary isActive={false}>
+        <div>recovered</div>
+      </ErrorBoundary>
+    )
+    rerender(
+      <ErrorBoundary isActive={true}>
+        <div>recovered</div>
+      </ErrorBoundary>
+    )
+
+    expect(screen.getByText('recovered')).toBeTruthy()
+    spy.mockRestore()
+  })
+
+  it('does not reset while isActive stays false', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { rerender } = render(
+      <ErrorBoundary isActive={true}>
+        <AlwaysThrows />
+      </ErrorBoundary>
+    )
+    expect(screen.getByText('Something went wrong')).toBeTruthy()
+
+    rerender(
+      <ErrorBoundary isActive={false}>
+        <div>recovered</div>
+      </ErrorBoundary>
+    )
+
+    expect(screen.getByText('Something went wrong')).toBeTruthy()
+    spy.mockRestore()
+  })
+
   it('logs error with component name to console', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     render(

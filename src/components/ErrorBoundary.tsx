@@ -1,9 +1,10 @@
-import { Component, useCallback, useState } from 'react'
+import { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 
 interface ErrorBoundaryProps {
   children: ReactNode
   name?: string
+  isActive?: boolean
 }
 
 interface BoundaryState {
@@ -15,6 +16,7 @@ interface BoundaryInnerProps {
   children: ReactNode
   name?: string
   onReset: () => void
+  onError: () => void
 }
 
 class ErrorBoundaryInner extends Component<BoundaryInnerProps, BoundaryState> {
@@ -28,6 +30,7 @@ class ErrorBoundaryInner extends Component<BoundaryInnerProps, BoundaryState> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError()
     const label = this.props.name ? ` (${this.props.name})` : ''
     console.error(`[ErrorBoundary${label}]`, error, info.componentStack)
   }
@@ -49,11 +52,30 @@ class ErrorBoundaryInner extends Component<BoundaryInnerProps, BoundaryState> {
   }
 }
 
-export function ErrorBoundary({ children, name }: ErrorBoundaryProps) {
+export function ErrorBoundary({ children, name, isActive }: ErrorBoundaryProps) {
   const [resetKey, setResetKey] = useState(0)
-  const handleReset = useCallback(() => setResetKey((k) => k + 1), [])
+  const hasErrorRef = useRef(false)
+  const prevIsActiveRef = useRef(isActive)
+
+  const handleReset = useCallback(() => {
+    hasErrorRef.current = false
+    setResetKey((k) => k + 1)
+  }, [])
+
+  const handleError = useCallback(() => {
+    hasErrorRef.current = true
+  }, [])
+
+  useEffect(() => {
+    if (isActive && !prevIsActiveRef.current && hasErrorRef.current) {
+      hasErrorRef.current = false
+      setResetKey((k) => k + 1)
+    }
+    prevIsActiveRef.current = isActive
+  }, [isActive])
+
   return (
-    <ErrorBoundaryInner key={resetKey} name={name} onReset={handleReset}>
+    <ErrorBoundaryInner key={resetKey} name={name} onReset={handleReset} onError={handleError}>
       {children}
     </ErrorBoundaryInner>
   )
