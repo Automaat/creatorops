@@ -114,18 +114,19 @@ describe('formatETA', () => {
 
 describe('formatDate', () => {
   it('formats unix timestamp', () => {
-    const result = formatDate('1704067200')
+    const result = formatDate('1704153600')
     expect(result).toContain('Jan')
     expect(result).toContain('2024')
   })
 
-  it('formats epoch timestamp (0)', () => {
-    const result = formatDate('0')
+  it('formats early unix timestamp (Jan 2 1970)', () => {
+    const result = formatDate('86400')
+    expect(result).toContain('Jan')
     expect(result).toContain('1970')
   })
 
   it('formats float string by truncating to integer', () => {
-    const result = formatDate('1704067200.9')
+    const result = formatDate('1704153600.9')
     expect(result).toContain('Jan')
     expect(result).toContain('2024')
   })
@@ -183,7 +184,7 @@ describe('formatDisplayDate', () => {
   })
 
   it('formats date object', () => {
-    const date = new Date('2025-03-20')
+    const date = new Date(2025, 2, 20)
     const result = formatDisplayDate(date)
     expect(result).toBe('Mar 20, 2025')
   })
