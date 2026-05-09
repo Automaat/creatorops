@@ -50,6 +50,7 @@ export function DatePicker({ value, onChange, label, required, id, autoOpen }: D
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
+    return undefined
   }, [isOpen, selectedDate, onChange])
 
   const formatDate = (date: Date) => {

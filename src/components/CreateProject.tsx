@@ -30,8 +30,8 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
     try {
       const project = await invoke<Project>('create_project', { ...formData })
       onProjectCreated?.(project)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create project')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create project')
     } finally {
       setIsSubmitting(false)
     }
