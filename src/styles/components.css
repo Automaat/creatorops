@@ -1071,6 +1071,11 @@ input[type='checkbox'] + label {
   color: var(--color-text-secondary);
 }
 
+.icon-sm {
+  height: 30px;
+  width: 30px;
+}
+
 /* Settings - Destinations */
 
 .destinations-list {

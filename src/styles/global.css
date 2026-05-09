@@ -123,6 +123,17 @@ a:hover {
   gap: var(--space-xxl);
 }
 
+.pad-md {
+  padding: var(--space-md);
+}
+.pad-lg {
+  padding: var(--space-lg);
+}
+
+.mt-md {
+  margin-top: var(--space-md);
+}
+
 .text-sm {
   font-size: var(--font-size-sm);
 }

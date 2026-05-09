@@ -586,7 +586,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               <img
                 src={folderIcon}
                 alt="Show in Finder"
-                style={{ height: '30px', width: '30px' }}
+                className="icon-sm"
               />
             </button>
           </div>
@@ -749,10 +749,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               {isDeleting ? (
                 <>
                   <h2>Deleting Project</h2>
-                  <div
-                    className="flex flex-col gap-md"
-                    style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
-                  >
+                  <div className="flex flex-col gap-md align-center pad-lg">
                     <div className="spinner" />
                     <p className="text-secondary">Hang tight, removing your project...</p>
                   </div>
@@ -797,17 +794,17 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                   <p className="text-secondary">Select an SD card to import files from</p>
 
                   {isScanning && sdCards.length === 0 ? (
-                    <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
+                    <div className="flex flex-col gap-md pad-lg">
                       <p className="text-secondary">Scanning for SD cards...</p>
                     </div>
                   ) : sdCards.length === 0 ? (
-                    <div className="flex flex-col gap-md" style={{ padding: 'var(--space-lg)' }}>
+                    <div className="flex flex-col gap-md pad-lg">
                       <p className="text-secondary">
                         No SD cards detected. Insert an SD card to continue.
                       </p>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-sm" style={{ marginTop: 'var(--space-md)' }}>
+                    <div className="flex flex-col gap-sm mt-md">
                       {sdCards.map((card) => (
                         <div
                           key={card.path}
@@ -815,7 +812,6 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
                           onClick={() => {
                             setSelectedSDCard(card)
                           }}
-                          style={{ cursor: 'pointer' }}
                           role="button"
                           tabIndex={0}
                         >
@@ -851,10 +847,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               ) : isImporting ? (
                 <>
                   <h2>Importing Files</h2>
-                  <div
-                    className="flex flex-col gap-md"
-                    style={{ alignItems: 'center', padding: 'var(--space-lg)' }}
-                  >
+                  <div className="flex flex-col gap-md align-center pad-lg">
                     <div className="spinner" />
                     <p className="text-secondary">Importing from {selectedSDCard?.name}...</p>
                   </div>
@@ -867,7 +860,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               ) : importResult ? (
                 <>
                   <h2>Import Complete</h2>
-                  <div className="flex flex-col gap-sm" style={{ padding: 'var(--space-md)' }}>
+                  <div className="flex flex-col gap-sm pad-md">
                     {importResult.success ? (
                       <>
                         <p className="text-success">
