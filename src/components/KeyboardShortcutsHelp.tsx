@@ -8,7 +8,7 @@ interface KeyboardShortcutsHelpProps {
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {
   if (!isOpen) {
-    return
+    return null
   }
 
   return (

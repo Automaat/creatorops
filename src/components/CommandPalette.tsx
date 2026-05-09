@@ -65,7 +65,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
 
   useEffect(() => {
     if (!isOpen) {
-      return
+      return undefined
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -111,7 +111,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   }
 
   if (!isOpen) {
-    return
+    return null
   }
 
   return (

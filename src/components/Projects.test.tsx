@@ -1450,6 +1450,7 @@ describe('projects', () => {
           return Promise.resolve(['/card/IMG_001.jpg', '/card/IMG_002.jpg'])
         if (cmd === 'copy_files') return Promise.resolve(copyResult)
         if (cmd === 'save_import_history') return Promise.resolve()
+        return undefined
       })
 
       const user = userEvent.setup()

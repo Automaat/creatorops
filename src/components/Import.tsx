@@ -327,8 +327,8 @@ function SDCardItem({
         if (autoEject) {
           try {
             await invoke('eject_sd_card', { volumePath: card.path })
-          } catch (error) {
-            console.error('Failed to eject SD card:', error)
+          } catch (ejectErr) {
+            console.error('Failed to eject SD card:', ejectErr)
             showWarning('Failed to eject SD card')
           }
         }
@@ -364,8 +364,8 @@ function SDCardItem({
           totalBytes: 0,
           videosCopied: 0,
         })
-      } catch (error) {
-        console.error('Failed to save import history:', error)
+      } catch (historyErr) {
+        console.error('Failed to save import history:', historyErr)
         showError('Failed to save import history')
       }
     } finally {
@@ -659,5 +659,5 @@ function SDCardItem({
   }
 
   // This should never be reached, but just in case return null
-  return
+  return null
 }

@@ -13,7 +13,7 @@ export interface KeyboardShortcut {
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[], enabled = true) {
   useEffect(() => {
     if (!enabled) {
-      return
+      return undefined
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -200,7 +200,7 @@ export function Projects({ initialSelectedProjectId, isActive, onBackFromProject
   // ESC key to return to previous view
   useEffect(() => {
     if (!selectedProject) {
-      return
+      return undefined
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -216,7 +216,7 @@ export function Projects({ initialSelectedProjectId, isActive, onBackFromProject
   // Cmd+N to create new project in list view
   useEffect(() => {
     if (selectedProject) {
-      return
+      return undefined
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -450,8 +450,8 @@ export function Projects({ initialSelectedProjectId, isActive, onBackFromProject
             projectId: selectedProject.id,
           })
           setSelectedProject(updatedProject)
-        } catch (error) {
-          console.error('Failed to update project status after import:', error)
+        } catch (statusErr) {
+          console.error('Failed to update project status after import:', statusErr)
         }
       }
     } catch (error) {
@@ -473,8 +473,8 @@ export function Projects({ initialSelectedProjectId, isActive, onBackFromProject
           totalBytes: 0,
           videosCopied: 0,
         })
-      } catch (error) {
-        console.error('Failed to save import history:', error)
+      } catch (historyErr) {
+        console.error('Failed to save import history:', historyErr)
         showError('Failed to save import history')
       }
     } finally {
