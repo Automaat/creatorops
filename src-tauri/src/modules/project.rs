@@ -4,8 +4,6 @@
 //! structure `YYYY-MM-DD_ClientName[_ShootType]/{RAW,Selects,Delivery}`.
 //! Project metadata is persisted in `SQLite` via the `Database` wrapper.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
-#![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -304,7 +302,6 @@ pub async fn get_project(
     get_project_by_id(&db, &project_id).map_err(String::from)
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

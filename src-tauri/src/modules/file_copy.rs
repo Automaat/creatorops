@@ -5,7 +5,6 @@
 //! via a per-import `CancellationToken`. Failed copies are retried with
 //! exponential back-off; persistent failures are counted as skipped.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::ImportError;
 use crate::utils::file_ops;
 use serde::{Deserialize, Serialize};
@@ -69,12 +68,6 @@ pub struct ImportProgress {
 }
 
 /// Copy files from source to destination with parallel processing.
-///
-/// Exceeds the line-count threshold because all import steps — cancellation token
-/// setup, per-file retry loops, progress emission, and result aggregation — share
-/// local state that cannot be split without introducing an intermediate context
-/// struct. Refactoring is tracked separately.
-#[allow(clippy::too_many_lines)]
 #[tauri::command]
 pub async fn copy_files(
     state: tauri::State<'_, crate::state::AppState>,
@@ -147,8 +140,6 @@ pub async fn copy_files(
             match copy_file_with_retry(&src, &dest_file, &cancel_token_clone).await {
                 Ok(size) => {
                     let copied = files_copied_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                    // Safe cast: file sizes fit in usize on target platform
-                    #[allow(clippy::cast_possible_truncation)]
                     total_bytes_clone.fetch_add(size as usize, Ordering::SeqCst);
 
                     match file_type {
@@ -277,7 +268,6 @@ pub async fn cancel_import(
         .map_err(String::from)
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -786,9 +776,6 @@ mod tests {
             total_files: 100,
             current_file: "photo_50.jpg".to_owned(),
         };
-
-        // Safe cast: small test values well within f64 mantissa precision
-        #[allow(clippy::cast_precision_loss)]
         let percent = (progress.files_copied as f64 / progress.total_files as f64) * 100.0;
         assert!((percent - 50.0).abs() < f64::EPSILON);
     }

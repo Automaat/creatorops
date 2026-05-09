@@ -72,8 +72,17 @@ expect_used = "deny"
 panic = "deny"
 todo = "warn"
 unimplemented = "warn"
-unreachable = "allow" # False positives in Tauri commands with Result return types
 wildcard_imports = "allow" # Tauri macros use wildcard imports
+# Numeric casts: progress/throughput math uses u64↔f64↔usize for transfer
+# rates, percentages, and ETA. Precision/truncation loss past 2^53 bytes (~9 PB)
+# is beyond any realistic file-transfer scenario.
+cast_precision_loss = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+# Long orchestration fns in google_drive/file_copy share local state across
+# retry/progress/cancellation steps; splitting requires param structs that
+# obscure data flow without simplifying logic.
+too_many_lines = "allow"
 
 # Additional quality lints
 dbg_macro = "warn"

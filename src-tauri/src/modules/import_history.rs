@@ -4,7 +4,6 @@
 //! and provides query commands for the full history or a single project's
 //! history. At most 100 records are kept; older entries are pruned on write.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::AppError;
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
@@ -137,12 +136,12 @@ fn get_history_file_path() -> Result<PathBuf, AppError> {
     Ok(base_path.join("import_history.json"))
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use tempfile::TempDir;
+    use tokio::sync::Mutex;
 
     // Global mutex to serialize tests that manipulate HOME environment variable
     lazy_static::lazy_static! {
@@ -232,11 +231,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_success() {
+        let _lock = HOME_TEST_MUTEX.lock().await;
         let temp_dir = TempDir::new().unwrap();
-        {
-            let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", temp_dir.path());
-        } // Lock dropped here
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = save_import_history(
             "proj-123".to_owned(),
@@ -264,11 +261,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_partial() {
+        let _lock = HOME_TEST_MUTEX.lock().await;
         let temp_dir = TempDir::new().unwrap();
-        {
-            let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", temp_dir.path());
-        } // Lock dropped here
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = save_import_history(
             "proj-456".to_owned(),
@@ -295,11 +290,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_import_history_failed() {
+        let _lock = HOME_TEST_MUTEX.lock().await;
         let temp_dir = TempDir::new().unwrap();
-        {
-            let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", temp_dir.path());
-        } // Lock dropped here
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = save_import_history(
             "proj-789".to_owned(),
@@ -357,10 +350,9 @@ mod tests {
     }
 
     #[tokio::test]
-    #[allow(clippy::await_holding_lock)]
     async fn test_status_determination_logic() {
         let temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().await;
         std::env::set_var("HOME", temp_dir.path());
 
         // Test Failed status (0 files copied)
@@ -425,11 +417,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_import_history_empty() {
+        let _lock = HOME_TEST_MUTEX.lock().await;
         let temp_dir = TempDir::new().unwrap();
-        {
-            let _lock = HOME_TEST_MUTEX.lock().unwrap();
-            std::env::set_var("HOME", temp_dir.path());
-        } // Lock dropped here
+        std::env::set_var("HOME", temp_dir.path());
 
         let result = get_import_history(None).await;
         assert!(result.is_ok());
@@ -437,10 +427,10 @@ mod tests {
         assert_eq!(histories.len(), 0);
     }
 
-    #[test]
-    fn test_get_history_file_path() {
+    #[tokio::test]
+    async fn test_get_history_file_path() {
         let temp_dir = TempDir::new().unwrap();
-        let _lock = HOME_TEST_MUTEX.lock().unwrap();
+        let _lock = HOME_TEST_MUTEX.lock().await;
         std::env::set_var("HOME", temp_dir.path());
 
         let result = get_history_file_path();

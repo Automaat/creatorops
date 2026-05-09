@@ -3,7 +3,6 @@
 //! Provides SHA-256 hashing, recursive directory traversal, home-directory
 //! resolution (cross-platform), and timestamp helpers.
 
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use crate::error::AppError;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -138,7 +137,6 @@ pub fn get_home_directory() -> Result<String, String> {
         .ok_or_else(|| "Failed to convert path to string".to_owned())
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

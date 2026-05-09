@@ -29,34 +29,6 @@ pub async fn remove_file(path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Remove failed: {e}"))
 }
 
-/// Get file metadata using `spawn_blocking` to avoid blocking the async runtime.
-///
-/// Phase 3 async I/O refactor will adopt this instead of calling `fs::metadata`
-/// directly on the Tokio thread pool.
-#[allow(dead_code)]
-pub async fn metadata(path: &Path) -> Result<std::fs::Metadata, String> {
-    let path = path.to_path_buf();
-
-    tokio::task::spawn_blocking(move || std::fs::metadata(&path))
-        .await
-        .map_err(|e| format!("Task join error: {e}"))?
-        .map_err(|e| format!("Metadata failed: {e}"))
-}
-
-/// Create directories using `spawn_blocking` to avoid blocking the async runtime.
-///
-/// Phase 3 async I/O refactor will adopt this instead of calling `fs::create_dir_all`
-/// directly on the Tokio thread pool.
-#[allow(dead_code)]
-pub async fn create_dir_all(path: &Path) -> Result<(), String> {
-    let path = path.to_path_buf();
-
-    tokio::task::spawn_blocking(move || std::fs::create_dir_all(&path))
-        .await
-        .map_err(|e| format!("Task join error: {e}"))?
-        .map_err(|e| format!("Create dir failed: {e}"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,29 +59,5 @@ mod tests {
 
         remove_file(&test_file).await.unwrap();
         assert!(!test_file.exists());
-    }
-
-    #[tokio::test]
-    async fn test_metadata() {
-        let temp_dir = std::env::temp_dir();
-        let test_file = temp_dir.join("test_metadata.txt");
-
-        std::fs::write(&test_file, b"12345").unwrap();
-
-        let meta = metadata(&test_file).await.unwrap();
-        assert_eq!(meta.len(), 5);
-
-        std::fs::remove_file(test_file).ok();
-    }
-
-    #[tokio::test]
-    async fn test_create_dir_all() {
-        let temp_dir = std::env::temp_dir();
-        let test_dir = temp_dir.join("test_create_dir").join("nested");
-
-        create_dir_all(&test_dir).await.unwrap();
-        assert!(test_dir.exists());
-
-        std::fs::remove_dir_all(temp_dir.join("test_create_dir")).ok();
     }
 }

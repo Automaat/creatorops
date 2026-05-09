@@ -6,15 +6,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use crate::modules::archive::ArchiveJob;
 use crate::modules::backup::BackupJob;
 use crate::modules::delivery::DeliveryJob;
-
-/// Maximum concurrent file copy operations
-const MAX_CONCURRENT_COPIES: usize = 4;
 
 /// Type alias for backup job queue
 pub type BackupQueue = Arc<Mutex<HashMap<String, BackupJob>>>;
@@ -41,14 +37,6 @@ pub struct AppState {
 
     /// Import operation cancellation tokens
     pub import_tokens: ImportTokens,
-
-    /// Semaphore for limiting concurrent file copy operations.
-    ///
-    /// Initialized but not yet wired into `copy_files`. Phase 2 will pass this through
-    /// `AppState` so all import jobs share a single `MAX_CONCURRENT_COPIES` cap instead
-    /// of each creating its own semaphore. See issue #6.
-    #[allow(dead_code)]
-    pub file_semaphore: Arc<Semaphore>,
 }
 
 impl Default for AppState {
@@ -58,7 +46,6 @@ impl Default for AppState {
             delivery_queue: Arc::new(Mutex::new(HashMap::new())),
             archive_queue: Arc::new(Mutex::new(HashMap::new())),
             import_tokens: Arc::new(Mutex::new(HashMap::new())),
-            file_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_COPIES)),
         }
     }
 }
@@ -66,15 +53,6 @@ impl Default for AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_app_state_creation() {
-        let state = AppState::default();
-        assert_eq!(
-            state.file_semaphore.available_permits(),
-            MAX_CONCURRENT_COPIES
-        );
-    }
 
     #[tokio::test]
     async fn test_backup_queue_operations() {
@@ -192,10 +170,5 @@ mod tests {
 
         let contains_key = state.import_tokens.lock().await.contains_key("import-1");
         assert!(contains_key);
-    }
-
-    #[test]
-    fn test_max_concurrent_copies_constant() {
-        assert_eq!(MAX_CONCURRENT_COPIES, 4);
     }
 }

@@ -109,11 +109,7 @@ impl Database {
         f(&conn)
     }
 
-    /// Execute a closure atomically; rolls back on error.
-    ///
-    /// Available for future multi-step writes (e.g., project + delivery creation).
-    /// No callers yet — current write paths each issue a single statement.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn transaction<F, R>(&self, f: F) -> Result<R, AppError>
     where
         F: FnOnce(&rusqlite::Transaction) -> Result<R, AppError>,
@@ -127,7 +123,6 @@ impl Database {
     }
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;

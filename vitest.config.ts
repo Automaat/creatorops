@@ -2,7 +2,6 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  // @ts-expect-error vite/vitest plugin type mismatch
   plugins: [react()],
   test: {
     coverage: {

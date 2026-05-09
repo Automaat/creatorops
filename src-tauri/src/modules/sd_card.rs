@@ -1,4 +1,3 @@
-#![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -96,32 +95,38 @@ fn count_files(path: &Path) -> usize {
         .count()
 }
 
-#[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
-#[allow(unsafe_code, clippy::unwrap_used, clippy::missing_const_for_fn)]
+#[cfg(target_os = "macos")]
 fn get_disk_usage(path: &Path) -> (u64, u64) {
-    #[cfg(target_os = "macos")]
-    {
-        use std::ffi::CString;
-        use std::mem;
+    use std::ffi::CString;
+    use std::mem;
 
-        unsafe {
-            let path_cstr = CString::new(path.to_str().unwrap()).unwrap();
-            let mut stats: libc::statfs = mem::zeroed();
+    let Some(path_str) = path.to_str() else {
+        return (0, 0);
+    };
+    let Ok(path_cstr) = CString::new(path_str) else {
+        return (0, 0);
+    };
 
-            if libc::statfs(path_cstr.as_ptr(), &mut stats) == 0 {
-                let block_size = u64::from(stats.f_bsize);
-                let total_blocks = stats.f_blocks;
-                let free_blocks = stats.f_bfree;
-
-                let size = total_blocks * block_size;
-                let free_space = free_blocks * block_size;
-
-                return (size, free_space);
-            }
+    // Safe: statfs(2) writes into a zeroed struct we own. No aliasing — the
+    // pointer is exclusively held for the duration of the call. The out-param
+    // is fully populated only when the call returns 0, which we check.
+    #[allow(unsafe_code)]
+    let stats = unsafe {
+        let mut stats: libc::statfs = mem::zeroed();
+        if libc::statfs(path_cstr.as_ptr(), &mut stats) != 0 {
+            return (0, 0);
         }
-    }
+        stats
+    };
 
-    // Fallback for non-macOS or if statfs fails
+    let block_size = u64::from(stats.f_bsize);
+    let size = stats.f_blocks * block_size;
+    let free_space = stats.f_bfree * block_size;
+    (size, free_space)
+}
+
+#[cfg(not(target_os = "macos"))]
+const fn get_disk_usage(_path: &Path) -> (u64, u64) {
     (0, 0)
 }
 
@@ -237,7 +242,6 @@ fn get_device_info(volume_name: &str) -> (String, bool) {
     ("Unknown".to_owned(), true)
 }
 
-#[allow(clippy::wildcard_imports)]
 #[cfg(test)]
 mod tests {
     use super::*;
