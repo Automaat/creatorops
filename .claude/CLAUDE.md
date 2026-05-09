@@ -335,10 +335,9 @@ Semantic HTML (`<button>` not `<div onClick>`), `:focus-visible`, `.visually-hid
 1. Frontend: `alert()` → NotificationContext
 2. Backend: `Result<T, String>` → custom errors with `thiserror`
 3. Backend: `eprintln!` → `log` crate
-4. No React error boundaries
-5. SQLite: no transactions
-6. `Settings.tsx:30`: fix `eslint-disable`
-7. `Projects.tsx:124-137`: extract inline styles
+4. SQLite: no transactions
+5. `Settings.tsx:30`: fix `eslint-disable`
+6. `Projects.tsx:124-137`: extract inline styles
 
 ## Questions for AI
 

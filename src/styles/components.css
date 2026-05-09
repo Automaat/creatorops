@@ -1983,3 +1983,60 @@ input[type='checkbox'] + label {
     transform: translateY(0);
   }
 }
+
+/* Error Boundary */
+
+.error-boundary-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.error-boundary-title {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.error-boundary-section {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-md);
+}
+
+.error-boundary-message {
+  font-size: var(--font-size-md);
+  color: var(--color-error);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md);
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  border-radius: var(--radius-md);
+  word-break: break-word;
+  max-width: 400px;
+}
+
+.error-boundary-reset {
+  padding: var(--space-xs) var(--space-xl);
+  background: var(--color-accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.error-boundary-reset:hover {
+  background: var(--color-hover);
+}
+
+.error-boundary-reset:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
