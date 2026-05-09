@@ -3,7 +3,7 @@
 //! Implements the OAuth 2.0 PKCE flow: starts a temporary local HTTP server to
 //! receive the redirect, exchanges the authorisation code for tokens, and persists
 //! them using two separate stores: account metadata (email, display name, folder
-//! configuration) goes into SQLite, while OAuth tokens are written as AES-encrypted
+//! configuration) goes into `SQLite`, while OAuth tokens are written as AES-encrypted
 //! files under `~/.creatorops/google_tokens_*.enc` (owner-only permissions, 0o600).
 //! Uploaded files are placed in a user-configurable parent folder on Google Drive.
 
@@ -32,7 +32,7 @@ const HTTP_TIMEOUT_SECONDS: u64 = 60; // HTTP client timeout
 
 // Data Structures
 
-/// Google Drive account metadata and configuration stored in SQLite.
+/// Google Drive account metadata and configuration stored in `SQLite`.
 ///
 /// OAuth tokens are stored separately in an encrypted file; see `store_tokens_in_keychain`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
