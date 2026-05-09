@@ -121,7 +121,7 @@ pub fn get_timestamp() -> String {
 pub fn get_home_directory() -> Result<String, String> {
     get_home_dir()?
         .to_str()
-        .map(ToString::to_string)
+        .map(str::to_owned)
         .ok_or_else(|| "Failed to convert path to string".to_owned())
 }
 
