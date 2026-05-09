@@ -1868,7 +1868,10 @@ mod tests {
         let nonexistent_email = format!("nonexistent-{}@example.com", Uuid::new_v4());
         let result = get_tokens_from_keychain(&nonexistent_email);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), GoogleDriveError::Io(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            GoogleDriveError::TokenNotFound
+        ));
     }
 
     #[test]
