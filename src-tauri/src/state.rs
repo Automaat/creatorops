@@ -42,9 +42,12 @@ pub struct AppState {
     /// Import operation cancellation tokens
     pub import_tokens: ImportTokens,
 
-    /// Semaphore for limiting concurrent file copy operations
-    /// TODO: Integrate with `file_copy.rs` `copy_files` function to use shared semaphore
-    #[allow(dead_code)] // Reserved for future use
+    /// Semaphore for limiting concurrent file copy operations.
+    ///
+    /// Initialized but not yet wired into `copy_files`. Phase 2 will pass this through
+    /// `AppState` so all import jobs share a single `MAX_CONCURRENT_COPIES` cap instead
+    /// of each creating its own semaphore. See issue #6.
+    #[allow(dead_code)]
     pub file_semaphore: Arc<Semaphore>,
 }
 

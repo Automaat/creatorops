@@ -111,10 +111,10 @@ impl Database {
         f(&conn)
     }
 
-    /// Execute a transaction with the database connection
+    /// Execute a closure atomically; rolls back on error.
     ///
-    /// This method ensures atomic operations by wrapping multiple database operations
-    /// in a transaction. If any operation fails, all changes are rolled back.
+    /// Available for future multi-step writes (e.g., project + delivery creation).
+    /// No callers yet — current write paths each issue a single statement.
     #[allow(dead_code)]
     pub fn transaction<F, R>(&self, f: F) -> Result<R, AppError>
     where

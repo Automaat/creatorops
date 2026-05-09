@@ -67,8 +67,13 @@ pub struct ImportProgress {
     pub current_file: String,
 }
 
-/// Copy files from source to destination with parallel processing
-#[allow(clippy::too_many_lines)] // Complex import logic requires detailed handling
+/// Copy files from source to destination with parallel processing.
+///
+/// Exceeds the line-count threshold because all import steps — cancellation token
+/// setup, per-file retry loops, progress emission, and result aggregation — share
+/// local state that cannot be split without introducing an intermediate context
+/// struct. Refactoring is tracked separately.
+#[allow(clippy::too_many_lines)]
 #[tauri::command]
 pub async fn copy_files(
     state: tauri::State<'_, crate::state::AppState>,
