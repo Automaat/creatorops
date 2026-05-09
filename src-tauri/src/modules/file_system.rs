@@ -51,14 +51,14 @@ fn open_in_external_app(
         .join(subfolder);
 
     if !media_path.exists() {
-        return Err(AppError::InvalidData(format!(
+        return Err(AppError::ExternalApp(format!(
             "{subfolder} directory not found. Expected RAW/{subfolder} subdirectory."
         )));
     }
 
     let media_path_str = media_path
         .to_str()
-        .ok_or_else(|| AppError::InvalidData("Invalid path encoding".to_owned()))?;
+        .ok_or_else(|| AppError::ExternalApp("Invalid path encoding".to_owned()))?;
 
     #[cfg(target_os = "macos")]
     {
@@ -67,7 +67,7 @@ fn open_in_external_app(
             .arg(app_name)
             .arg(media_path_str)
             .spawn()
-            .map_err(|e| AppError::InvalidData(format!("Failed to open in {app_name}: {e}")))?;
+            .map_err(|e| AppError::ExternalApp(format!("Failed to open in {app_name}: {e}")))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -79,7 +79,7 @@ fn open_in_external_app(
                     .arg(media_path_str)
                     .spawn()
                     .map_err(|e| {
-                        AppError::InvalidData(format!("Failed to open in {app_name}: {e}"))
+                        AppError::ExternalApp(format!("Failed to open in {app_name}: {e}"))
                     })?;
                 launched = true;
                 break;
@@ -87,7 +87,7 @@ fn open_in_external_app(
         }
 
         if !launched {
-            return Err(AppError::InvalidData(format!(
+            return Err(AppError::ExternalApp(format!(
                 "{app_name} not found. Please ensure it's installed."
             )));
         }
@@ -101,15 +101,15 @@ fn open_in_external_app(
                     .arg(media_path_str)
                     .spawn()
                     .map_err(|e| {
-                        AppError::InvalidData(format!("Failed to open in {app_name}: {e}"))
+                        AppError::ExternalApp(format!("Failed to open in {app_name}: {e}"))
                     })?;
             } else {
-                return Err(AppError::InvalidData(format!(
+                return Err(AppError::ExternalApp(format!(
                     "{app_name} not found. Please ensure it's installed."
                 )));
             }
         } else {
-            return Err(AppError::InvalidData(format!(
+            return Err(AppError::ExternalApp(format!(
                 "{app_name} not supported on Linux"
             )));
         }

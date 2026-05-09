@@ -285,9 +285,13 @@ fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, AppErro
         let mut stmt = conn
             .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
 
-        let project = stmt.query_row(params![project_id], map_project_row)?;
-
-        Ok(project)
+        stmt.query_row(params![project_id], map_project_row).map_err(|e| {
+            if e == rusqlite::Error::QueryReturnedNoRows {
+                AppError::ProjectNotFound { id: project_id.to_owned() }
+            } else {
+                AppError::from(e)
+            }
+        })
     })
 }
 

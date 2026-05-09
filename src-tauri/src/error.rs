@@ -44,6 +44,10 @@ pub enum AppError {
     #[error("Invalid data: {0}")]
     InvalidData(String),
 
+    /// External application launch or environment failure
+    #[error("{0}")]
+    ExternalApp(String),
+
     /// Configuration error
     #[error("Configuration error: {0}")]
     Config(String),
