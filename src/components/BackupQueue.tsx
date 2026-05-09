@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes, formatETA, formatSpeed } from '../utils/formatting'
@@ -21,6 +21,20 @@ export function BackupQueue({ isActive }: BackupQueueProps) {
   const [jobs, setJobs] = useState<BackupJob[]>([])
   const [progress, setProgress] = useState<Map<string, BackupProgress>>(new Map())
 
+  const loadQueue = useCallback(async () => {
+    try {
+      const data = await invoke<BackupJob[]>('get_backup_queue')
+      setJobs(data)
+      hasShownQueueError.current = false
+    } catch (error) {
+      console.error('Failed to load backup queue:', error)
+      if (isActiveRef.current && !hasShownQueueError.current) {
+        showError('Failed to load backup queue')
+        hasShownQueueError.current = true
+      }
+    }
+  }, [showError])
+
   useEffect(() => {
     void loadQueue()
 
@@ -40,21 +54,7 @@ export function BackupQueue({ isActive }: BackupQueueProps) {
       void unlistenJobUpdate.then((fn) => fn()).catch(() => {})
       clearInterval(interval)
     }
-  }, [])
-
-  async function loadQueue() {
-    try {
-      const data = await invoke<BackupJob[]>('get_backup_queue')
-      setJobs(data)
-      hasShownQueueError.current = false
-    } catch (error) {
-      console.error('Failed to load backup queue:', error)
-      if (isActiveRef.current && !hasShownQueueError.current) {
-        showError('Failed to load backup queue')
-        hasShownQueueError.current = true
-      }
-    }
-  }
+  }, [loadQueue])
 
   async function startBackup(jobId: string) {
     try {

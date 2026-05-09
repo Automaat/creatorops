@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes } from '../utils/formatting'
@@ -40,6 +40,56 @@ export function Delivery({ isActive }: DeliveryProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  const loadProjects = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await invoke<Project[]>('list_projects')
+      const sortedProjects = sortProjectsByStatus(data)
+      setProjects(sortedProjects)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      if (isActiveRef.current) showError('Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }, [showError])
+
+  const loadDestinations = useCallback(() => {
+    try {
+      const stored = localStorage.getItem('delivery_destinations')
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored)
+        const migrated = migrateDeliveryDestinations(parsed)
+        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
+        setDestinations(migrated)
+      }
+    } catch (error) {
+      console.error('Failed to load destinations:', error)
+      if (isActiveRef.current) showError('Failed to load destinations')
+    }
+  }, [showError])
+
+  const loadDeliveryQueue = useCallback(async () => {
+    try {
+      const queue = await invoke<DeliveryJob[]>('get_delivery_queue')
+      setDeliveryJobs(queue)
+    } catch (error) {
+      console.error('Failed to load delivery queue:', error)
+      if (isActiveRef.current) showError('Failed to load delivery queue')
+    }
+  }, [showError])
+
+  const loadProjectFiles = useCallback(async (projectId: string) => {
+    try {
+      const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
+      setProjectFiles(files)
+      setSelectedFiles(new Set())
+    } catch (error) {
+      console.error('Failed to load project files:', error)
+      showError('Failed to load project files')
+    }
+  }, [showError])
+
   useEffect(() => {
     void loadProjects()
     loadDestinations()
@@ -79,13 +129,13 @@ export function Delivery({ isActive }: DeliveryProps) {
       void unlistenDelivery.then((fn) => fn()).catch(() => {})
       void unlistenDrive.then((fn) => fn()).catch(() => {})
     }
-  }, [])
+  }, [loadProjects, loadDestinations, loadDeliveryQueue])
 
   useEffect(() => {
     if (selectedProject) {
       void loadProjectFiles(selectedProject.id)
     }
-  }, [selectedProject])
+  }, [selectedProject, loadProjectFiles])
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -124,56 +174,6 @@ export function Delivery({ isActive }: DeliveryProps) {
         top: rect.bottom + 8,
         width: rect.width,
       })
-    }
-  }
-
-  async function loadProjects() {
-    try {
-      setLoading(true)
-      const data = await invoke<Project[]>('list_projects')
-      const sortedProjects = sortProjectsByStatus(data)
-      setProjects(sortedProjects)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-      if (isActiveRef.current) showError('Failed to load projects')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadProjectFiles(projectId: string) {
-    try {
-      const files = await invoke<ProjectFile[]>('list_project_files', { projectId })
-      setProjectFiles(files)
-      setSelectedFiles(new Set())
-    } catch (error) {
-      console.error('Failed to load project files:', error)
-      showError('Failed to load project files')
-    }
-  }
-
-  function loadDestinations() {
-    try {
-      const stored = localStorage.getItem('delivery_destinations')
-      if (stored) {
-        const parsed: unknown = JSON.parse(stored)
-        const migrated = migrateDeliveryDestinations(parsed)
-        localStorage.setItem('delivery_destinations', JSON.stringify(migrated))
-        setDestinations(migrated)
-      }
-    } catch (error) {
-      console.error('Failed to load destinations:', error)
-      if (isActiveRef.current) showError('Failed to load destinations')
-    }
-  }
-
-  async function loadDeliveryQueue() {
-    try {
-      const queue = await invoke<DeliveryJob[]>('get_delivery_queue')
-      setDeliveryJobs(queue)
-    } catch (error) {
-      console.error('Failed to load delivery queue:', error)
-      if (isActiveRef.current) showError('Failed to load delivery queue')
     }
   }
 

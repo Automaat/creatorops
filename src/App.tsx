@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -60,7 +60,7 @@ function App() {
   useTheme()
 
   // Load and refresh project count for badge
-  const loadProjectCount = async () => {
+  const loadProjectCount = useCallback(async () => {
     try {
       const projects = await invoke<Project[]>('list_projects')
       setProjectsCount(projects.length)
@@ -68,11 +68,11 @@ function App() {
       console.error('Failed to load project count:', error)
       showError('Failed to load project count')
     }
-  }
+  }, [showError])
 
   useEffect(() => {
     void loadProjectCount()
-  }, [])
+  }, [loadProjectCount])
 
   // Global SD card scanner - runs in background across all pages
   const { sdCards, isScanning, scanForSDCards } = useSDCardScanner({

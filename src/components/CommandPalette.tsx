@@ -17,6 +17,16 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
   const inputRef = useRef<HTMLInputElement>(null)
   const selectedItemRef = useRef<HTMLDivElement>(null)
 
+  const loadProjects = useCallback(async () => {
+    try {
+      const projectList = await invoke<Project[]>('list_projects')
+      setProjects(projectList)
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
+    }
+  }, [showError])
+
   useEffect(() => {
     if (isOpen) {
       void loadProjects()
@@ -25,17 +35,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
       // Focus input after render
       setTimeout(() => inputRef.current?.focus(), 0)
     }
-  }, [isOpen])
-
-  const loadProjects = async () => {
-    try {
-      const projectList = await invoke<Project[]>('list_projects')
-      setProjects(projectList)
-    } catch (error) {
-      console.error('Failed to load projects:', error)
-      showError('Failed to load projects')
-    }
-  }
+  }, [isOpen, loadProjects])
 
   const filteredProjects = projects.filter((project) => {
     const query = searchQuery.toLowerCase()
