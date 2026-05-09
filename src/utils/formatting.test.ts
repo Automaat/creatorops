@@ -15,6 +15,14 @@ describe('formatBytes', () => {
     expect(formatBytes(0)).toBe('0 B')
   })
 
+  it('formats 1 byte', () => {
+    expect(formatBytes(1)).toBe('1.00 B')
+  })
+
+  it('formats bytes just below 1 KB', () => {
+    expect(formatBytes(1023)).toBe('1023.00 B')
+  })
+
   it('formats bytes', () => {
     expect(formatBytes(500)).toBe('500.00 B')
   })
@@ -68,13 +76,29 @@ describe('formatETA', () => {
     expect(formatETA(0)).toBe('--')
   })
 
+  it('formats 1 second', () => {
+    expect(formatETA(1)).toBe('1s')
+  })
+
   it('formats seconds only', () => {
     expect(formatETA(45)).toBe('45s')
+  })
+
+  it('formats 59 seconds (boundary before minutes)', () => {
+    expect(formatETA(59)).toBe('59s')
+  })
+
+  it('formats exactly 60 seconds as minutes', () => {
+    expect(formatETA(60)).toBe('1m 0s')
   })
 
   it('formats minutes and seconds', () => {
     expect(formatETA(90)).toBe('1m 30s')
     expect(formatETA(125)).toBe('2m 5s')
+  })
+
+  it('formats 3599 seconds (boundary before hours)', () => {
+    expect(formatETA(3599)).toBe('59m 59s')
   })
 
   it('formats hours and minutes', () => {
@@ -91,6 +115,17 @@ describe('formatETA', () => {
 describe('formatDate', () => {
   it('formats unix timestamp', () => {
     const result = formatDate('1704067200')
+    expect(result).toContain('Jan')
+    expect(result).toContain('2024')
+  })
+
+  it('formats epoch timestamp (0)', () => {
+    const result = formatDate('0')
+    expect(result).toContain('1970')
+  })
+
+  it('formats float string by truncating to integer', () => {
+    const result = formatDate('1704067200.9')
     expect(result).toContain('Jan')
     expect(result).toContain('2024')
   })
@@ -119,6 +154,14 @@ describe('formatDateShort', () => {
     expect(result).toBe('25 Dec 2025')
   })
 
+  it('formats leap year date', () => {
+    expect(formatDateShort('2024-02-29')).toBe('29 Feb 2024')
+  })
+
+  it('formats end of year date', () => {
+    expect(formatDateShort('2024-12-31')).toBe('31 Dec 2024')
+  })
+
   it('returns original string for invalid date', () => {
     expect(formatDateShort('invalid')).toBe('invalid')
   })
@@ -143,6 +186,22 @@ describe('formatDisplayDate', () => {
     const date = new Date('2025-03-20')
     const result = formatDisplayDate(date)
     expect(result).toBe('Mar 20, 2025')
+  })
+
+  it('returns empty string for undefined', () => {
+    expect(formatDisplayDate(undefined)).toBe('')
+  })
+
+  it('returns empty string for empty string', () => {
+    expect(formatDisplayDate('')).toBe('')
+  })
+
+  it('returns empty string for invalid Date object', () => {
+    expect(formatDisplayDate(new Date('invalid'))).toBe('')
+  })
+
+  it('returns original string for invalid date string', () => {
+    expect(formatDisplayDate('not-a-date')).toBe('not-a-date')
   })
 
   it('formats all months correctly', () => {

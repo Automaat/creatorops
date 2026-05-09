@@ -160,4 +160,80 @@ describe('migrateDeliveryDestinations', () => {
     const result = migrateDeliveryDestinations([])
     expect(result).toEqual([])
   })
+
+  it('preserves enabled=false in old format', () => {
+    const oldFormat = [
+      {
+        id: 'dest-1',
+        name: 'Disabled Dest',
+        path: '/path/to/folder',
+        enabled: false,
+      },
+    ]
+
+    const result = migrateDeliveryDestinations(oldFormat)
+
+    expect(result[0].enabled).toBe(false)
+  })
+
+  it('defaults enabled to true when null in old format', () => {
+    const oldFormat = [
+      {
+        id: 'dest-1',
+        name: 'Test',
+        path: '/path/to/folder',
+        enabled: null,
+      },
+    ]
+
+    const result = migrateDeliveryDestinations(oldFormat)
+
+    expect(result[0].enabled).toBe(true)
+  })
+
+  it('auto-generates createdAt when it is a non-string type', () => {
+    const oldFormat = [
+      {
+        id: 'dest-1',
+        name: 'Test',
+        path: '/path/to/folder',
+        createdAt: 1704067200,
+      },
+    ]
+
+    const result = migrateDeliveryDestinations(oldFormat)
+
+    expect(result[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+  })
+
+  it('auto-generates createdAt when it is boolean', () => {
+    const oldFormat = [
+      {
+        id: 'dest-1',
+        name: 'Test',
+        path: '/path/to/folder',
+        createdAt: true,
+      },
+    ]
+
+    const result = migrateDeliveryDestinations(oldFormat)
+
+    expect(result[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+  })
+
+  it('preserves google-drive destination fields intact', () => {
+    const gDrive = {
+      type: 'google-drive' as const,
+      id: 'gd-1',
+      name: 'Client Drive',
+      accountId: 'account-abc',
+      folderId: 'folder-xyz',
+      enabled: true,
+      createdAt: '2024-06-01T12:00:00Z',
+    }
+
+    const result = migrateDeliveryDestinations([gDrive])
+
+    expect(result[0]).toEqual(gDrive)
+  })
 })
