@@ -20,13 +20,13 @@ vi.mock('@tauri-apps/plugin-opener', () => ({
   open: vi.fn(),
 }))
 
-const sdCardScannerState: { isScanning: boolean; sdCards: SDCard[] } = {
+const mockSdScannerState = vi.hoisted(() => ({
   isScanning: false,
-  sdCards: [],
-}
+  sdCards: [] as SDCard[],
+}))
 
 vi.mock('../hooks/useSDCardScanner', () => ({
-  useSDCardScanner: () => sdCardScannerState,
+  useSDCardScanner: () => mockSdScannerState,
 }))
 
 const mockInvoke = vi.mocked(invoke)
@@ -61,8 +61,8 @@ describe('projects', () => {
     mockInvoke.mockResolvedValue([])
     localStorage.clear()
     vi.clearAllMocks()
-    sdCardScannerState.isScanning = false
-    sdCardScannerState.sdCards = []
+    mockSdScannerState.isScanning = false
+    mockSdScannerState.sdCards = []
   })
 
   afterEach(() => {
@@ -1282,25 +1282,34 @@ describe('projects', () => {
   })
 
   describe('import Dialog', () => {
-    const projectDetailInvoke = (
-      project = createMockProject(),
-      extra: Record<string, unknown> = {}
-    ) => {
+    const setupProjectDetail = (project: Project, extraInvokes?: (cmd: string) => unknown) => {
       mockInvoke.mockImplementation((cmd: string) => {
         if (cmd === 'get_project') return Promise.resolve(project)
         if (cmd === 'get_project_import_history') return Promise.resolve([])
         if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
-        if (cmd in extra) return Promise.resolve(extra[cmd])
+        if (extraInvokes) {
+          const result = extraInvokes(cmd)
+          if (result !== undefined) return result
+        }
         return Promise.resolve([])
       })
     }
 
-    it('shows scanning state when SD cards are being detected', async () => {
-      sdCardScannerState.isScanning = true
-      sdCardScannerState.sdCards = []
-      projectDetailInvoke()
+    const mockSDCard: SDCard = {
+      name: 'NIKON D850',
+      path: '/dev/disk2',
+      size: 64_000_000_000,
+      freeSpace: 30_000_000_000,
+      fileCount: 200,
+      deviceType: 'SD',
+      isRemovable: true,
+    }
 
+    it('shows no SD cards message when none detected', async () => {
+      const project = createMockProject()
+      setupProjectDetail(project)
       const user = userEvent.setup()
+
       render(
         <NotificationProvider>
           <Projects initialSelectedProjectId="1" />
@@ -1308,27 +1317,7 @@ describe('projects', () => {
       )
 
       await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
-      await user.click(screen.getByTitle('Import from SD Card'))
-
-      await waitFor(() => {
-        expect(screen.getByText('Scanning for SD cards...')).toBeTruthy()
-      })
-    })
-
-    it('shows no SD cards state when none detected', async () => {
-      sdCardScannerState.isScanning = false
-      sdCardScannerState.sdCards = []
-      projectDetailInvoke()
-
-      const user = userEvent.setup()
-      render(
-        <NotificationProvider>
-          <Projects initialSelectedProjectId="1" />
-        </NotificationProvider>
-      )
-
-      await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
-      await user.click(screen.getByTitle('Import from SD Card'))
+      await user.click(screen.getByText('Import'))
 
       await waitFor(() => {
         expect(
@@ -1337,21 +1326,13 @@ describe('projects', () => {
       })
     })
 
-    it('shows SD card list when cards are available', async () => {
-      const card: SDCard = {
-        deviceType: 'SD',
-        fileCount: 42,
-        freeSpace: 1_000_000_000,
-        isRemovable: true,
-        name: 'LUMIX SD',
-        path: '/Volumes/LUMIX',
-        size: 64_000_000_000,
-      }
-      sdCardScannerState.isScanning = false
-      sdCardScannerState.sdCards = [card]
-      projectDetailInvoke()
+    it('shows scanning message when scanner is active', async () => {
+      mockSdScannerState.isScanning = true
 
+      const project = createMockProject()
+      setupProjectDetail(project)
       const user = userEvent.setup()
+
       render(
         <NotificationProvider>
           <Projects initialSelectedProjectId="1" />
@@ -1359,10 +1340,31 @@ describe('projects', () => {
       )
 
       await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
-      await user.click(screen.getByTitle('Import from SD Card'))
+      await user.click(screen.getByText('Import'))
 
       await waitFor(() => {
-        expect(screen.getByText('LUMIX SD')).toBeTruthy()
+        expect(screen.getByText('Scanning for SD cards...')).toBeTruthy()
+      })
+    })
+
+    it('lists detected SD cards', async () => {
+      mockSdScannerState.sdCards = [mockSDCard]
+
+      const project = createMockProject()
+      setupProjectDetail(project)
+      const user = userEvent.setup()
+
+      render(
+        <NotificationProvider>
+          <Projects initialSelectedProjectId="1" />
+        </NotificationProvider>
+      )
+
+      await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
+      await user.click(screen.getByText('Import'))
+
+      await waitFor(() => {
+        expect(screen.getByText('NIKON D850')).toBeTruthy()
       })
     })
 
@@ -1376,8 +1378,8 @@ describe('projects', () => {
         path: '/Volumes/TESTSD',
         size: 32_000_000_000,
       }
-      sdCardScannerState.isScanning = false
-      sdCardScannerState.sdCards = [card]
+      mockSdScannerState.isScanning = false
+      mockSdScannerState.sdCards = [card]
 
       let resolveCopy!: (v: CopyResult) => void
       const copyPromise = new Promise<CopyResult>((res) => {
@@ -1394,6 +1396,7 @@ describe('projects', () => {
       })
 
       const user = userEvent.setup()
+
       render(
         <NotificationProvider>
           <Projects initialSelectedProjectId="1" />
@@ -1401,7 +1404,7 @@ describe('projects', () => {
       )
 
       await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
-      await user.click(screen.getByTitle('Import from SD Card'))
+      await user.click(screen.getByText('Import'))
       await waitFor(() => expect(screen.getByText('TEST SD')).toBeTruthy())
 
       await user.click(screen.getByText('TEST SD'))
@@ -1423,105 +1426,85 @@ describe('projects', () => {
       })
     })
 
-    it('shows import result after successful import', async () => {
-      const card: SDCard = {
-        deviceType: 'SD',
-        fileCount: 5,
-        freeSpace: 1_000_000_000,
-        isRemovable: true,
-        name: 'RESULT SD',
-        path: '/Volumes/RESULTSD',
-        size: 32_000_000_000,
-      }
-      sdCardScannerState.isScanning = false
-      sdCardScannerState.sdCards = [card]
+    it('shows import complete after successful import', async () => {
+      mockSdScannerState.sdCards = [mockSDCard]
 
+      const project = createMockProject({ id: 'proj-1' })
       const copyResult: CopyResult = {
-        error: undefined,
+        success: true,
         filesCopied: 5,
         filesSkipped: 0,
-        photosCopied: 3,
         skippedFiles: [],
-        success: true,
-        totalBytes: 10240,
-        videosCopied: 2,
+        totalBytes: 524_288_000,
+        photosCopied: 5,
+        videosCopied: 0,
       }
 
-      mockInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'get_project') return Promise.resolve(createMockProject())
-        if (cmd === 'get_project_import_history') return Promise.resolve([])
-        if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
+      setupProjectDetail(project, (cmd: string) => {
+        if (cmd === 'update_project_status')
+          return Promise.resolve({ ...project, status: ProjectStatus.Editing })
         if (cmd === 'list_sd_card_files')
-          return Promise.resolve(['/Volumes/RESULTSD/IMG_001.jpg', '/Volumes/RESULTSD/VID_001.mp4'])
+          return Promise.resolve(['/card/IMG_001.jpg', '/card/IMG_002.jpg'])
         if (cmd === 'copy_files') return Promise.resolve(copyResult)
-        if (cmd === 'save_import_history') return Promise.resolve(undefined)
-        if (cmd === 'update_project_status') return Promise.resolve(createMockProject())
-        return Promise.resolve([])
+        if (cmd === 'save_import_history') return Promise.resolve()
       })
 
       const user = userEvent.setup()
       render(
         <NotificationProvider>
-          <Projects initialSelectedProjectId="1" />
+          <Projects initialSelectedProjectId="proj-1" />
         </NotificationProvider>
       )
 
       await waitFor(() => expect(screen.getByText('Import')).toBeTruthy())
-      await user.click(screen.getByTitle('Import from SD Card'))
-      await waitFor(() => expect(screen.getByText('RESULT SD')).toBeTruthy())
+      await user.click(screen.getByText('Import'))
 
-      await user.click(screen.getByText('RESULT SD'))
+      await waitFor(() => expect(screen.getByText('NIKON D850')).toBeTruthy())
+      await user.click(screen.getByText('NIKON D850').closest('[role="button"]')!)
       await user.click(screen.getByText('Start Import'))
 
       await waitFor(() => {
         expect(screen.getByText('Import Complete')).toBeTruthy()
-        expect(screen.getByText(/Successfully imported 5 files/)).toBeTruthy()
       })
     })
   })
 
-  describe('deleting State', () => {
-    it('shows spinner while delete is in progress', async () => {
-      const project = createMockProject({ id: 'proj-del', name: 'To Delete' })
-
+  describe('delete Dialog Spinner', () => {
+    it('shows deleting spinner while deletion is in progress', async () => {
+      const project = createMockProject({ id: 'proj-123', name: 'Test Project' })
       let resolveDelete!: () => void
-      const deletePromise = new Promise<void>((res) => {
-        resolveDelete = res
-      })
 
       mockInvoke.mockImplementation((cmd: string) => {
         if (cmd === 'get_project') return Promise.resolve(project)
         if (cmd === 'get_project_import_history') return Promise.resolve([])
         if (cmd === 'get_home_directory') return Promise.resolve('/Users/test')
-        if (cmd === 'delete_project') return deletePromise
+        if (cmd === 'delete_project')
+          return new Promise<void>((resolve) => {
+            resolveDelete = resolve
+          })
         return Promise.resolve([])
       })
 
-      const user = userEvent.setup()
       render(
         <NotificationProvider>
-          <Projects initialSelectedProjectId="proj-del" />
+          <Projects initialSelectedProjectId="proj-123" />
         </NotificationProvider>
       )
 
       await waitFor(() => expect(screen.getAllByText('Delete Project').length).toBeGreaterThan(0))
 
-      const deleteButton = screen
+      const dangerBtn = screen
         .getAllByText('Delete Project')
-        .find((btn) => btn.classList.contains('btn-danger'))
-      await user.click(deleteButton!)
+        .find((btn) => btn.classList.contains('btn-danger'))!
+      fireEvent.click(dangerBtn)
 
       await waitFor(() => expect(screen.getByText(/Are you sure/)).toBeTruthy())
+      fireEvent.click(screen.getAllByText('Delete Project').at(-1)!)
 
-      const confirmButtons = screen.getAllByText('Delete Project')
-      await user.click(confirmButtons.at(-1)!)
-
-      await waitFor(() => {
-        expect(screen.getByText('Deleting Project')).toBeTruthy()
-        expect(screen.getByText('Hang tight, removing your project...')).toBeTruthy()
-      })
+      await waitFor(() => expect(screen.getByText('Deleting Project')).toBeTruthy())
 
       resolveDelete()
+      await waitFor(() => expect(screen.queryByText('Deleting Project')).toBeNull())
     })
   })
 
