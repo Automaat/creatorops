@@ -264,3 +264,13 @@ a:hover {
   color: var(--color-text-tertiary);
   line-height: var(--line-height-base);
 }
+
+/* View visibility utilities */
+
+.view-hidden {
+  display: none;
+}
+
+.view-active {
+  display: block;
+}

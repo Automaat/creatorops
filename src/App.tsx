@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Layout } from './components/Layout'
+
+import { CommandPalette } from './components/CommandPalette'
 import { Dashboard } from './components/Dashboard'
-import { Import } from './components/Import'
-import { Projects } from './components/Projects'
 import { BackupQueue } from './components/BackupQueue'
 import { Delivery } from './components/Delivery'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { History } from './components/History'
-import { Settings } from './components/Settings'
-import { NotificationToast } from './components/NotificationToast'
+import { Import } from './components/Import'
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp'
-import { CommandPalette } from './components/CommandPalette'
-import { useTheme } from './hooks/useTheme'
-import { useSDCardScanner } from './hooks/useSDCardScanner'
+import { Layout } from './components/Layout'
+import { NotificationToast } from './components/NotificationToast'
+import { Projects } from './components/Projects'
+import { Settings } from './components/Settings'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useSDCardScanner } from './hooks/useSDCardScanner'
+import { useTheme } from './hooks/useTheme'
 import type { Project } from './types'
 
 type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'history' | 'settings'
@@ -21,6 +24,21 @@ type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'histo
 function isView(value: string): value is View {
   return ['dashboard', 'import', 'projects', 'backup', 'delivery', 'history', 'settings'].includes(
     value
+  )
+}
+
+interface ViewWrapperProps {
+  isActive: boolean
+  name: string
+  children: ReactNode
+}
+
+function ViewWrapper({ isActive, name, children }: ViewWrapperProps) {
+  const className = isActive ? 'view-active' : 'view-hidden'
+  return (
+    <div className={className}>
+      <ErrorBoundary name={name}>{children}</ErrorBoundary>
+    </div>
   )
 }
 
@@ -163,35 +181,35 @@ function App() {
         importCount={sdCards.length}
         projectsCount={projectsCount}
       >
-        <div style={{ display: currentView === 'dashboard' ? 'block' : 'none' }}>
+        <ViewWrapper isActive={currentView === 'dashboard'} name="Dashboard">
           <Dashboard onProjectClick={handleNavigateToProject} />
-        </div>
-        <div style={{ display: currentView === 'import' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'import'} name="Import">
           <Import
             sdCards={sdCards}
             isScanning={isScanning}
             onImportComplete={handleNavigateToProject}
           />
-        </div>
-        <div style={{ display: currentView === 'projects' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'projects'} name="Projects">
           <Projects
             key={`${selectedProjectId ?? 'projects-list'}-${projectsResetKey}`}
             initialSelectedProjectId={selectedProjectId}
             onBackFromProject={handleBackFromProject}
           />
-        </div>
-        <div style={{ display: currentView === 'backup' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'backup'} name="Backup Queue">
           <BackupQueue />
-        </div>
-        <div style={{ display: currentView === 'delivery' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'delivery'} name="Delivery">
           <Delivery />
-        </div>
-        <div style={{ display: currentView === 'history' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'history'} name="History">
           <History />
-        </div>
-        <div style={{ display: currentView === 'settings' ? 'block' : 'none' }}>
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'settings'} name="Settings">
           <Settings />
-        </div>
+        </ViewWrapper>
       </Layout>
       <NotificationToast />
       <KeyboardShortcutsHelp
