@@ -43,7 +43,7 @@ hyper = { version = "1.0", features = ["server", "http1"] }
 hyper-rustls = "0.27"
 http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio"] }
-keyring = "3.0"
+keyring = "4.0"
 rand = "0.10"
 base64 = "0.22"
 urlencoding = "2.1"
