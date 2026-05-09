@@ -10,7 +10,7 @@ function Thrower({ shouldThrow }: { shouldThrow: boolean }) {
   return <div>content</div>
 }
 
-function AlwaysThrows() {
+function AlwaysThrows(): never {
   throw new Error('Component crashed')
 }
 
