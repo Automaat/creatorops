@@ -1,9 +1,11 @@
 //! Google Drive integration for uploading delivered project files.
 //!
 //! Implements the OAuth 2.0 PKCE flow: starts a temporary local HTTP server to
-//! receive the redirect, exchanges the authorisation code for tokens, and stores
-//! credentials in the `SQLite` database. Uploaded files are placed in a
-//! user-configurable parent folder on Google Drive.
+//! receive the redirect, exchanges the authorisation code for tokens, and persists
+//! them using two separate stores: account metadata (email, display name, folder
+//! configuration) goes into SQLite, while OAuth tokens are written as AES-encrypted
+//! files under `~/.creatorops/google_tokens_*.enc` (owner-only permissions, 0o600).
+//! Uploaded files are placed in a user-configurable parent folder on Google Drive.
 
 #![allow(clippy::unreachable)] // False positive: Clippy incorrectly flags Result returns
 
@@ -30,7 +32,9 @@ const HTTP_TIMEOUT_SECONDS: u64 = 60; // HTTP client timeout
 
 // Data Structures
 
-/// Persisted Google Drive account credentials and configuration.
+/// Google Drive account metadata and configuration stored in SQLite.
+///
+/// OAuth tokens are stored separately in an encrypted file; see `store_tokens_in_keychain`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoogleDriveAccount {
     pub id: String,
@@ -601,7 +605,7 @@ pub async fn set_drive_parent_folder(
     )
 }
 
-/// Remove the stored Google Drive account and revoke its keychain credentials.
+/// Remove the stored Google Drive account and delete its encrypted token file.
 #[tauri::command]
 pub async fn remove_google_drive_account(db: tauri::State<'_, Database>) -> Result<(), String> {
     // First get the email to remove from keychain
