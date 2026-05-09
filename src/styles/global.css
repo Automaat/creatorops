@@ -123,6 +123,9 @@ a:hover {
   gap: var(--space-xxl);
 }
 
+.pad-sm {
+  padding: var(--space-sm);
+}
 .pad-md {
   padding: var(--space-md);
 }
@@ -130,8 +133,14 @@ a:hover {
   padding: var(--space-lg);
 }
 
+.mt-sm {
+  margin-top: var(--space-sm);
+}
 .mt-md {
   margin-top: var(--space-md);
+}
+.mt-lg {
+  margin-top: var(--space-lg);
 }
 
 .text-sm {
