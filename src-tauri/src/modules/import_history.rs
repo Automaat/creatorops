@@ -5,6 +5,7 @@
 //! history. At most 100 records are kept; older entries are pruned on write.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::AppError;
 use crate::modules::file_utils::{get_home_dir, get_timestamp};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -118,21 +119,21 @@ pub async fn get_project_import_history(project_id: String) -> Result<Vec<Import
         .collect())
 }
 
-fn load_all_histories() -> Result<Vec<ImportHistory>, String> {
+fn load_all_histories() -> Result<Vec<ImportHistory>, AppError> {
     let history_path = get_history_file_path()?;
 
     if !history_path.exists() {
         return Ok(Vec::new());
     }
 
-    let json_data = fs::read_to_string(&history_path).map_err(|e| e.to_string())?;
-    serde_json::from_str(&json_data).map_err(|e| e.to_string())
+    let json_data = fs::read_to_string(&history_path)?;
+    Ok(serde_json::from_str(&json_data)?)
 }
 
-fn get_history_file_path() -> Result<PathBuf, String> {
+fn get_history_file_path() -> Result<PathBuf, AppError> {
     let home_dir = get_home_dir()?;
     let base_path = home_dir.join("CreatorOps");
-    fs::create_dir_all(&base_path).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&base_path)?;
     Ok(base_path.join("import_history.json"))
 }
 

@@ -5,6 +5,7 @@
 //! Final Cut Pro). All launch calls are fire-and-forget background processes.
 
 #![allow(clippy::wildcard_imports)] // Tauri command macro uses wildcard imports
+use crate::error::AppError;
 use std::process::Command;
 
 // Windows application paths for external editors
@@ -44,20 +45,20 @@ fn open_in_external_app(
     app_name: &str,
     #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] windows_paths: &[&str],
     #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] linux_path: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let media_path = std::path::Path::new(project_path)
         .join("RAW")
         .join(subfolder);
 
     if !media_path.exists() {
-        return Err(format!(
+        return Err(AppError::InvalidData(format!(
             "{subfolder} directory not found. Expected RAW/{subfolder} subdirectory."
-        ));
+        )));
     }
 
     let media_path_str = media_path
         .to_str()
-        .ok_or_else(|| "Invalid path encoding".to_owned())?;
+        .ok_or_else(|| AppError::InvalidData("Invalid path encoding".to_owned()))?;
 
     #[cfg(target_os = "macos")]
     {
@@ -66,7 +67,7 @@ fn open_in_external_app(
             .arg(app_name)
             .arg(media_path_str)
             .spawn()
-            .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
+            .map_err(|e| AppError::InvalidData(format!("Failed to open in {app_name}: {e}")))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -77,17 +78,18 @@ fn open_in_external_app(
                 Command::new(exe_path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
+                    .map_err(|e| {
+                        AppError::InvalidData(format!("Failed to open in {app_name}: {e}"))
+                    })?;
                 launched = true;
                 break;
             }
         }
 
         if !launched {
-            return Err(format!(
-                "{} not found. Please ensure it's installed.",
-                app_name
-            ));
+            return Err(AppError::InvalidData(format!(
+                "{app_name} not found. Please ensure it's installed."
+            )));
         }
     }
 
@@ -98,14 +100,18 @@ fn open_in_external_app(
                 Command::new(path)
                     .arg(media_path_str)
                     .spawn()
-                    .map_err(|e| format!("Failed to open in {app_name}: {e}"))?;
+                    .map_err(|e| {
+                        AppError::InvalidData(format!("Failed to open in {app_name}: {e}"))
+                    })?;
             } else {
-                return Err(format!(
+                return Err(AppError::InvalidData(format!(
                     "{app_name} not found. Please ensure it's installed."
-                ));
+                )));
             }
         } else {
-            return Err(format!("{app_name} not supported on Linux"));
+            return Err(AppError::InvalidData(format!(
+                "{app_name} not supported on Linux"
+            )));
         }
     }
 
@@ -158,6 +164,7 @@ pub fn open_in_lightroom(path: &str) -> Result<(), String> {
     let paths = &[];
 
     open_in_external_app(path, "Photos", "Adobe Lightroom Classic", paths, None)
+        .map_err(String::from)
 }
 
 /// Open the project's `RAW/Photos` folder in `AfterShoot`.
@@ -168,7 +175,7 @@ pub fn open_in_aftershoot(path: &str) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
     let paths = &[];
 
-    open_in_external_app(path, "Photos", "AfterShoot", paths, None)
+    open_in_external_app(path, "Photos", "AfterShoot", paths, None).map_err(String::from)
 }
 
 /// Open the project's `RAW/Videos` folder in `DaVinci` Resolve.
@@ -186,6 +193,7 @@ pub fn open_in_davinci_resolve(path: &str) -> Result<(), String> {
         paths,
         Some("/opt/resolve/bin/resolve"),
     )
+    .map_err(String::from)
 }
 
 /// Open the project's `RAW/Videos` folder in Final Cut Pro (macOS only).
@@ -198,6 +206,7 @@ pub fn open_in_final_cut_pro(path: &str) -> Result<(), String> {
         &[],
         Some("/Applications/Final Cut Pro.app/Contents/MacOS/Final Cut Pro"),
     )
+    .map_err(String::from)
 }
 
 #[allow(clippy::wildcard_imports)]
@@ -227,7 +236,7 @@ mod tests {
         let result = open_in_external_app(project_path, "NonExistent", "TestApp", &[], None);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not found"));
+        assert!(result.unwrap_err().to_string().contains("not found"));
 
         std::fs::remove_dir_all(temp_dir).ok();
     }
@@ -365,6 +374,6 @@ mod tests {
         );
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not found"));
+        assert!(result.unwrap_err().to_string().contains("not found"));
     }
 }

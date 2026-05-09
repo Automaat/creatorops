@@ -47,6 +47,10 @@ pub enum AppError {
     /// Configuration error
     #[error("Configuration error: {0}")]
     Config(String),
+
+    /// JSON serialization/deserialization error
+    #[error("Serialization error: {0}")]
+    Serde(#[from] serde_json::Error),
 }
 
 /// Convert `AppError` to String for Tauri commands
@@ -82,5 +86,12 @@ mod tests {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let app_err: AppError = io_err.into();
         assert!(app_err.to_string().contains("IO error"));
+    }
+
+    #[test]
+    fn test_serde_error_conversion() {
+        let serde_err = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
+        let app_err: AppError = serde_err.into();
+        assert!(app_err.to_string().contains("Serialization error"));
     }
 }

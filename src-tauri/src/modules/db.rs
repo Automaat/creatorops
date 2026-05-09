@@ -96,9 +96,7 @@ impl Database {
 
     /// Get default database file path
     fn get_default_path() -> Result<PathBuf, AppError> {
-        let home_dir = crate::modules::file_utils::get_home_dir()
-            .map_err(|e| AppError::Config(format!("Failed to get home directory: {e}")))?;
-
+        let home_dir = crate::modules::file_utils::get_home_dir()?;
         Ok(home_dir.join("CreatorOps").join("creatorops.db"))
     }
 
