@@ -87,7 +87,11 @@ impl Drop for SessionCleanup {
 fn generate_random_alphanumeric(length: usize) -> String {
     use rand::distr::Alphanumeric;
     use rand::RngExt;
-    rand::rng().sample_iter(Alphanumeric).take(length).map(char::from).collect()
+    rand::rng()
+        .sample_iter(Alphanumeric)
+        .take(length)
+        .map(char::from)
+        .collect()
 }
 
 fn generate_pkce() -> PkceData {
