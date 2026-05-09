@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 import { CommandPalette } from './components/CommandPalette'
+import { Clients } from './components/Clients'
 import { Dashboard } from './components/Dashboard'
 import { BackupQueue } from './components/BackupQueue'
 import { Delivery } from './components/Delivery'
@@ -18,14 +19,29 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useNotification } from './hooks/useNotification'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 import { useTheme } from './hooks/useTheme'
-import type { Project } from './types'
+import type { Client, Project } from './types'
 
-type View = 'dashboard' | 'import' | 'projects' | 'backup' | 'delivery' | 'history' | 'settings'
+type View =
+  | 'dashboard'
+  | 'import'
+  | 'projects'
+  | 'clients'
+  | 'backup'
+  | 'delivery'
+  | 'history'
+  | 'settings'
 
 function isView(value: string): value is View {
-  return ['dashboard', 'import', 'projects', 'backup', 'delivery', 'history', 'settings'].includes(
-    value
-  )
+  return [
+    'dashboard',
+    'import',
+    'projects',
+    'clients',
+    'backup',
+    'delivery',
+    'history',
+    'settings',
+  ].includes(value)
 }
 
 interface ViewWrapperProps {
@@ -51,6 +67,7 @@ function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>()
   const [projectsCount, setProjectsCount] = useState<number>(0)
+  const [clientsCount, setClientsCount] = useState<number>(0)
   const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
   const [projectsResetKey, setProjectsResetKey] = useState<number>(0)
 
@@ -70,9 +87,19 @@ function App() {
     }
   }, [showError])
 
+  const loadClientsCount = useCallback(async () => {
+    try {
+      const clients = await invoke<Client[]>('list_clients', { includeArchived: false })
+      setClientsCount(clients.length)
+    } catch (error) {
+      console.error('Failed to load client count:', error)
+    }
+  }, [])
+
   useEffect(() => {
     void loadProjectCount()
-  }, [loadProjectCount])
+    void loadClientsCount()
+  }, [loadProjectCount, loadClientsCount])
 
   // Global SD card scanner - runs in background across all pages
   const { sdCards, isScanning, scanForSDCards } = useSDCardScanner({
@@ -119,21 +146,27 @@ function App() {
         metaKey: true,
       },
       {
+        action: () => setCurrentView('clients'),
+        description: 'Go to Clients',
+        key: '4',
+        metaKey: true,
+      },
+      {
         action: () => setCurrentView('backup'),
         description: 'Go to Backup Queue',
-        key: '4',
+        key: '5',
         metaKey: true,
       },
       {
         action: () => setCurrentView('delivery'),
         description: 'Go to Delivery',
-        key: '5',
+        key: '6',
         metaKey: true,
       },
       {
         action: () => setCurrentView('history'),
         description: 'Go to History',
-        key: '6',
+        key: '7',
         metaKey: true,
       },
       {
@@ -173,9 +206,12 @@ function App() {
     if (isView(view)) {
       setCurrentView(view)
     }
-    // Refresh count when switching to views that show projects
+    // Refresh counts when switching to relevant views
     if (view === 'dashboard' || view === 'projects') {
       void loadProjectCount()
+    }
+    if (view === 'clients') {
+      void loadClientsCount()
     }
   }
 
@@ -186,6 +222,7 @@ function App() {
         onNavigate={handleViewChange}
         importCount={sdCards.length}
         projectsCount={projectsCount}
+        clientsCount={clientsCount}
       >
         <ViewWrapper isActive={currentView === 'dashboard'} name="Dashboard">
           <Dashboard
@@ -207,6 +244,9 @@ function App() {
             isActive={currentView === 'projects'}
             onBackFromProject={handleBackFromProject}
           />
+        </ViewWrapper>
+        <ViewWrapper isActive={currentView === 'clients'} name="Clients">
+          <Clients isActive={currentView === 'clients'} />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'backup'} name="Backup Queue">
           <BackupQueue isActive={currentView === 'backup'} />

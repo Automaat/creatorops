@@ -20,6 +20,7 @@ interface LayoutProps {
   onNavigate: (view: string) => void
   importCount?: number
   projectsCount?: number
+  clientsCount?: number
 }
 
 export function Layout({
@@ -28,6 +29,7 @@ export function Layout({
   onNavigate,
   importCount,
   projectsCount,
+  clientsCount,
 }: LayoutProps) {
   return (
     <div className="app-container">
@@ -59,6 +61,13 @@ export function Layout({
               active={currentView === 'projects'}
               count={projectsCount}
               onClick={() => onNavigate('projects')}
+            />
+            <NavItem
+              icon="👥"
+              label="Clients"
+              active={currentView === 'clients'}
+              count={clientsCount}
+              onClick={() => onNavigate('clients')}
             />
           </NavSection>
 

@@ -34,6 +34,31 @@ impl Database {
 
     /// Initialize database schema
     fn init_schema(conn: &Connection) -> Result<(), AppError> {
+        // Create clients table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS clients (
+                id TEXT PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                email TEXT,
+                phone TEXT,
+                notes TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status)",
+            [],
+        )?;
+
         // Create projects table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
@@ -50,6 +75,17 @@ impl Database {
             )",
             [],
         )?;
+
+        // Migration: add client_id column to existing projects tables
+        let add_client_id = conn.execute(
+            "ALTER TABLE projects ADD COLUMN client_id TEXT REFERENCES clients(id)",
+            [],
+        );
+        if let Err(e) = add_client_id {
+            if !e.to_string().contains("duplicate column") {
+                return Err(e.into());
+            }
+        }
 
         // Create indexes for common queries
         conn.execute(
@@ -88,6 +124,11 @@ impl Database {
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_client_name ON projects(client_name)",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_projects_client_id ON projects(client_id)",
             [],
         )?;
 
@@ -178,6 +219,25 @@ mod tests {
         assert!(indexes.contains(&"idx_projects_updated_at".to_owned()));
         assert!(indexes.contains(&"idx_projects_date".to_owned()));
         assert!(indexes.contains(&"idx_projects_client_name".to_owned()));
+        assert!(indexes.contains(&"idx_projects_client_id".to_owned()));
+    }
+
+    #[test]
+    fn test_schema_initialization_creates_clients_table() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let db = Database::new_with_path(&db_path).unwrap();
+
+        let exists = db
+            .execute(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='clients'",
+                )?;
+                Ok(stmt.exists([])?)
+            })
+            .unwrap();
+
+        assert!(exists);
     }
 
     #[test]

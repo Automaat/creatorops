@@ -1,5 +1,22 @@
 // Type definitions
 
+type ClientStatus = 'active' | 'archived'
+
+interface Client {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+  notes?: string
+  status: ClientStatus
+  createdAt: string
+  updatedAt: string
+}
+
+interface ClientWithProjects extends Client {
+  projects: Project[]
+}
+
 interface SDCard {
   name: string
   path: string
@@ -21,6 +38,7 @@ interface Project {
   createdAt: string
   updatedAt: string
   deadline?: string
+  clientId?: string
 }
 
 enum ProjectStatus {
@@ -222,6 +240,9 @@ interface ProjectFile {
 }
 
 export type {
+  Client,
+  ClientStatus,
+  ClientWithProjects,
   SDCard,
   Project,
   ImportProgress,

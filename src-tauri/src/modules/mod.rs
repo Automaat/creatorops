@@ -5,6 +5,7 @@
 
 pub mod archive;
 pub mod backup;
+pub mod client;
 pub mod db;
 pub mod delivery;
 pub mod file_copy;
