@@ -188,7 +188,10 @@ function App() {
         projectsCount={projectsCount}
       >
         <ViewWrapper isActive={currentView === 'dashboard'} name="Dashboard">
-          <Dashboard isActive={currentView === 'dashboard'} onProjectClick={handleNavigateToProject} />
+          <Dashboard
+            isActive={currentView === 'dashboard'}
+            onProjectClick={handleNavigateToProject}
+          />
         </ViewWrapper>
         <ViewWrapper isActive={currentView === 'import'} name="Import">
           <Import
