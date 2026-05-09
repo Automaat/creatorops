@@ -583,11 +583,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
               className="btn-icon"
               title="Show in Finder"
             >
-              <img
-                src={folderIcon}
-                alt="Show in Finder"
-                className="icon-sm"
-              />
+              <img src={folderIcon} alt="Show in Finder" className="icon-sm" />
             </button>
           </div>
           {importHistory.length > 0 && importHistory[0].status === 'success' && (
