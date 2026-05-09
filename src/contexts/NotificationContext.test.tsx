@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, renderHook } from '@testing-library/react'
-import { NotificationContext, NotificationProvider } from './NotificationContext'
+import { NotificationContext } from './notification-context'
+import { NotificationProvider } from './NotificationContext'
 import { useContext } from 'react'
 
 describe('notificationContext', () => {
