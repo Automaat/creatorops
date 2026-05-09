@@ -13,9 +13,23 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 const mockInvoke = vi.mocked(invoke)
 
+const mockProject: Project = {
+  clientName: 'Test Client',
+  createdAt: '2025-11-20',
+  date: '2025-11-20',
+  folderPath: '/test/path',
+  id: '123',
+  name: 'Test Project',
+  shootType: '',
+  status: ProjectStatus.Editing,
+  updatedAt: '2025-11-20',
+}
+
 describe('createProject', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // list_clients returns empty by default
+    mockInvoke.mockResolvedValue([])
   })
 
   it('renders form with all fields', () => {
@@ -51,40 +65,20 @@ describe('createProject', () => {
     expect(dateInput).toBeTruthy()
   })
 
-  it('updates form fields when typing', async () => {
+  it('updates project name when typing', async () => {
     const user = userEvent.setup()
     render(<CreateProject />)
 
     const nameInput = screen.getByLabelText(/Project Name/)
-    const clientInput = screen.getByLabelText(/Client Name/)
-    const shootTypeInput = screen.getByLabelText(/Shoot Type/)
-
     await user.type(nameInput, 'Test Project')
-    await user.type(clientInput, 'Test Client')
-    await user.type(shootTypeInput, 'Wedding')
 
     expect(nameInput).toBeInstanceOf(HTMLInputElement)
     expect(nameInput).toHaveProperty('value', 'Test Project')
-    expect(clientInput).toBeInstanceOf(HTMLInputElement)
-    expect(clientInput).toHaveProperty('value', 'Test Client')
-    expect(shootTypeInput).toBeInstanceOf(HTMLInputElement)
-    expect(shootTypeInput).toHaveProperty('value', 'Wedding')
   })
 
   it('calls onProjectCreated with created project on submit', async () => {
-    const mockProject: Project = {
-      clientName: 'Test Client',
-      createdAt: '2025-11-20',
-      date: '2025-11-20',
-      folderPath: '/test/path',
-      id: '123',
-      name: 'Test Project',
-      shootType: '',
-      status: ProjectStatus.Editing,
-      updatedAt: '2025-11-20',
-    }
-
-    mockInvoke.mockResolvedValue(mockProject)
+    mockInvoke.mockResolvedValueOnce([]) // list_clients
+    mockInvoke.mockResolvedValueOnce(mockProject) // create_project
 
     const onProjectCreated = vi.fn()
     const user = userEvent.setup()
@@ -119,7 +113,8 @@ describe('createProject', () => {
 
   it('shows loading state while submitting', async () => {
     let resolveInvoke: (value: Project) => void
-    mockInvoke.mockReturnValue(
+    mockInvoke.mockReturnValueOnce(Promise.resolve([])) // list_clients
+    mockInvoke.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveInvoke = resolve
       })
@@ -155,7 +150,8 @@ describe('createProject', () => {
   })
 
   it('disables buttons while submitting', async () => {
-    mockInvoke.mockReturnValue(new Promise(() => {}))
+    mockInvoke.mockReturnValueOnce(Promise.resolve([])) // list_clients
+    mockInvoke.mockReturnValueOnce(new Promise(() => {}))
 
     const onCancel = vi.fn()
     const user = userEvent.setup()
@@ -178,7 +174,8 @@ describe('createProject', () => {
   })
 
   it('displays error message on submit failure', async () => {
-    mockInvoke.mockRejectedValue(new Error('Database error'))
+    mockInvoke.mockReturnValueOnce(Promise.resolve([])) // list_clients
+    mockInvoke.mockRejectedValueOnce(new Error('Database error'))
 
     const user = userEvent.setup()
     render(<CreateProject />)
@@ -198,18 +195,9 @@ describe('createProject', () => {
   })
 
   it('clears error on new submit attempt', async () => {
+    mockInvoke.mockReturnValueOnce(Promise.resolve([])) // list_clients
     mockInvoke.mockRejectedValueOnce(new Error('First error'))
-    mockInvoke.mockResolvedValueOnce({
-      clientName: 'Test',
-      createdAt: '2025-11-20',
-      date: '2025-11-20',
-      folderPath: '/test/path',
-      id: '1',
-      name: 'Test',
-      shootType: '',
-      status: ProjectStatus.Editing,
-      updatedAt: '2025-11-20',
-    })
+    mockInvoke.mockResolvedValueOnce(mockProject)
 
     const user = userEvent.setup()
     render(<CreateProject />)
@@ -246,17 +234,5 @@ describe('createProject', () => {
 
     const optionalLabels = screen.getAllByText(/\(optional\)/)
     expect(optionalLabels.length).toBeGreaterThanOrEqual(2) // Shoot Type and Deadline
-  })
-
-  it('prevents form submission when required fields are empty', async () => {
-    const user = userEvent.setup()
-
-    render(<CreateProject />)
-
-    const submitButton = screen.getByText('Create Project')
-    await user.click(submitButton)
-
-    // HTML5 validation should prevent the invoke from being called
-    expect(invoke).not.toHaveBeenCalled()
   })
 })

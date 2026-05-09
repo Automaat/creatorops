@@ -28,6 +28,8 @@ pub struct Project {
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deadline: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
 }
 
 /// Workflow stage of a project from creation through archiving.
@@ -79,8 +81,8 @@ fn sanitize_path_component(s: &str) -> String {
         .collect()
 }
 
-/// Map a database row to a Project struct
-fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
+/// Map a database row to a `Project`.
+pub fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
     let status_str: String = row.get(5)?;
     let status = status_str.parse::<ProjectStatus>().map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(
@@ -101,6 +103,7 @@ fn map_project_row(row: &rusqlite::Row) -> rusqlite::Result<Project> {
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
         deadline: row.get(9)?,
+        client_id: row.get(10)?,
     })
 }
 
@@ -113,11 +116,35 @@ pub async fn create_project(
     date: String,
     shoot_type: String,
     deadline: Option<String>,
+    client_id: Option<String>,
 ) -> Result<Project, String> {
     let id = Uuid::new_v4().to_string();
 
+    // When client_id is provided, look up the canonical client name
+    let resolved_client_name = if let Some(ref cid) = client_id {
+        let looked_up = db
+            .execute(|conn| {
+                conn.query_row(
+                    "SELECT name FROM clients WHERE id = ?1",
+                    params![cid],
+                    |row| row.get::<_, String>(0),
+                )
+                .map_err(|e| {
+                    if e == rusqlite::Error::QueryReturnedNoRows {
+                        AppError::InvalidData(format!("Client not found: {cid}"))
+                    } else {
+                        AppError::from(e)
+                    }
+                })
+            })
+            .map_err(|e| format!("Failed to look up client: {e}"))?;
+        looked_up
+    } else {
+        client_name
+    };
+
     // Create folder structure: YYYY-MM-DD_ClientName[_ProjectType]/[RAW, Selects, Delivery]
-    let sanitized_client = sanitize_path_component(&client_name);
+    let sanitized_client = sanitize_path_component(&resolved_client_name);
     let folder_name = if shoot_type.is_empty() {
         format!("{date}_{sanitized_client}")
     } else {
@@ -142,7 +169,7 @@ pub async fn create_project(
     let project = Project {
         id,
         name,
-        client_name,
+        client_name: resolved_client_name,
         date,
         shoot_type,
         status: ProjectStatus::New,
@@ -150,13 +177,15 @@ pub async fn create_project(
         created_at: now.clone(),
         updated_at: now,
         deadline: deadline.filter(|d| !d.is_empty()),
+        client_id,
     };
 
     // Insert into database
     db.execute(|conn| {
         conn.execute(
-            "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO projects (id, name, client_name, date, shoot_type, status, folder_path,
+              created_at, updated_at, deadline, client_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 &project.id,
                 &project.name,
@@ -168,6 +197,7 @@ pub async fn create_project(
                 &project.created_at,
                 &project.updated_at,
                 &project.deadline,
+                &project.client_id,
             ],
         )?;
         Ok(())
@@ -182,7 +212,7 @@ pub async fn create_project(
 pub async fn list_projects(db: tauri::State<'_, Database>) -> Result<Vec<Project>, String> {
     db.execute(|conn| {
         let mut stmt = conn
-            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC")?;
+            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline, client_id FROM projects ORDER BY updated_at DESC")?;
 
         let projects = stmt
             .query_map([], map_project_row)?
@@ -281,7 +311,7 @@ pub async fn update_project_deadline(
 fn get_project_by_id(db: &Database, project_id: &str) -> Result<Project, AppError> {
     db.execute(|conn| {
         let mut stmt = conn
-            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects WHERE id = ?1")?;
+            .prepare("SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline, client_id FROM projects WHERE id = ?1")?;
 
         stmt.query_row(params![project_id], map_project_row).map_err(|e| {
             if e == rusqlite::Error::QueryReturnedNoRows {
@@ -415,6 +445,7 @@ mod tests {
             created_at: "2024-01-15T10:00:00Z".to_owned(),
             updated_at: "2024-01-15T10:00:00Z".to_owned(),
             deadline: Some("2024-02-01".to_owned()),
+            client_id: None,
         };
 
         let json = serde_json::to_string(&project).unwrap();
@@ -487,7 +518,7 @@ mod tests {
         let projects = db
             .execute(|conn| {
                 let mut stmt = conn.prepare(
-                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC",
+                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline, client_id FROM projects ORDER BY updated_at DESC",
                 )?;
                 let projects = stmt
                     .query_map([], map_project_row)?
@@ -545,7 +576,7 @@ mod tests {
         let projects = db
             .execute(|conn| {
                 let mut stmt = conn.prepare(
-                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC",
+                    "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline, client_id FROM projects ORDER BY updated_at DESC",
                 )?;
                 let projects = stmt
                     .query_map([], map_project_row)?
@@ -704,6 +735,7 @@ mod tests {
             created_at: "2024-01-15T10:00:00Z".to_owned(),
             updated_at: "2024-01-15T10:00:00Z".to_owned(),
             deadline: Some("2024-07-01".to_owned()),
+            client_id: None,
         };
 
         assert_eq!(project.id, "test-123");
@@ -726,6 +758,7 @@ mod tests {
             created_at: "2024-01-15T10:00:00Z".to_owned(),
             updated_at: "2024-01-15T10:00:00Z".to_owned(),
             deadline: None,
+            client_id: None,
         };
 
         assert_eq!(project.deadline, None);
@@ -754,6 +787,7 @@ mod tests {
                 created_at: "2024-01-01T00:00:00Z".to_owned(),
                 updated_at: "2024-01-01T00:00:00Z".to_owned(),
                 deadline: None,
+                client_id: None,
             };
 
             assert_eq!(project.status, status);
@@ -838,7 +872,7 @@ mod tests {
 
         let projects = db.execute(|conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline FROM projects ORDER BY updated_at DESC"
+                "SELECT id, name, client_name, date, shoot_type, status, folder_path, created_at, updated_at, deadline, client_id FROM projects ORDER BY updated_at DESC"
             )?;
             let projects = stmt
                 .query_map([], map_project_row)?

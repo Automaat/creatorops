@@ -1,44 +1,52 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { Project } from '../types'
-import { ClientSelector } from './ClientSelector'
-import { DatePicker } from './DatePicker'
+import type { Client } from '../types'
 
-interface CreateProjectProps {
-  onProjectCreated?: (project: Project) => void
+interface CreateClientProps {
+  onClientCreated?: (client: Client) => void
   onCancel?: () => void
 }
 
-export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps) {
-  const [formData, setFormData] = useState(() => {
-    const today = new Date().toISOString().split('T')[0]
-    return {
-      clientId: null as string | null,
-      clientName: '',
-      date: today,
-      deadline: '',
-      name: '',
-      shootType: '',
-    }
+function validateEmail(email: string): boolean {
+  const atIdx = email.indexOf('@')
+  if (atIdx <= 0) return false
+  const afterAt = email.slice(atIdx + 1)
+  if (afterAt.includes('@') || afterAt.includes(' ')) return false
+  const dotIdx = afterAt.lastIndexOf('.')
+  return dotIdx > 0 && dotIdx < afterAt.length - 1
+}
+
+export function CreateClient({ onClientCreated, onCancel }: CreateClientProps) {
+  const [formData, setFormData] = useState({
+    email: '',
+    name: '',
+    notes: '',
+    phone: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.name.trim()) {
+      setError('Name is required')
+      return
+    }
+    if (formData.email && !validateEmail(formData.email)) {
+      setError('Invalid email format')
+      return
+    }
     setIsSubmitting(true)
     setError(undefined)
 
     try {
-      const project = await invoke<Project>('create_project', {
-        clientId: formData.clientId,
-        clientName: formData.clientName,
-        date: formData.date,
-        deadline: formData.deadline,
+      const client = await invoke<Client>('create_client', {
+        email: formData.email || null,
         name: formData.name,
-        shootType: formData.shootType,
+        notes: formData.notes || null,
+        phone: formData.phone || null,
       })
-      onProjectCreated?.(project)
+      onClientCreated?.(client)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -46,12 +54,14 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
     }
   }
 
-  const handleChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
+  const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    if (field === 'email') setError(undefined)
   }
 
   return (
     <form
+      noValidate
       onSubmit={(e) => {
         e.preventDefault()
         void handleSubmit(e)
@@ -59,70 +69,59 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
     >
       <div className="flex flex-col gap-sm">
         <div className="flex flex-col gap-xxs">
-          <label htmlFor="name" className="form-label">
-            Project Name *
+          <label htmlFor="client-name" className="form-label">
+            Name *
           </label>
           <input
-            id="name"
+            id="client-name"
             type="text"
             className="input"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="e.g., Wedding Portfolio"
+            placeholder="e.g., Smith Family"
             required
           />
         </div>
 
         <div className="flex flex-col gap-xxs">
-          <label htmlFor="clientSelector" className="form-label">
-            Client Name *
-          </label>
-          <ClientSelector
-            value={formData.clientName}
-            clientId={formData.clientId}
-            onChange={(name, id) => {
-              setFormData((prev) => ({ ...prev, clientName: name, clientId: id }))
-            }}
-            required
-          />
-        </div>
-
-        <div className="flex flex-col gap-xxs">
-          <DatePicker
-            id="date"
-            label="Shoot Date"
-            value={formData.date}
-            onChange={(value) => handleChange('date', value)}
-            required
-          />
-        </div>
-
-        <hr className="form-section-separator" />
-
-        <div className="flex flex-col gap-xxs">
-          <label htmlFor="shootType" className="form-label">
-            Shoot Type <span className="text-optional">(optional)</span>
+          <label htmlFor="client-email" className="form-label">
+            Email <span className="text-optional">(optional)</span>
           </label>
           <input
-            id="shootType"
-            type="text"
+            id="client-email"
+            type="email"
             className="input"
-            value={formData.shootType}
-            onChange={(e) => handleChange('shootType', e.target.value)}
-            placeholder="e.g., Wedding, Portrait, Event"
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            placeholder="e.g., smith@example.com"
           />
         </div>
 
         <div className="flex flex-col gap-xxs">
-          <DatePicker
-            id="deadline"
-            label={
-              <>
-                Deadline <span className="text-optional">(optional)</span>
-              </>
-            }
-            value={formData.deadline}
-            onChange={(value) => handleChange('deadline', value)}
+          <label htmlFor="client-phone" className="form-label">
+            Phone <span className="text-optional">(optional)</span>
+          </label>
+          <input
+            id="client-phone"
+            type="tel"
+            className="input"
+            value={formData.phone}
+            onChange={(e) => handleChange('phone', e.target.value)}
+            placeholder="e.g., +1 555 123 4567"
+          />
+        </div>
+
+        <div className="flex flex-col gap-xxs">
+          <label htmlFor="client-notes" className="form-label">
+            Notes <span className="text-optional">(optional)</span>
+          </label>
+          <textarea
+            id="client-notes"
+            className="input"
+            value={formData.notes}
+            onChange={(e) => handleChange('notes', e.target.value)}
+            placeholder="Any notes about this client"
+            rows={3}
           />
         </div>
 
@@ -161,7 +160,7 @@ export function CreateProject({ onProjectCreated, onCancel }: CreateProjectProps
               </button>
             )}
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Project'}
+              {isSubmitting ? 'Creating...' : 'Create Client'}
             </button>
           </div>
         </div>

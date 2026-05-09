@@ -29,6 +29,10 @@ use modules::backup::{
     cancel_backup, get_backup_history, get_backup_queue, get_project_backup_history, queue_backup,
     remove_backup_job, start_backup,
 };
+use modules::client::{
+    create_client, delete_client, get_client, list_clients, migrate_clients_from_projects,
+    search_clients, update_client, update_client_status,
+};
 use modules::delivery::{
     create_delivery, get_delivery_queue, list_project_files, remove_delivery_job, start_delivery,
 };
@@ -85,6 +89,14 @@ pub fn run() -> AppResult {
             eject_sd_card,
             copy_files,
             cancel_import,
+            create_client,
+            list_clients,
+            get_client,
+            update_client,
+            update_client_status,
+            delete_client,
+            search_clients,
+            migrate_clients_from_projects,
             create_project,
             list_projects,
             get_project,
