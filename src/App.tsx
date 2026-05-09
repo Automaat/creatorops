@@ -15,6 +15,7 @@ import { NotificationToast } from './components/NotificationToast'
 import { Projects } from './components/Projects'
 import { Settings } from './components/Settings'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useNotification } from './hooks/useNotification'
 import { useSDCardScanner } from './hooks/useSDCardScanner'
 import { useTheme } from './hooks/useTheme'
 import type { Project } from './types'
@@ -53,6 +54,8 @@ function App() {
   const [viewBeforeProject, setViewBeforeProject] = useState<View>('dashboard')
   const [projectsResetKey, setProjectsResetKey] = useState<number>(0)
 
+  const { error: showError } = useNotification()
+
   // Apply theme on app load
   useTheme()
 
@@ -63,6 +66,7 @@ function App() {
       setProjectsCount(projects.length)
     } catch (error) {
       console.error('Failed to load project count:', error)
+      showError('Failed to load project count')
     }
   }
 

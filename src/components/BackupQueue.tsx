@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { formatBytes, formatETA, formatSpeed } from '../utils/formatting'
+import { useNotification } from '../hooks/useNotification'
 import type { BackupJob, BackupProgress } from '../types'
 
 const QUEUE_REFRESH_INTERVAL = 30_000
 
 export function BackupQueue() {
+  const { error: showError } = useNotification()
   const [jobs, setJobs] = useState<BackupJob[]>([])
   const [progress, setProgress] = useState<Map<string, BackupProgress>>(new Map())
 
@@ -37,6 +39,7 @@ export function BackupQueue() {
       setJobs(data)
     } catch (error) {
       console.error('Failed to load backup queue:', error)
+      showError('Failed to load backup queue')
     }
   }
 
@@ -46,6 +49,7 @@ export function BackupQueue() {
       await loadQueue()
     } catch (error) {
       console.error('Failed to start backup:', error)
+      showError('Failed to start backup')
     }
   }
 
@@ -55,6 +59,7 @@ export function BackupQueue() {
       await loadQueue()
     } catch (error) {
       console.error('Failed to cancel backup:', error)
+      showError('Failed to cancel backup')
     }
   }
 
@@ -64,6 +69,7 @@ export function BackupQueue() {
       await loadQueue()
     } catch (error) {
       console.error('Failed to remove job:', error)
+      showError('Failed to remove job')
     }
   }
 

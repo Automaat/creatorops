@@ -33,9 +33,9 @@ export function Delivery() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadProjects().catch(console.error)
+    void loadProjects()
     loadDestinations()
-    loadDeliveryQueue().catch(console.error)
+    void loadDeliveryQueue()
 
     const unlistenDelivery = listen<DeliveryProgress>('delivery-progress', (event) => {
       const progress = event.payload
@@ -127,6 +127,7 @@ export function Delivery() {
       setProjects(sortedProjects)
     } catch (error) {
       console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
     } finally {
       setLoading(false)
     }
@@ -139,6 +140,7 @@ export function Delivery() {
       setSelectedFiles(new Set())
     } catch (error) {
       console.error('Failed to load project files:', error)
+      showError('Failed to load project files')
     }
   }
 
@@ -153,6 +155,7 @@ export function Delivery() {
       }
     } catch (error) {
       console.error('Failed to load destinations:', error)
+      showError('Failed to load destinations')
     }
   }
 
@@ -162,6 +165,7 @@ export function Delivery() {
       setDeliveryJobs(queue)
     } catch (error) {
       console.error('Failed to load delivery queue:', error)
+      showError('Failed to load delivery queue')
     }
   }
 
@@ -215,6 +219,7 @@ export function Delivery() {
       setDeliveryJobs((prev) => [...prev, job])
     } catch (error) {
       console.error('Failed to create delivery:', error)
+      showError('Failed to create delivery')
     }
   }
 
@@ -224,6 +229,7 @@ export function Delivery() {
       setDeliveryJobs((prev) => prev.filter((j) => j.id !== jobId))
     } catch (error) {
       console.error('Failed to remove job:', error)
+      showError('Failed to remove job')
     }
   }
 

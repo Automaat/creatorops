@@ -10,6 +10,18 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }))
 
+vi.mock('../hooks/useNotification', () => ({
+  useNotification: () => ({
+    addNotification: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    notifications: [],
+    removeNotification: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+  }),
+}))
+
 const mockInvoke = vi.mocked(invoke)
 
 // Mock scrollIntoView

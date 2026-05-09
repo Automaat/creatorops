@@ -80,6 +80,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       return data
     } catch (error) {
       console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
       return []
     } finally {
       setLoading(false)
@@ -87,10 +88,10 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
   }, [])
 
   useEffect(() => {
-    loadProjects().catch(console.error)
+    void loadProjects()
     loadDestinations()
     loadArchiveLocation()
-    loadHomeDirectory().catch(console.error)
+    void loadHomeDirectory()
   }, [loadProjects])
 
   async function loadHomeDirectory() {
@@ -99,6 +100,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       setHomeDir(dir)
     } catch (error) {
       console.error('Failed to load home directory:', error)
+      showError('Failed to load home directory')
     }
   }
 
@@ -114,6 +116,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         })
         .catch((error: unknown) => {
           console.error('Failed to load project:', error)
+          showError('Failed to load project')
         })
     } else {
       // Clear selection when navigating to projects list
@@ -193,6 +196,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       }
     } catch (error) {
       console.error('Failed to load destinations:', error)
+      showError('Failed to load destinations')
     }
   }
 
@@ -204,6 +208,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       }
     } catch (error) {
       console.error('Failed to load archive location:', error)
+      showError('Failed to load archive location')
     }
   }
 
@@ -213,6 +218,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       setImportHistory(history)
     } catch (error) {
       console.error('Failed to load import history:', error)
+      showError('Failed to load import history')
     }
   }
 
@@ -228,6 +234,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       })
     } catch (error) {
       console.error('Failed to queue backup:', error)
+      showError('Failed to queue backup')
     }
   }
 
@@ -441,6 +448,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       }
     } catch (error) {
       console.error('Import failed:', error)
+      showError('Import failed')
       setImportResult(createEmptyResult(String(error)))
 
       try {
@@ -459,6 +467,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
         })
       } catch (error) {
         console.error('Failed to save import history:', error)
+        showError('Failed to save import history')
       }
     } finally {
       setIsImporting(false)
@@ -475,6 +484,7 @@ export function Projects({ initialSelectedProjectId, onBackFromProject }: Projec
       await invoke('cancel_import', { importId })
     } catch (error) {
       console.error('Failed to cancel import:', error)
+      showError('Failed to cancel import')
     }
   }
 

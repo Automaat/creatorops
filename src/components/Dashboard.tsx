@@ -4,6 +4,7 @@ import { ProjectStatus } from '../types'
 import type { Project } from '../types'
 import { isOverdue, sortProjects } from '../utils/project'
 import { formatDisplayDate } from '../utils/formatting'
+import { useNotification } from '../hooks/useNotification'
 import { CreateProject } from './CreateProject'
 
 interface DashboardProps {
@@ -11,6 +12,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onProjectClick }: DashboardProps) {
+  const { error: showError } = useNotification()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateProject, setShowCreateProject] = useState(false)
@@ -26,6 +28,7 @@ export function Dashboard({ onProjectClick }: DashboardProps) {
       setProjects(projectList)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
+      showError('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }

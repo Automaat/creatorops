@@ -12,7 +12,7 @@ const DEFAULT_FILE_TEMPLATE = '{original}'
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
-  const { error: showError, success: showSuccess } = useNotification()
+  const { error: showError, success: showSuccess, warning: showWarning } = useNotification()
   const [destinations, setDestinations] = useState<BackupDestination[]>([])
   const [newDestName, setNewDestName] = useState('')
   const [deliveryDestinations, setDeliveryDestinations] = useState<DeliveryDestination[]>([])
@@ -34,8 +34,9 @@ export function Settings() {
       setDriveAccount(account)
     } catch (error) {
       console.error('Failed to load Google Drive account:', error)
+      showError('Failed to load Google Drive account')
     }
-  }, [])
+  }, [showError])
 
   useEffect(() => {
     function loadDestinations() {
@@ -59,6 +60,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load destinations:', error)
+        showError('Failed to load destinations')
       }
     }
 
@@ -73,6 +75,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load delivery destinations:', error)
+        showError('Failed to load delivery destinations')
       }
     }
 
@@ -84,6 +87,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load default import location:', error)
+        showError('Failed to load default import location')
       }
     }
 
@@ -95,6 +99,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load archive location:', error)
+        showError('Failed to load archive location')
       }
     }
 
@@ -134,6 +139,7 @@ export function Settings() {
         }
       } catch (error) {
         console.error('Failed to load conflict mode:', error)
+        showError('Failed to load drive conflict mode')
       }
     }
 
@@ -143,7 +149,7 @@ export function Settings() {
     loadArchiveLocation()
     loadTemplates()
     loadAutoEject()
-    loadDriveAccount().catch(console.error)
+    void loadDriveAccount()
     loadDriveConflictMode()
   }, [loadDriveAccount, showError])
 
@@ -154,7 +160,7 @@ export function Settings() {
 
   async function addDestination() {
     if (!newDestName.trim()) {
-      console.warn('Destination name is required')
+      showWarning('Destination name is required')
       return
     }
 
@@ -178,6 +184,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to add destination:', error)
+      showError('Failed to add destination')
     }
   }
 
@@ -221,6 +228,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to add delivery destination:', error)
+      showError('Failed to add delivery destination')
     }
   }
 
@@ -248,6 +256,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error(`Failed to select ${storageKey}:`, error)
+      showError('Failed to select location')
     }
   }
 
@@ -291,6 +300,7 @@ export function Settings() {
       const { authUrl } = await invoke<{ authUrl: string }>('start_google_drive_auth')
       await openUrl(authUrl).catch((err: unknown) => {
         console.error('Failed to open auth URL:', err)
+        showError('Failed to open authentication URL')
       })
 
       // Poll for authentication completion

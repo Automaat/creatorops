@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { useNotification } from '../hooks/useNotification'
 import type { Project } from '../types'
 
 interface CommandPaletteProps {
@@ -9,6 +10,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPaletteProps) {
+  const { error: showError } = useNotification()
   const [projects, setProjects] = useState<Project[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -31,6 +33,7 @@ export function CommandPalette({ isOpen, onClose, onSelectProject }: CommandPale
       setProjects(projectList)
     } catch (error) {
       console.error('Failed to load projects:', error)
+      showError('Failed to load projects')
     }
   }
 
