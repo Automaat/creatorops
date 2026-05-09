@@ -55,10 +55,6 @@ pub struct OAuthState {
 }
 
 /// Token payload returned by Google OAuth and used by the local token store functions.
-///
-/// Referenced only by `store_tokens_in_keychain`, `get_tokens_from_keychain`, and
-/// `refresh_access_token`, which are themselves unused pending full OAuth integration.
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TokenData {
@@ -768,10 +764,6 @@ fn decrypt_data(encrypted: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, String> {
 }
 
 /// Persist OAuth tokens to an encrypted file in `~/.creatorops/tokens/`.
-///
-/// Not yet called — token storage will be wired in once the full OAuth flow is
-/// complete and `get_valid_access_token` delegates to this function.
-#[allow(dead_code)]
 fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), String> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -823,10 +815,6 @@ fn store_tokens_in_keychain(email: &str, tokens: &TokenData) -> Result<(), Strin
 }
 
 /// Load OAuth tokens from the encrypted file written by `store_tokens_in_keychain`.
-///
-/// Not yet called — token retrieval will be wired in once the full OAuth flow is
-/// complete and `get_valid_access_token` delegates to this function.
-#[allow(dead_code)]
 fn get_tokens_from_keychain(email: &str) -> Result<TokenData, String> {
     use base64::{engine::general_purpose, Engine as _};
 
@@ -863,10 +851,6 @@ struct RefreshResponse {
 }
 
 /// Exchange a refresh token for a new access token via the Google OAuth endpoint.
-///
-/// Not yet integrated — `get_valid_access_token` will call this once token expiry
-/// detection is plumbed in from `store_tokens_in_keychain` / `get_tokens_from_keychain`.
-#[allow(dead_code)]
 async fn refresh_access_token(refresh_token: &str) -> Result<TokenData, String> {
     let client_id = std::env::var("GOOGLE_CLIENT_ID")
         .unwrap_or_else(|_| "YOUR_CLIENT_ID.apps.googleusercontent.com".to_owned());
@@ -944,10 +928,6 @@ struct UploadProgress {
 // Helper Functions
 
 /// Return the current UTC time as an RFC 3339 string.
-///
-/// Utility for token metadata (`issued_at`, `expires_at`). Unused until
-/// `store_tokens_in_keychain` records token timestamps.
-#[allow(dead_code)]
 fn get_current_timestamp() -> String {
     Utc::now().to_rfc3339()
 }
