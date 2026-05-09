@@ -656,7 +656,7 @@ pub async fn test_google_drive_connection(db: tauri::State<'_, Database>) -> Res
     let access_token = get_valid_access_token(&account.email).await.map_err(|e| {
         log::error!("Failed to get valid access token for {}: {}", account.email, e);
         match &e {
-            GoogleDriveError::Io(_) | GoogleDriveError::TokenNotFound => {
+            GoogleDriveError::TokenNotFound => {
                 format!("Authentication expired - please disconnect and reconnect your account. (Error: {e})")
             }
             GoogleDriveError::InvalidData(_) | GoogleDriveError::Crypto(_) => {
@@ -822,7 +822,11 @@ fn get_tokens_from_keychain(email: &str) -> Result<TokenData, GoogleDriveError> 
 
     let encoded = std::fs::read_to_string(&token_file).map_err(|e| {
         log::error!("Failed to read token file for '{email}': {e}");
-        GoogleDriveError::Io(e)
+        if e.kind() == std::io::ErrorKind::NotFound {
+            GoogleDriveError::TokenNotFound
+        } else {
+            GoogleDriveError::Io(e)
+        }
     })?;
 
     let encrypted = general_purpose::STANDARD
