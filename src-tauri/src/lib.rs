@@ -2,7 +2,7 @@
 //!
 //! This is the core library for the `CreatorOps` Tauri application.
 
-mod error;
+pub mod error;
 mod modules;
 mod progress;
 pub mod state;
