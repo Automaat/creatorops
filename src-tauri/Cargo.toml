@@ -47,7 +47,7 @@ keyring = "4.0"
 rand = "0.10"
 base64 = "0.22"
 urlencoding = "2.1"
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 argon2 = "0.5"
 reqwest = { version = "0.13", features = ["json", "query", "form"] }
 dotenvy = "0.15"
