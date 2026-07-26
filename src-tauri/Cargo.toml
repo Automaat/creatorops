@@ -45,7 +45,7 @@ http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["tokio"] }
 keyring = "4.0"
 rand = "0.10"
-base64 = "0.22"
+base64 = "0.23"
 urlencoding = "2.1"
 aes-gcm = "0.11"
 argon2 = "0.5"
