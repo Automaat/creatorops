@@ -2,7 +2,7 @@
 rust = "1.97.1"
 node = "24.18.1"
 "cargo:tauri-cli" = "2.9.4"
-"cargo:cargo-llvm-cov" = "0.8.0"
+"cargo:cargo-llvm-cov" = "0.8.7"
 
 [tasks.dev]
 description = "Run Tauri app in development mode"
