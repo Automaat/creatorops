@@ -1,6 +1,6 @@
 [tools]
 rust = "1.98.0"
-node = "24.19.0"
+node = "24.20.0"
 "cargo:tauri-cli" = "2.11.4"
 "cargo:cargo-llvm-cov" = "0.9.0"
 
