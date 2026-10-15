@@ -1,5 +1,5 @@
 [tools]
-rust = "1.99.0"
+rust = "1.99.1"
 node = "24.22.0"
 "cargo:tauri-cli" = "2.12.3"
 "cargo:cargo-llvm-cov" = "0.9.1"
